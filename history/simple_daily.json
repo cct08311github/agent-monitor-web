@@ -1,0 +1,162 @@
+[
+  {
+    "timestamp": "2026-02-18T08:59:11.237Z",
+    "stats": {
+      "total": 21,
+      "executing": 0,
+      "recent": 1,
+      "historical": 15,
+      "dormant": 4,
+      "inactive": 1,
+      "error": 0,
+      "effectiveActive": 1,
+      "configured": 21,
+      "totalTokens": 93516,
+      "systemStatus": "error"
+    }
+  },
+  {
+    "timestamp": "2026-02-18T08:59:16.182Z",
+    "stats": {
+      "total": 21,
+      "executing": 0,
+      "recent": 1,
+      "historical": 15,
+      "dormant": 4,
+      "inactive": 1,
+      "error": 0,
+      "effectiveActive": 1,
+      "configured": 21,
+      "totalTokens": 93516,
+      "systemStatus": "error"
+    }
+  },
+  {
+    "timestamp": "2026-02-18T09:05:55.000Z",
+    "stats": {
+      "total": 21,
+      "executing": 1,
+      "recent": 1,
+      "historical": 14,
+      "dormant": 4,
+      "inactive": 1,
+      "error": 0,
+      "effectiveActive": 2,
+      "configured": 21,
+      "totalTokens": 55717,
+      "systemStatus": "error"
+    }
+  },
+  {
+    "timestamp": "2026-02-18T09:05:59.989Z",
+    "stats": {
+      "total": 21,
+      "executing": 1,
+      "recent": 1,
+      "historical": 14,
+      "dormant": 4,
+      "inactive": 1,
+      "error": 0,
+      "effectiveActive": 2,
+      "configured": 21,
+      "totalTokens": 55717,
+      "systemStatus": "error"
+    }
+  },
+  {
+    "timestamp": "2026-02-18T09:06:29.990Z",
+    "stats": {
+      "total": 21,
+      "executing": 1,
+      "recent": 1,
+      "historical": 14,
+      "dormant": 4,
+      "inactive": 1,
+      "error": 0,
+      "effectiveActive": 2,
+      "configured": 21,
+      "totalTokens": 55717,
+      "systemStatus": "error"
+    }
+  },
+  {
+    "timestamp": "2026-02-18T09:06:59.995Z",
+    "stats": {
+      "total": 21,
+      "executing": 1,
+      "recent": 1,
+      "historical": 14,
+      "dormant": 4,
+      "inactive": 1,
+      "error": 0,
+      "effectiveActive": 2,
+      "configured": 21,
+      "totalTokens": 55717,
+      "systemStatus": "error"
+    }
+  },
+  {
+    "timestamp": "2026-02-18T09:07:29.982Z",
+    "stats": {
+      "total": 21,
+      "executing": 0,
+      "recent": 2,
+      "historical": 14,
+      "dormant": 4,
+      "inactive": 1,
+      "error": 0,
+      "effectiveActive": 2,
+      "configured": 21,
+      "totalTokens": 55717,
+      "systemStatus": "error"
+    }
+  },
+  {
+    "timestamp": "2026-02-18T09:07:59.987Z",
+    "stats": {
+      "total": 21,
+      "executing": 0,
+      "recent": 2,
+      "historical": 14,
+      "dormant": 4,
+      "inactive": 1,
+      "error": 0,
+      "effectiveActive": 2,
+      "configured": 21,
+      "totalTokens": 55717,
+      "systemStatus": "error"
+    }
+  },
+  {
+    "timestamp": "2026-02-18T09:08:29.983Z",
+    "stats": {
+      "total": 21,
+      "executing": 0,
+      "recent": 2,
+      "historical": 14,
+      "dormant": 4,
+      "inactive": 1,
+      "error": 0,
+      "effectiveActive": 2,
+      "configured": 21,
+      "totalTokens": 55717,
+      "systemStatus": "error"
+    }
+  },
+  {
+    "timestamp": "2026-02-18T09:08:59.972Z",
+    "stats": {
+      "total": 21,
+      "executing": 0,
+      "recent": 2,
+      "historical": 14,
+      "dormant": 4,
+      "inactive": 1,
+      "error": 0,
+      "effectiveActive": 2,
+      "configured": 21,
+      "totalTokens": 55717,
+      "systemStatus": "error"
+    }
+  }
+]
