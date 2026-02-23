@@ -7,7 +7,7 @@
    4) SRE response panel with follow-up conversation
    ================================================ */
 
-const USD_TO_TWD = 32.5;
+let currentExchangeRate = 32.0; // Fallback default
 
 // --- State ---
 let latestDashboard = null;
@@ -53,7 +53,7 @@ function formatTokens(n) {
 }
 
 function formatTWD(usd) {
-    const twd = usd * USD_TO_TWD;
+    const twd = usd * currentExchangeRate;
     if (twd >= 1000) return 'NT$' + twd.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     if (twd >= 100) return 'NT$' + twd.toFixed(0);
     if (twd >= 1) return 'NT$' + twd.toFixed(1);
@@ -543,7 +543,15 @@ function updateCostDisplay() {
     if (!latestDashboard) return;
     const range = document.getElementById('costRange').value;
     const agents = latestDashboard.agents || [];
-    const totalUSD = agents.reduce((s, a) => s + parseFloat(a.cost || 0), 0);
+    
+    // Use the periodic costs from backend if available, otherwise fallback to legacy total cost
+    let totalUSD = 0;
+    if (range === 'all') {
+        totalUSD = agents.reduce((s, a) => s + parseFloat(a.costs?.total ?? a.cost ?? 0), 0);
+    } else {
+        totalUSD = agents.reduce((s, a) => s + parseFloat(a.costs?.[range] ?? a.cost ?? 0), 0);
+    }
+    
     const rangeLabel = { today: '今日', week: '本週', month: '月', all: '全部' }[range] || '月';
     document.getElementById('costLabel').textContent = `${rangeLabel}費用 (TWD)`;
     document.getElementById('totalCost').textContent = formatTWD(totalUSD);
@@ -551,14 +559,21 @@ function updateCostDisplay() {
 
 // --- Render ---
 function renderModelUsage(listId, summaryId, agents) {
+    const range = document.getElementById('costRange')?.value || 'month';
     const allModelUsage = {};
     let totalCost = 0;
+    
     agents.forEach(a => {
-        totalCost += parseFloat(a.cost || 0);
+        // Calculate total for the summary
+        const agentPeriodCost = (range === 'all' ? (a.costs?.total ?? a.cost ?? 0) : (a.costs?.[range] ?? a.cost ?? 0));
+        totalCost += parseFloat(agentPeriodCost);
+        
         if (a.modelUsage) {
             Object.entries(a.modelUsage).forEach(([model, u]) => {
                 if (!allModelUsage[model]) allModelUsage[model] = { total: 0, cost: 0, sessions: 0 };
                 allModelUsage[model].total += u.total;
+                // Note: modelUsage breakdown remains aggregate in this version 
+                // but we could extend backend to provide periodic modelUsage if needed
                 allModelUsage[model].cost += u.cost;
                 allModelUsage[model].sessions += u.sessions;
             });
@@ -577,10 +592,12 @@ function renderModelUsage(listId, summaryId, agents) {
 function showAgentDetail(agentId) {
     const data = latestDashboard;
     if (!data) return;
+    const range = document.getElementById('costRange')?.value || 'month';
     const agent = data.agents.find(a => a.id === agentId);
     if (!agent) return;
     const si = getStatusInfo(agent.status);
-    const costTWD = formatTWD(parseFloat(agent.cost || 0));
+    const agentPeriodCost = (range === 'all' ? (agent.costs?.total ?? agent.cost ?? 0) : (agent.costs?.[range] ?? agent.cost ?? 0));
+    const costTWD = formatTWD(parseFloat(agentPeriodCost));
     const muHtml = Object.entries(agent.modelUsage || {}).sort((a, b) => b[1].cost - a[1].cost)
         .map(([m, u]) => `<div class="model-usage-item"><div><span class="model-usage-name">${esc(m)}</span><span class="model-usage-sessions">(${u.sessions})</span></div><div class="model-usage-stats"><div class="model-usage-tokens">${formatTokens(u.total)}</div><div class="model-usage-cost">${formatTWD(u.cost)}</div></div></div>`).join('');
     document.getElementById('detailContent').innerHTML = `
@@ -607,6 +624,10 @@ function showAgentDetail(agentId) {
 function renderDashboard(data) {
     if (!data || !data.success) return;
     latestDashboard = data;
+    if (data.exchangeRate) {
+        currentExchangeRate = data.exchangeRate;
+    }
+    const range = document.getElementById('costRange')?.value || 'month';
     const agents = data.agents || [];
     let totalCost = 0, activeCount = 0;
 
@@ -635,7 +656,8 @@ function renderDashboard(data) {
 
     const gridEl = document.getElementById('agentGrid');
     gridEl.innerHTML = agents.map(a => {
-        const cost = parseFloat(a.cost || 0); totalCost += cost;
+        const agentPeriodCost = (range === 'all' ? (a.costs?.total ?? a.cost ?? 0) : (a.costs?.[range] ?? a.cost ?? 0));
+        const cost = parseFloat(agentPeriodCost); totalCost += cost;
         if (a.status === 'active_executing' || a.status === 'active_recent') activeCount++;
         const si = getStatusInfo(a.status);
         const taskText = a.currentTask?.task || '';

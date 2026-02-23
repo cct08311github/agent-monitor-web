@@ -3,10 +3,54 @@ const os = require('os');
 const path = require('path');
 const util = require('util');
 const { exec } = require('child_process');
+const fetch = require('node-fetch');
 const execPromise = util.promisify(exec);
 
 const DASHBOARD_CACHE_TTL_MS = 3000;
 let dashboardCache = { ts: 0, payload: null };
+
+// Exchange Rate Cache (24 hours)
+let exchangeRateCache = { rate: 32.0, lastFetch: 0 };
+async function getExchangeRate() {
+    const now = Date.now();
+    if (now - exchangeRateCache.lastFetch < 24 * 60 * 60 * 1000) {
+        return exchangeRateCache.rate;
+    }
+    try {
+        const res = await fetch('https://open.er-api.com/v6/latest/USD');
+        const data = await res.json();
+        if (data && data.rates && data.rates.TWD) {
+            exchangeRateCache = { rate: data.rates.TWD, lastFetch: now };
+            return data.rates.TWD;
+        }
+    } catch (e) {
+        console.error('[ExchangeRate] Fetch failed:', e.message);
+    }
+    return exchangeRateCache.rate;
+}
+
+// Time range helpers
+function isToday(ms) {
+    const d = new Date(ms);
+    const now = new Date();
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+}
+
+function isThisWeek(ms) {
+    const d = new Date(ms);
+    const now = new Date();
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Adjust to Monday
+    const startOfWeek = new Date(now.setDate(diff));
+    startOfWeek.setHours(0, 0, 0, 0);
+    return d >= startOfWeek;
+}
+
+function isThisMonth(ms) {
+    const d = new Date(ms);
+    const now = new Date();
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+}
 
 // Server-Sent Events (SSE) clients
 const sseClients = new Set();
@@ -121,6 +165,7 @@ function detectDetailedActivity(agentId) {
     let detail = {
         status: 'inactive',
         cost: 0,
+        costs: { today: 0, week: 0, month: 0, total: 0 },
         lastActivity: 'never',
         tokens: { input: 0, output: 0, cacheRead: 0, total: 0 },
         currentTask: { label: 'Idle', task: '' },
@@ -143,6 +188,7 @@ function detectDetailedActivity(agentId) {
                 if (k.includes(':subagent:')) return;
 
                 const s = json[k];
+                const updatedAt = Number(s.updatedAt || 0);
                 const sessionInput = s.inputTokens || 0;
                 const sessionOutput = s.outputTokens || 0;
                 const sessionCacheRead = s.cacheRead || 0;
@@ -167,6 +213,13 @@ function detectDetailedActivity(agentId) {
                 modelUsage[sessionModel].cost += sessionCost;
                 totalCost += sessionCost;
 
+                // Periodic cost calculation
+                if (updatedAt > 0) {
+                    if (isToday(updatedAt)) detail.costs.today += sessionCost;
+                    if (isThisWeek(updatedAt)) detail.costs.week += sessionCost;
+                    if (isThisMonth(updatedAt)) detail.costs.month += sessionCost;
+                }
+
                 // Track active model based on most recent session
                 if (s.model) {
                     detail.activeModel = s.model;
@@ -175,7 +228,8 @@ function detectDetailedActivity(agentId) {
             });
 
             detail.tokens.total = detail.tokens.input + detail.tokens.output;
-            detail.cost = totalCost.toFixed(4);
+            detail.costs.total = totalCost;
+            detail.cost = totalCost.toFixed(4); // Keep for legacy
             detail.modelUsage = modelUsage;
         }
 
@@ -265,10 +319,11 @@ async function buildDashboardPayload() {
         return dashboardCache.payload;
     }
 
-    const [sys, agentsResult, cronResult] = await Promise.all([
+    const [sys, agentsResult, cronResult, exchangeRate] = await Promise.all([
         getSystemResources(),
         execPromise('/Users/openclaw/.openclaw/bin/openclaw agents list').catch(() => ({ stdout: '' })),
         execPromise('/Users/openclaw/.openclaw/bin/openclaw cron list --json').catch(() => ({ stdout: '{"jobs":[]}' })),
+        getExchangeRate()
     ]);
 
     const agents = parseAgentsList(agentsResult.stdout || '').map(a => ({ ...a, ...detectDetailedActivity(a.id) }));
@@ -291,7 +346,7 @@ async function buildDashboardPayload() {
     const { fetchModelCooldowns } = require('../utils/modelMonitor');
     const cooldowns = await fetchModelCooldowns();
 
-    const payload = { success: true, sys, agents, cron, subagents, cooldowns };
+    const payload = { success: true, sys, agents, cron, subagents, cooldowns, exchangeRate };
     dashboardCache = { ts: now, payload };
     return payload;
 }
