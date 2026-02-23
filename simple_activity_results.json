@@ -1,0 +1,348 @@
+{
+  "timestamp": "2026-02-18T08:47:13.121Z",
+  "totalAgents": 21,
+  "results": [
+    {
+      "agentId": "main",
+      "agentName": "default",
+      "workspace": "~/.openclaw/workspace-main",
+      "workspaceActivity": {
+        "lastModified": "2026-02-18T08:16:28.634Z",
+        "minutesAgo": 30,
+        "hasActivity": true
+      },
+      "status": "active_historical",
+      "emoji": "⚠️",
+      "label": "歷史活動",
+      "description": "有歷史活動記錄",
+      "confidence": "low",
+      "timestamp": "2026-02-18T08:47:13.120Z"
+    },
+    {
+      "agentId": "visionary",
+      "agentName": "閃電",
+      "workspace": "~/.openclaw/workspace-visionary",
+      "workspaceActivity": {
+        "lastModified": "2026-02-18T07:52:34.545Z",
+        "minutesAgo": 54,
+        "hasActivity": true
+      },
+      "status": "active_historical",
+      "emoji": "⚠️",
+      "label": "歷史活動",
+      "description": "有歷史活動記錄",
+      "confidence": "low",
+      "timestamp": "2026-02-18T08:47:13.120Z"
+    },
+    {
+      "agentId": "critic",
+      "agentName": "寒冰",
+      "workspace": "~/.openclaw/workspace-critic",
+      "workspaceActivity": {
+        "lastModified": "2026-02-18T07:53:02.596Z",
+        "minutesAgo": 54,
+        "hasActivity": true
+      },
+      "status": "active_historical",
+      "emoji": "⚠️",
+      "label": "歷史活動",
+      "description": "有歷史活動記錄",
+      "confidence": "low",
+      "timestamp": "2026-02-18T08:47:13.120Z"
+    },
+    {
+      "agentId": "architect",
+      "agentName": "齒輪",
+      "workspace": "~/.openclaw/workspace-architect",
+      "workspaceActivity": {
+        "lastModified": "2026-02-18T07:53:31.784Z",
+        "minutesAgo": 53,
+        "hasActivity": true
+      },
+      "status": "active_historical",
+      "emoji": "⚠️",
+      "label": "歷史活動",
+      "description": "有歷史活動記錄",
+      "confidence": "low",
+      "timestamp": "2026-02-18T08:47:13.120Z"
+    },
+    {
+      "agentId": "work",
+      "agentName": "work",
+      "workspace": "~/.openclaw/workspace-work",
+      "workspaceActivity": {
+        "lastModified": "2026-02-18T07:43:22.192Z",
+        "minutesAgo": 63,
+        "hasActivity": true
+      },
+      "status": "active_historical",
+      "emoji": "⚠️",
+      "label": "歷史活動",
+      "description": "有歷史活動記錄",
+      "confidence": "low",
+      "timestamp": "2026-02-18T08:47:13.120Z"
+    },
+    {
+      "agentId": "coder",
+      "agentName": "coder",
+      "workspace": "~/.openclaw/workspace-coder",
+      "workspaceActivity": {
+        "lastModified": "2026-02-18T07:43:46.934Z",
+        "minutesAgo": 63,
+        "hasActivity": true
+      },
+      "status": "active_historical",
+      "emoji": "⚠️",
+      "label": "歷史活動",
+      "description": "有歷史活動記錄",
+      "confidence": "low",
+      "timestamp": "2026-02-18T08:47:13.121Z"
+    },
+    {
+      "agentId": "finance",
+      "agentName": "finance",
+      "workspace": "~/.openclaw/workspace-finance",
+      "workspaceActivity": {
+        "lastModified": "2026-02-18T07:51:14.957Z",
+        "minutesAgo": 55,
+        "hasActivity": true
+      },
+      "status": "active_historical",
+      "emoji": "⚠️",
+      "label": "歷史活動",
+      "description": "有歷史活動記錄",
+      "confidence": "low",
+      "timestamp": "2026-02-18T08:47:13.121Z"
+    },
+    {
+      "agentId": "sre",
+      "agentName": "sre",
+      "workspace": "~/.openclaw/workspace-sre",
+      "workspaceActivity": {
+        "lastModified": "2026-02-18T07:43:10.817Z",
+        "minutesAgo": 64,
+        "hasActivity": true
+      },
+      "status": "active_historical",
+      "emoji": "⚠️",
+      "label": "歷史活動",
+      "description": "有歷史活動記錄",
+      "confidence": "low",
+      "timestamp": "2026-02-18T08:47:13.121Z"
+    },
+    {
+      "agentId": "intelligence",
+      "agentName": "intelligence",
+      "workspace": "~/.openclaw/workspace-intelligence",
+      "workspaceActivity": {
+        "lastModified": "2026-02-18T07:50:23.894Z",
+        "minutesAgo": 56,
+        "hasActivity": true
+      },
+      "status": "active_historical",
+      "emoji": "⚠️",
+      "label": "歷史活動",
+      "description": "有歷史活動記錄",
+      "confidence": "low",
+      "timestamp": "2026-02-18T08:47:13.121Z"
+    },
+    {
+      "agentId": "life",
+      "agentName": "生活管家",
+      "workspace": "~/.openclaw/workspace-life",
+      "workspaceActivity": {
+        "lastModified": "2026-02-18T07:43:33.952Z",
+        "minutesAgo": 63,
+        "hasActivity": true
+      },
+      "status": "active_historical",
+      "emoji": "⚠️",
+      "label": "歷史活動",
+      "description": "有歷史活動記錄",
+      "confidence": "low",
+      "timestamp": "2026-02-18T08:47:13.121Z"
+    },
+    {
+      "agentId": "concierge",
+      "agentName": "concierge",
+      "workspace": "~/.openclaw/workspace-concierge",
+      "workspaceActivity": {
+        "lastModified": "2026-02-18T01:37:03.440Z",
+        "minutesAgo": 430,
+        "hasActivity": true
+      },
+      "status": "dormant",
+      "emoji": "💤",
+      "label": "休眠中",
+      "description": "有配置但近期無活動",
+      "confidence": "medium",
+      "timestamp": "2026-02-18T08:47:13.121Z"
+    },
+    {
+      "agentId": "mistress",
+      "agentName": "管家婆",
+      "workspace": "~/.openclaw/workspace-mistress",
+      "workspaceActivity": {
+        "lastModified": null,
+        "minutesAgo": 29523407,
+        "hasActivity": false
+      },
+      "status": "inactive",
+      "emoji": "❌",
+      "label": "離線",
+      "description": "無活動跡象",
+      "confidence": "high",
+      "timestamp": "2026-02-18T08:47:13.121Z"
+    },
+    {
+      "agentId": "researcher",
+      "agentName": "研究者",
+      "workspace": "~/.openclaw/workspace-researcher",
+      "workspaceActivity": {
+        "lastModified": "2026-02-18T07:49:34.400Z",
+        "minutesAgo": 57,
+        "hasActivity": true
+      },
+      "status": "active_historical",
+      "emoji": "⚠️",
+      "label": "歷史活動",
+      "description": "有歷史活動記錄",
+      "confidence": "low",
+      "timestamp": "2026-02-18T08:47:13.121Z"
+    },
+    {
+      "agentId": "data",
+      "agentName": "數據師",
+      "workspace": "~/.openclaw/workspace-data",
+      "workspaceActivity": {
+        "lastModified": "2026-02-18T07:51:40.427Z",
+        "minutesAgo": 55,
+        "hasActivity": true
+      },
+      "status": "active_historical",
+      "emoji": "⚠️",
+      "label": "歷史活動",
+      "description": "有歷史活動記錄",
+      "confidence": "low",
+      "timestamp": "2026-02-18T08:47:13.121Z"
+    },
+    {
+      "agentId": "creative",
+      "agentName": "創意師",
+      "workspace": "~/.openclaw/workspace-creative",
+      "workspaceActivity": {
+        "lastModified": "2026-02-18T07:52:06.811Z",
+        "minutesAgo": 55,
+        "hasActivity": true
+      },
+      "status": "active_historical",
+      "emoji": "⚠️",
+      "label": "歷史活動",
+      "description": "有歷史活動記錄",
+      "confidence": "low",
+      "timestamp": "2026-02-18T08:47:13.121Z"
+    },
+    {
+      "agentId": "github",
+      "agentName": "GitHub 管事",
+      "workspace": "~/.openclaw/workspace-github",
+      "workspaceActivity": {
+        "lastModified": "2026-02-18T07:42:46.850Z",
+        "minutesAgo": 64,
+        "hasActivity": true
+      },
+      "status": "active_historical",
+      "emoji": "⚠️",
+      "label": "歷史活動",
+      "description": "有歷史活動記錄",
+      "confidence": "low",
+      "timestamp": "2026-02-18T08:47:13.121Z"
+    },
+    {
+      "agentId": "pm",
+      "agentName": "PM",
+      "workspace": "~/.openclaw/workspace-dev-team/pm",
+      "workspaceActivity": {
+        "lastModified": "2026-02-18T08:39:27.396Z",
+        "minutesAgo": 7,
+        "hasActivity": true
+      },
+      "status": "active_recent",
+      "emoji": "✅",
+      "label": "近期活動",
+      "description": "近期有活動跡象",
+      "confidence": "medium",
+      "timestamp": "2026-02-18T08:47:13.121Z"
+    },
+    {
+      "agentId": "docs",
+      "agentName": "docs",
+      "workspace": "~/.openclaw/workspace-dev-team/docs",
+      "workspaceActivity": {
+        "lastModified": "2026-02-18T01:37:03.447Z",
+        "minutesAgo": 430,
+        "hasActivity": true
+      },
+      "status": "dormant",
+      "emoji": "💤",
+      "label": "休眠中",
+      "description": "有配置但近期無活動",
+      "confidence": "medium",
+      "timestamp": "2026-02-18T08:47:13.121Z"
+    },
+    {
+      "agentId": "code",
+      "agentName": "code",
+      "workspace": "~/.openclaw/workspace-dev-team/coder",
+      "workspaceActivity": {
+        "lastModified": "2026-02-18T01:37:03.446Z",
+        "minutesAgo": 430,
+        "hasActivity": true
+      },
+      "status": "dormant",
+      "emoji": "💤",
+      "label": "休眠中",
+      "description": "有配置但近期無活動",
+      "confidence": "medium",
+      "timestamp": "2026-02-18T08:47:13.121Z"
+    },
+    {
+      "agentId": "tester",
+      "agentName": "Test-agent",
+      "workspace": "~/.openclaw/workspace-dev-team/tester",
+      "workspaceActivity": {
+        "lastModified": "2026-02-18T01:37:03.448Z",
+        "minutesAgo": 430,
+        "hasActivity": true
+      },
+      "status": "dormant",
+      "emoji": "💤",
+      "label": "休眠中",
+      "description": "有配置但近期無活動",
+      "confidence": "medium",
+      "timestamp": "2026-02-18T08:47:13.121Z"
+    },
+    {
+      "agentId": "writer",
+      "agentName": "文章小幫手",
+      "workspace": "~/.openclaw/workspace-writer",
+      "workspaceActivity": {
+        "lastModified": "2026-02-18T07:42:59.393Z",
+        "minutesAgo": 64,
+        "hasActivity": true
+      },
+      "status": "active_historical",
+      "emoji": "⚠️",
+      "label": "歷史活動",
+      "description": "有歷史活動記錄",
+      "confidence": "low",
+      "timestamp": "2026-02-18T08:47:13.121Z"
+    }
+  ],
+  "summary": {
+    "active_historical": 15,
+    "dormant": 4,
+    "inactive": 1,
+    "active_recent": 1
+  }
+}

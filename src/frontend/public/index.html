@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="OpenClaw Watch">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="description" content="OpenClaw Watch Pro - Agent 架構監控系統">
+    <title>OpenClaw Watch Pro</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <div id="app">
+        <!-- Error Banner -->
+        <div id="errorBanner" class="error-banner" style="display:none">
+            <div class="error-banner-content">
+                <span class="error-banner-icon">⚠️</span>
+                <span id="errorBannerMsg" class="error-banner-msg">偵測到異常</span>
+                <div class="error-banner-actions">
+                    <button id="errorFixBtn" class="error-fix-btn" onclick="handleErrorFix()">一鍵修復</button>
+                    <button class="error-sre-btn" onclick="sendErrorToSRE()">📨 通知 SRE</button>
+                    <button class="error-dismiss-btn" onclick="dismissError()">忽略</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <header id="appHeader" class="app-header">
+            <div class="header-left">
+                <div class="header-logo">🐾</div>
+                <div class="header-title">
+                    <h1>OpenClaw Watch Pro</h1>
+                    <span class="header-subtitle">Agent 架構監控 (v2.0)</span>
+                </div>
+            </div>
+            <div class="header-center">
+                <!-- Desktop Top Tabs -->
+                <div class="desktop-tabs">
+                    <button class="desktop-tab active" data-dtab="monitor" onclick="switchDesktopTab('monitor')">🖥️
+                        監控</button>
+                    <button class="desktop-tab" data-dtab="system" onclick="switchDesktopTab('system')">📊
+                        系統/費用</button>
+                    <button class="desktop-tab" data-dtab="logs" onclick="switchDesktopTab('logs')">⚙️ 操作/日誌</button>
+                </div>
+            </div>
+            <div class="header-right">
+                <span id="alertBadge" class="alert-badge" style="display:none" onclick="scrollToErrors()">
+                    <span class="alert-icon">🔔</span>
+                    <span id="alertCount">0</span>
+                </span>
+                <span id="liveIndicator" class="live-indicator">
+                    <span class="live-dot"></span>
+                    即時更新
+                </span>
+                <button class="header-btn icon-only" onclick="update(true)" title="重新整理">🔄</button>
+            </div>
+        </header>
+
+        <!-- Summary Cards -->
+        <section id="summarySection" class="summary-section">
+            <div class="summary-card">
+                <div class="summary-card-content">
+                    <div>
+                        <div class="summary-label">總 Agents</div>
+                        <div class="summary-value" id="totalAgents">0</div>
+                    </div>
+                    <div class="summary-icon blue">🤖</div>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-card-content">
+                    <div>
+                        <div class="summary-label">執行中</div>
+                        <div class="summary-value" id="activeAgents">0</div>
+                    </div>
+                    <div class="summary-icon green">🟢</div>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-card-content">
+                    <div>
+                        <div class="summary-label">Sub-Agents</div>
+                        <div class="summary-value" id="totalSubagents">0</div>
+                    </div>
+                    <div class="summary-icon orange">🔗</div>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-card-content">
+                    <div>
+                        <div class="summary-label" id="costLabel">月費用 (TWD)</div>
+                        <div class="summary-value cost" id="totalCost">NT$0</div>
+                    </div>
+                    <div class="summary-icon purple">💰</div>
+                </div>
+                <div class="cost-range-selector">
+                    <select id="costRange" onchange="updateCostDisplay()">
+                        <option value="today">今日</option>
+                        <option value="week">本週</option>
+                        <option value="month" selected>本月</option>
+                        <option value="all">全部</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Content (single column, tab-switched on both desktop and mobile) -->
+        <main class="main-content">
+            <!-- TAB: Monitor -->
+            <div id="dtabMonitor" class="dtab-page active">
+                <div class="section-header">
+                    <h2>🖥️ 監控中心</h2>
+                    <span id="deviceOnlineStatus" class="online-status">0/0 執行中</span>
+                </div>
+                <div class="sub-tabs">
+                    <button class="sub-tab active" data-subtab="agents" onclick="switchSubTab('agents')">
+                        🤖 Agents <span id="agentCountBadge" class="tab-badge">0</span>
+                    </button>
+                    <button class="sub-tab" data-subtab="subagents" onclick="switchSubTab('subagents')">
+                        🔗 Sub-Agents <span id="subagentCountBadge" class="tab-badge">0</span>
+                    </button>
+                    <button class="sub-tab" data-subtab="cron" onclick="switchSubTab('cron')">
+                        ⏰ Cron <span id="cronCountBadge" class="tab-badge">0</span>
+                    </button>
+                </div>
+                <div id="subTabAgents" class="sub-tab-content active">
+                    <div id="agentGrid" class="agent-grid"></div>
+                </div>
+                <div id="subTabSubagents" class="sub-tab-content">
+                    <div id="subagentGrid" class="agent-grid subagent-grid"></div>
+                </div>
+                <div id="subTabCron" class="sub-tab-content">
+                    <div id="cronGrid" class="cron-grid"></div>
+                </div>
+            </div>
+
+            <!-- TAB: System & Cost -->
+            <div id="dtabSystem" class="dtab-page">
+                <div class="system-layout">
+                    <div class="system-left">
+                        <div class="section-header">
+                            <h2>📊 系統資源</h2>
+                        </div>
+                        <div class="sys-cards">
+                            <div class="sys-card">
+                                <div class="sys-card-header"><span>CPU</span><span id="cpuVal" class="sys-val">0%</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div id="cpuBar" class="progress-fill blue" style="width:0%"></div>
+                                </div>
+                            </div>
+                            <div class="sys-card">
+                                <div class="sys-card-header"><span>記憶體</span><span id="memVal" class="sys-val">0%</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div id="memBar" class="progress-fill green" style="width:0%"></div>
+                                </div>
+                                <div class="sys-sub" id="memDetail"></div>
+                            </div>
+                            <div class="sys-card">
+                                <div class="sys-card-header"><span>磁碟</span><span id="diskVal" class="sys-val">0%</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div id="diskBar" class="progress-fill amber" style="width:0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chart-container" style="margin-top:16px">
+                            <canvas id="sysChart" width="600" height="200"></canvas>
+                        </div>
+                    </div>
+                    <div class="system-right">
+                        <div class="section-header">
+                            <h2>💰 Model 使用統計</h2>
+                        </div>
+                        <div id="modelUsageList" class="model-usage-list"></div>
+                        <div id="costSummary" class="cost-summary"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Commands & Logs -->
+            <div id="dtabLogs" class="dtab-page">
+                <div class="logs-layout">
+                    <div class="logs-left">
+                        <div class="section-header">
+                            <h2>⚙️ 系統操作</h2>
+                        </div>
+                        <div class="command-panel">
+                            <div class="command-group">
+                                <span class="command-group-label">查詢</span>
+                                <div class="command-row">
+                                    <button class="cmd-btn" onclick="runCmd('status')">📋 系統狀態</button>
+                                    <button class="cmd-btn" onclick="runCmd('models')">🤖 模型狀態</button>
+                                    <button class="cmd-btn" onclick="runCmd('agents')">👥 Agent 列表</button>
+                                </div>
+                            </div>
+                            <div class="command-group">
+                                <span class="command-group-label">控制 (需確認)</span>
+                                <div class="command-row">
+                                    <button class="cmd-btn warning" onclick="runCmd('restart')">🔄 重啟 Gateway</button>
+                                    <button class="cmd-btn danger" onclick="runCmd('update')">⬆️ 更新版本</button>
+                                </div>
+                            </div>
+                            <div class="command-group">
+                                <span class="command-group-label">Agent 通訊</span>
+                                <div class="command-row">
+                                    <button class="cmd-btn" onclick="openChat('main')">💬 對話 main</button>
+                                    <button class="cmd-btn" onclick="openChat('sre')">🛡️ 對話 SRE</button>
+                                </div>
+                            </div>
+                            <!-- Watchdog Status -->
+                            <div class="command-group">
+                                <span class="command-group-label">🐕 Gateway Watchdog (自動修復)</span>
+                                <div id="watchdogStatus" class="watchdog-panel">
+                                    <div class="watchdog-header">
+                                        <div class="watchdog-indicator" id="watchdogIndicator">
+                                            <span class="watchdog-dot"></span>
+                                            <span id="watchdogStateText">載入中...</span>
+                                        </div>
+                                        <label class="watchdog-toggle">
+                                            <input type="checkbox" id="watchdogToggle" checked
+                                                onchange="toggleWatchdog(this.checked)">
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="watchdog-stats" id="watchdogStats"></div>
+                                    <div class="watchdog-history" id="watchdogHistory"></div>
+                                    <div class="command-row" style="margin-top:8px">
+                                        <button class="cmd-btn warning" onclick="manualRepair()">🔧 手動修復</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="logs-right">
+                        <div class="section-header">
+                            <h2>📜 即時日誌</h2>
+                        </div>
+                        <div id="logTerminal" class="log-terminal">系統準備就緒...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detail Page (Agent Detail) -->
+            <div id="dtabDetail" class="dtab-page">
+                <div class="detail-back" onclick="switchDesktopTab('monitor')">← 返回監控</div>
+                <div id="detailContent"></div>
+            </div>
+        </main>
+
+        <!-- Chat Modal -->
+        <div id="chatModal" class="modal-overlay" style="display:none">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <span id="chatTitle">💬 Agent 對話</span>
+                    <button class="modal-close" onclick="closeChat()">✕</button>
+                </div>
+                <div id="chatLog" class="chat-log"></div>
+                <div class="chat-input-row">
+                    <input id="chatInput" class="chat-input" placeholder="輸入訊息..." maxlength="2000"
+                        onkeydown="if(event.key==='Enter') sendChat()">
+                    <span id="chatCharCount" class="char-count">0/2000</span>
+                    <button class="chat-send" onclick="sendChat()">發送</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Model Switch Modal -->
+        <div id="modelModal" class="modal-overlay" style="display:none">
+            <div class="modal-content compact">
+                <div class="modal-header">
+                    <span>🔄 切換模型</span>
+                    <button class="modal-close" onclick="closeModelModal()">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="model-info" id="modelCurrentInfo"></div>
+                    <select id="modelSelect" class="model-select">
+                        <optgroup label="Google">
+                            <option value="gemini-3-flash">Gemini 3 Flash</option>
+                            <option value="gemini-3-pro">Gemini 3 Pro</option>
+                            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                        </optgroup>
+                        <optgroup label="OpenAI">
+                            <option value="gpt-5.2">GPT-5.2</option>
+                            <option value="gpt-4.1">GPT-4.1</option>
+                            <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
+                            <option value="o4-mini">O4-Mini</option>
+                        </optgroup>
+                        <optgroup label="Anthropic">
+                            <option value="claude-sonnet-4">Claude Sonnet 4</option>
+                            <option value="claude-4-opus">Claude 4 Opus</option>
+                            <option value="claude-3.5-haiku">Claude 3.5 Haiku</option>
+                        </optgroup>
+                        <optgroup label="DeepSeek">
+                            <option value="deepseek-chat">DeepSeek Chat</option>
+                            <option value="deepseek-reasoner">DeepSeek Reasoner</option>
+                        </optgroup>
+                    </select>
+                    <button class="ctrl-btn accent full-width" onclick="confirmModelSwitch()">確認切換</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Command Output Modal -->
+        <div id="cmdOutputModal" class="modal-overlay" style="display:none">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <span id="cmdOutputTitle">📋 指令輸出</span>
+                    <button class="modal-close" onclick="closeCmdOutput()">✕</button>
+                </div>
+                <div class="modal-body">
+                    <pre id="cmdOutputContent" class="cmd-output-content"></pre>
+                </div>
+            </div>
+        </div>
+        <!-- SRE Response Modal (#4) -->
+        <div id="sreModal" class="modal-overlay" style="display:none">
+            <div class="modal-content sre-modal">
+                <div class="modal-header sre-header">
+                    <span>🛡️ SRE 工程師處理報告</span>
+                    <button class="modal-close" onclick="closeSREModal()">✕</button>
+                </div>
+                <div id="sreLog" class="sre-log"></div>
+                <div class="sre-input-row">
+                    <input id="sreInput" class="chat-input" placeholder="追問或指示下一步..." maxlength="2000">
+                    <button class="chat-send" onclick="sendSREFollowUp()">發送</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast -->
+        <div id="toast" class="toast"></div>
+
+        <!-- Bottom Tab Bar (Mobile only) -->
+        <nav id="bottomNav" class="bottom-nav">
+            <button class="nav-btn active" data-page="monitor" onclick="switchDesktopTab('monitor')">
+                <span class="nav-icon">🖥️</span>
+                <span class="nav-label">監控</span>
+            </button>
+            <button class="nav-btn" data-page="system" onclick="switchDesktopTab('system')">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">系統</span>
+            </button>
+            <button class="nav-btn" data-page="logs" onclick="switchDesktopTab('logs')">
+                <span class="nav-icon">⚙️</span>
+                <span class="nav-label">操作</span>
+            </button>
+        </nav>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+
+</html>
