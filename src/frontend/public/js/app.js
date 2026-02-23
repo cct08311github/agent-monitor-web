@@ -679,14 +679,38 @@ function renderDashboard(data) {
     }).join('') || '<div style="color:var(--text-muted);padding:20px;text-align:center;">沒有 Agent</div>';
 
     const subagents = (data.subagents || []).sort((a, b) => ({ running: 0, recent: 1, idle: 2 }[a.status] ?? 3) - ({ running: 0, recent: 1, idle: 2 }[b.status] ?? 3));
-    document.getElementById('subagentGrid').innerHTML = subagents.slice(0, 30).map(s => {
+    document.getElementById('subagentGrid').innerHTML = subagents.slice(0, 40).map(s => {
         const sc = s.status === 'running' ? 'running' : (s.status === 'recent' ? 'active' : '');
         const sd = s.status === 'running' ? 'online' : (s.status === 'recent' ? 'running' : 'idle');
-        const abt = s.abortedLastRun ? '<span style="color:var(--red);font-size:10px"> ⚠中斷</span>' : '';
-        return `<div class="agent-card ${sc}" style="padding:12px"><div class="agent-card-header" style="margin-bottom:6px">
-            <div class="agent-card-name"><div class="agent-avatar" style="width:28px;height:28px;font-size:12px">🔗</div><div><div class="agent-name" style="font-size:12px">${esc(s.subagentId.slice(0, 8))}${abt}</div><div class="agent-hostname">by ${esc(s.ownerAgent)}</div></div></div>
-            <div class="agent-status ${sd}" style="font-size:10px;padding:2px 8px"><span class="agent-status-dot"></span>${esc(s.status.toUpperCase())}</div></div>
-            <div class="agent-info-row" style="font-size:12px"><span class="agent-info-label">${s.label ? esc(s.label.slice(0, 30)) : '活動'}</span><span class="agent-info-value">${esc(s.lastActivity)}</span></div></div>`;
+        const abt = s.abortedLastRun ? '<span style="color:var(--red);font-weight:600;font-size:10px"> ⚠️ ABORTED</span>' : '';
+        const durationHtml = s.duration ? `<span class="agent-info-value" style="background:var(--bg-muted);padding:1px 4px;border-radius:4px">${s.duration}</span>` : '';
+        
+        return `<div class="agent-card ${sc}" style="padding:12px">
+            <div class="agent-card-header" style="margin-bottom:8px">
+                <div class="agent-card-name">
+                    <div class="agent-avatar" style="width:28px;height:28px;font-size:12px;background:var(--accent-gradient)">🔗</div>
+                    <div>
+                        <div class="agent-name" style="font-size:12px">${esc(s.subagentId.slice(0, 8))}${abt}</div>
+                        <div class="agent-hostname">by ${esc(s.ownerAgent)}</div>
+                    </div>
+                </div>
+                <div class="agent-status ${sd}" style="font-size:10px;padding:2px 8px"><span class="agent-status-dot"></span>${esc(s.status.toUpperCase())}</div>
+            </div>
+            <div class="agent-task-preview" style="margin: 4px 0 8px 0; background: rgba(0,0,0,0.03); border-radius: 4px; padding: 6px;">
+                <div class="agent-task-content" style="font-size:11px; color:var(--text); -webkit-line-clamp: 2; line-clamp: 2;">${esc(s.label)}</div>
+            </div>
+            <div class="agent-info-row" style="font-size:11px; margin-bottom:2px">
+                <span class="agent-info-label">最後活動</span>
+                <span class="agent-info-value">${esc(s.lastActivity)}</span>
+            </div>
+            <div class="agent-info-row" style="font-size:11px">
+                <span class="agent-info-label">模型 / 耗時</span>
+                <div style="display:flex; gap:4px; align-items:center">
+                    <span class="agent-info-value" style="font-size:10px; opacity:0.8">${esc(s.model.split('/').pop())}</span>
+                    ${durationHtml}
+                </div>
+            </div>
+        </div>`;
     }).join('') || '<div style="color:var(--text-muted);padding:20px;text-align:center;">沒有 Sub-Agents</div>';
 
     document.getElementById('totalAgents').textContent = agents.length;

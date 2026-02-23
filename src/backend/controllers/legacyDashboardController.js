@@ -183,6 +183,7 @@ function detectDetailedActivity(agentId) {
             let totalCost = 0;
             const modelUsage = {};
 
+            let latestSessionTime = 0;
             Object.keys(json).forEach(k => {
                 // Skip subagent sessions for the agent-level summary
                 if (k.includes(':subagent:')) return;
@@ -219,9 +220,11 @@ function detectDetailedActivity(agentId) {
                     if (isThisWeek(updatedAt)) detail.costs.week += sessionCost;
                     if (isThisMonth(updatedAt)) detail.costs.month += sessionCost;
                 }
-
-                // Track active model based on most recent session
-                if (s.model) {
+                
+                // Track active model based on the session (prefer the one with the latest timestamp)
+                // If updatedAt is missing, we still capture it as a fallback
+                if (updatedAt >= latestSessionTime && s.model) {
+                    latestSessionTime = updatedAt;
                     detail.activeModel = s.model;
                     detail.activeProvider = s.modelProvider || null;
                 }
@@ -269,9 +272,11 @@ function buildSubagentStatus() {
     const subagents = [];
     const agentsRoot = '/Users/openclaw/.openclaw/agents';
     try {
-        const agentDirs = fs.readdirSync(agentsRoot).map((name) => path.join(agentsRoot, name, 'sessions', 'sessions.json'));
-        for (const sessionsPath of agentDirs) {
+        const agentDirs = fs.readdirSync(agentsRoot);
+        for (const agentDirName of agentDirs) {
+            const sessionsPath = path.join(agentsRoot, agentDirName, 'sessions', 'sessions.json');
             if (!fs.existsSync(sessionsPath)) continue;
+            
             let sessions;
             try {
                 sessions = JSON.parse(fs.readFileSync(sessionsPath, 'utf8'));
@@ -279,9 +284,12 @@ function buildSubagentStatus() {
 
             for (const [sessionKey, meta] of Object.entries(sessions)) {
                 if (!sessionKey.includes(':subagent:')) continue;
+                
                 const updatedAt = Number(meta?.updatedAt || 0);
+                const createdAt = Number(meta?.createdAt || updatedAt);
                 const minutesAgo = updatedAt > 0 ? Math.floor((Date.now() - updatedAt) / 60000) : null;
-                const totalTokens = Number(meta?.totalTokens || meta?.inputTokens || 0) + Number(meta?.outputTokens || 0);
+                const durationMs = updatedAt > createdAt ? (updatedAt - createdAt) : 0;
+                
                 let status = 'idle';
                 if (minutesAgo !== null && minutesAgo <= 5) status = 'running';
                 else if (minutesAgo !== null && minutesAgo <= 60) status = 'recent';
@@ -289,15 +297,17 @@ function buildSubagentStatus() {
                 const parts = sessionKey.split(':');
                 subagents.push({
                     key: sessionKey,
-                    ownerAgent: parts[1] || 'unknown',
+                    ownerAgent: parts[1] || agentDirName,
                     subagentId: parts[3] || 'unknown',
                     status,
-                    minutesAgo,
-                    lastActivity: minutesAgo === null ? 'unknown' : `${minutesAgo}m ago`,
-                    tokens: totalTokens,
+                    updatedAt,
+                    createdAt,
+                    duration: durationMs > 0 ? `${Math.floor(durationMs / 1000)}s` : null,
+                    lastActivity: minutesAgo === null ? 'unknown' : (minutesAgo < 1 ? 'just now' : `${minutesAgo}m ago`),
+                    tokens: Number(meta?.totalTokens || 0),
                     abortedLastRun: !!meta?.abortedLastRun,
-                    spawnedBy: meta?.spawnedBy || null,
-                    label: meta?.label || null,
+                    label: meta?.label || meta?.model || 'Sub-Agent Task',
+                    model: meta?.model || 'unknown'
                 });
             }
         }
@@ -326,7 +336,15 @@ async function buildDashboardPayload() {
         getExchangeRate()
     ]);
 
-    const agents = parseAgentsList(agentsResult.stdout || '').map(a => ({ ...a, ...detectDetailedActivity(a.id) }));
+    const agents = parseAgentsList(agentsResult.stdout || '').map(a => {
+        const activity = detectDetailedActivity(a.id);
+        // Use activeModel from sessions if available (it reflects real fallback/usage)
+        return { 
+            ...a, 
+            ...activity, 
+            model: activity.activeModel || a.model 
+        };
+    });
 
     let cronJobs = [];
     try {
