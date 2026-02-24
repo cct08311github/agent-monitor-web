@@ -765,10 +765,15 @@ function renderCronJobs() {
                         <div class="agent-hostname">${esc(job.schedule?.expr || 'Once')}</div>
                     </div>
                 </div>
-                <label class="watchdog-toggle">
-                    <input type="checkbox" ${job.enabled ? 'checked' : ''} onchange="toggleCronJob('${job.id}', this.checked)">
-                    <span class="toggle-slider"></span>
-                </label>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <button class="cron-run-button" title="立即執行" onclick="runCronJob('${job.id}')" style="background:var(--green);color:white;border:none;border-radius:4px;padding:4px 8px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;">
+                        ▶️ 執行
+                    </button>
+                    <label class="watchdog-toggle">
+                        <input type="checkbox" ${job.enabled ? 'checked' : ''} onchange="toggleCronJob('${job.id}', this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
             </div>
             <div class="agent-card-body">
                 <div class="agent-info-row">
@@ -816,6 +821,32 @@ async function toggleCronJob(id, enabled) {
     } catch (e) {
         showToast(`❌ 操作失敗: ${e.message}`, 'error');
         // Revert UI if needed (fetching again is safer)
+        fetchCronJobs();
+    }
+}
+
+/**
+ * 立即執行指定的 Cron 任務
+ * @param {string} id - 任務 ID
+ */
+async function runCronJob(id) {
+    showToast('正在執行任務...', 'info');
+    try {
+        const res = await fetch(`/api/cron/jobs/${id}/run`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast('✅ 任務執行成功', 'success');
+            // 刷新任務列表以更新最後執行時間
+            fetchCronJobs();
+        } else {
+            throw new Error(data.error || '執行失敗');
+        }
+    } catch (e) {
+        showToast(`❌ 執行失敗: ${e.message}`, 'error');
+        // 可選：刷新列表以確保狀態一致
         fetchCronJobs();
     }
 }
