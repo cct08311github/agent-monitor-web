@@ -2,14 +2,30 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const util = require('util');
-const { exec } = require('child_process');
+const { exec, execFile } = require('child_process');
 const fetch = require('node-fetch');
 const execPromise = util.promisify(exec);
+const execFilePromise = util.promisify(execFile);
 
+// --- Constants & Config ---
 const DASHBOARD_CACHE_TTL_MS = 3000;
+const HOME_DIR = os.homedir();
+const OPENCLAW_ROOT = path.join(HOME_DIR, '.openclaw');
+const OPENCLAW_BIN = path.join(OPENCLAW_ROOT, 'bin', 'openclaw');
+const AGENTS_ROOT = path.join(OPENCLAW_ROOT, 'agents');
+
 let dashboardCache = { ts: 0, payload: null };
 
-// Exchange Rate Cache (24 hours)
+// --- Security: Dynamic path masking ---
+const SENSITIVE_PATH_PREFIXES = [OPENCLAW_ROOT, HOME_DIR];
+function maskSensitivePaths(input) {
+    if (typeof input !== 'string' || !input) return input;
+    let out = input;
+    for (const prefix of SENSITIVE_PATH_PREFIXES) out = out.split(prefix).join('[REDACTED_PATH]');
+    return out;
+}
+
+// --- Exchange Rate Cache (24 hours) ---
 let exchangeRateCache = { rate: 32.0, lastFetch: 0 };
 async function getExchangeRate() {
     const now = Date.now();
@@ -29,7 +45,7 @@ async function getExchangeRate() {
     return exchangeRateCache.rate;
 }
 
-// Time range helpers
+// --- Helpers ---
 function isToday(ms) {
     const d = new Date(ms);
     const now = new Date();
@@ -40,7 +56,7 @@ function isThisWeek(ms) {
     const d = new Date(ms);
     const now = new Date();
     const day = now.getDay();
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Adjust to Monday
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
     const startOfWeek = new Date(now.setDate(diff));
     startOfWeek.setHours(0, 0, 0, 0);
     return d >= startOfWeek;
@@ -57,7 +73,6 @@ const sseClients = new Set();
 let isPolling = false;
 
 // More accurate pricing per 1M tokens (input/output averaged)
-// Based on actual 2026 pricing for these providers
 const MODEL_PRICING = {
     // OpenAI
     'gpt-5.3-codex': { input: 15, output: 60 },
@@ -88,9 +103,7 @@ const MODEL_PRICING = {
 function getModelPricing(modelName) {
     if (!modelName) return MODEL_PRICING['default'];
     const lower = modelName.toLowerCase();
-    // Try exact match first
     if (MODEL_PRICING[lower]) return MODEL_PRICING[lower];
-    // Try partial match
     for (const [key, pricing] of Object.entries(MODEL_PRICING)) {
         if (key !== 'default' && lower.includes(key)) return pricing;
     }
@@ -99,7 +112,6 @@ function getModelPricing(modelName) {
 
 function calculateCost(inputTokens, outputTokens, cacheRead, modelName) {
     const pricing = getModelPricing(modelName);
-    // Cache read tokens are typically 90% cheaper
     const cacheDiscount = 0.1;
     const freshInputTokens = Math.max(0, inputTokens - (cacheRead || 0));
     const cachedTokens = cacheRead || 0;
@@ -117,11 +129,16 @@ async function getSystemResources() {
         const totalMem = os.totalmem();
         const freeMem = os.freemem();
         const memUsage = ((totalMem - freeMem) / totalMem * 100).toFixed(1);
+        
         let diskUsage = '0';
         try {
-            const { stdout } = await execPromise("df -h / | tail -1 | awk '{print $5}' | sed 's/%//' ");
-            diskUsage = stdout.trim();
+            // Using execFile for df is safer
+            const { stdout } = await execFilePromise('df', ['-h', '/']);
+            const lastLine = stdout.trim().split('\n').pop();
+            const match = lastLine.match(/(\d+)%/);
+            if (match) diskUsage = match[1];
         } catch (e) { }
+
         const uptimeSeconds = os.uptime();
         const hours = Math.floor(uptimeSeconds / 3600);
         const minutes = Math.floor((uptimeSeconds % 3600) / 60);
@@ -169,25 +186,23 @@ function detectDetailedActivity(agentId) {
         lastActivity: 'never',
         tokens: { input: 0, output: 0, cacheRead: 0, total: 0 },
         currentTask: { label: 'Idle', task: '' },
-        modelUsage: {},  // per-model breakdown
+        modelUsage: {},
         activeModel: null,
         activeProvider: null,
     };
 
     try {
-        const agentDir = path.join('/Users/openclaw/.openclaw/agents', agentId, 'sessions');
+        const agentDir = path.join(AGENTS_ROOT, agentId, 'sessions');
         const sessionJsonPath = path.join(agentDir, 'sessions.json');
 
         if (fs.existsSync(sessionJsonPath)) {
             const json = JSON.parse(fs.readFileSync(sessionJsonPath, 'utf8'));
             let totalCost = 0;
             const modelUsage = {};
-
             let latestSessionTime = 0;
-            Object.keys(json).forEach(k => {
-                // Skip subagent sessions for the agent-level summary
-                if (k.includes(':subagent:')) return;
 
+            Object.keys(json).forEach(k => {
+                if (k.includes(':subagent:')) return;
                 const s = json[k];
                 const updatedAt = Number(s.updatedAt || 0);
                 const sessionInput = s.inputTokens || 0;
@@ -200,7 +215,6 @@ function detectDetailedActivity(agentId) {
                 detail.tokens.output += sessionOutput;
                 detail.tokens.cacheRead += sessionCacheRead;
 
-                // Track per-model usage
                 if (!modelUsage[sessionModel]) {
                     modelUsage[sessionModel] = { input: 0, output: 0, cacheRead: 0, total: 0, cost: 0, sessions: 0 };
                 }
@@ -214,15 +228,12 @@ function detectDetailedActivity(agentId) {
                 modelUsage[sessionModel].cost += sessionCost;
                 totalCost += sessionCost;
 
-                // Periodic cost calculation
                 if (updatedAt > 0) {
                     if (isToday(updatedAt)) detail.costs.today += sessionCost;
                     if (isThisWeek(updatedAt)) detail.costs.week += sessionCost;
                     if (isThisMonth(updatedAt)) detail.costs.month += sessionCost;
                 }
                 
-                // Track active model based on the session (prefer the one with the latest timestamp)
-                // If updatedAt is missing, we still capture it as a fallback
                 if (updatedAt >= latestSessionTime && s.model) {
                     latestSessionTime = updatedAt;
                     detail.activeModel = s.model;
@@ -232,7 +243,7 @@ function detectDetailedActivity(agentId) {
 
             detail.tokens.total = detail.tokens.input + detail.tokens.output;
             detail.costs.total = totalCost;
-            detail.cost = totalCost.toFixed(4); // Keep for legacy
+            detail.cost = totalCost.toFixed(4);
             detail.modelUsage = modelUsage;
         }
 
@@ -270,56 +281,36 @@ function detectDetailedActivity(agentId) {
 
 function buildSubagentStatus() {
     const subagents = [];
-    const agentsRoot = '/Users/openclaw/.openclaw/agents';
     try {
-        const agentDirs = fs.readdirSync(agentsRoot);
+        const agentDirs = fs.readdirSync(AGENTS_ROOT);
         for (const agentDirName of agentDirs) {
-            const sessionsPath = path.join(agentsRoot, agentDirName, 'sessions', 'sessions.json');
+            const sessionsPath = path.join(AGENTS_ROOT, agentDirName, 'sessions', 'sessions.json');
             if (!fs.existsSync(sessionsPath)) continue;
-            
             let sessions;
-            try {
-                sessions = JSON.parse(fs.readFileSync(sessionsPath, 'utf8'));
-            } catch (e) { continue; }
+            try { sessions = JSON.parse(fs.readFileSync(sessionsPath, 'utf8')); } catch (e) { continue; }
 
             for (const [sessionKey, meta] of Object.entries(sessions)) {
                 if (!sessionKey.includes(':subagent:')) continue;
-                
                 const updatedAt = Number(meta?.updatedAt || 0);
                 const createdAt = Number(meta?.createdAt || updatedAt);
                 const minutesAgo = updatedAt > 0 ? Math.floor((Date.now() - updatedAt) / 60000) : null;
                 const durationMs = updatedAt > createdAt ? (updatedAt - createdAt) : 0;
-                
                 let status = 'idle';
                 if (minutesAgo !== null && minutesAgo <= 5) status = 'running';
                 else if (minutesAgo !== null && minutesAgo <= 60) status = 'recent';
-
                 const parts = sessionKey.split(':');
                 subagents.push({
-                    key: sessionKey,
-                    ownerAgent: parts[1] || agentDirName,
-                    subagentId: parts[3] || 'unknown',
-                    status,
-                    updatedAt,
-                    createdAt,
-                    duration: durationMs > 0 ? `${Math.floor(durationMs / 1000)}s` : null,
+                    key: sessionKey, ownerAgent: parts[1] || agentDirName, subagentId: parts[3] || 'unknown',
+                    status, updatedAt, createdAt, duration: durationMs > 0 ? `${Math.floor(durationMs / 1000)}s` : null,
                     lastActivity: minutesAgo === null ? 'unknown' : (minutesAgo < 1 ? 'just now' : `${minutesAgo}m ago`),
-                    tokens: Number(meta?.totalTokens || 0),
-                    abortedLastRun: !!meta?.abortedLastRun,
-                    label: meta?.label || meta?.model || 'Sub-Agent Task',
-                    model: meta?.model || 'unknown'
+                    tokens: Number(meta?.totalTokens || 0), abortedLastRun: !!meta?.abortedLastRun,
+                    label: meta?.label || meta?.model || 'Sub-Agent Task', model: meta?.model || 'unknown'
                 });
             }
         }
     } catch (e) { }
-
     const rank = { running: 0, recent: 1, idle: 2 };
-    subagents.sort((a, b) => {
-        const ra = rank[a.status] ?? 9;
-        const rb = rank[b.status] ?? 9;
-        if (ra !== rb) return ra - rb;
-        return (a.minutesAgo ?? 999999) - (b.minutesAgo ?? 999999);
-    });
+    subagents.sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9) || (a.minutesAgo ?? 999999) - (b.minutesAgo ?? 999999));
     return subagents;
 }
 
@@ -331,19 +322,14 @@ async function buildDashboardPayload() {
 
     const [sys, agentsResult, cronResult, exchangeRate] = await Promise.all([
         getSystemResources(),
-        execPromise('/Users/openclaw/.openclaw/bin/openclaw agents list').catch(() => ({ stdout: '' })),
-        execPromise('/Users/openclaw/.openclaw/bin/openclaw cron list --json').catch(() => ({ stdout: '{"jobs":[]}' })),
+        execFilePromise(OPENCLAW_BIN, ['agents', 'list']).catch(() => ({ stdout: '' })),
+        execFilePromise(OPENCLAW_BIN, ['cron', 'list', '--json']).catch(() => ({ stdout: '{"jobs":[]}' })),
         getExchangeRate()
     ]);
 
     const agents = parseAgentsList(agentsResult.stdout || '').map(a => {
         const activity = detectDetailedActivity(a.id);
-        // Use activeModel from sessions if available (it reflects real fallback/usage)
-        return { 
-            ...a, 
-            ...activity, 
-            model: activity.activeModel || a.model 
-        };
+        return { ...a, ...activity, model: activity.activeModel || a.model };
     });
 
     let cronJobs = [];
@@ -359,22 +345,12 @@ async function buildDashboardPayload() {
     }));
 
     const subagents = buildSubagentStatus();
-
-    // Fetch Model Cooldowns
     const { fetchModelCooldowns } = require('../utils/modelMonitor');
     const cooldowns = await fetchModelCooldowns();
 
     const payload = { success: true, sys, agents, cron, subagents, cooldowns, exchangeRate };
     dashboardCache = { ts: now, payload };
     return payload;
-}
-
-const SENSITIVE_PATH_PREFIXES = ['/Users/openclaw/.openclaw', '/Users/openclaw'];
-function maskSensitivePaths(input) {
-    if (typeof input !== 'string' || !input) return input;
-    let out = input;
-    for (const prefix of SENSITIVE_PATH_PREFIXES) out = out.split(prefix).join('[REDACTED_PATH]');
-    return out;
 }
 
 function truncate(input, maxLen) {
@@ -395,55 +371,65 @@ function minimizeDashboardPayload(payload) {
     return { ...payload, agents: safeAgents };
 }
 
-// Event-driven real-time push mechanism
+// --- SSE Performance Optimization: Shared Background Poller ---
 let lastSnapshotTime = 0;
-const TSDB_SNAPSHOT_INTERVAL = 60000; // 60s
+const TSDB_SNAPSHOT_INTERVAL = 60000;
 const tsdbService = require('../services/tsdbService');
 const agentWatcherService = require('../services/agentWatcherService');
 
-let broadcastTimeout = null;
+let sharedPayload = null;
+let lastUpdateTs = 0;
+
+async function updateSharedData() {
+    try {
+        const payload = await buildDashboardPayload();
+        sharedPayload = minimizeDashboardPayload(payload);
+        lastUpdateTs = Date.now();
+
+        // Time-series persistence
+        if (lastUpdateTs - lastSnapshotTime >= TSDB_SNAPSHOT_INTERVAL) {
+            lastSnapshotTime = lastUpdateTs;
+            tsdbService.saveSnapshot(sharedPayload.sys || {}, sharedPayload.agents || []);
+        }
+        return true;
+    } catch (e) {
+        console.error('[Poller] Update failed:', e);
+        return false;
+    }
+}
 
 async function doBroadcast() {
     if (sseClients.size === 0) return;
-    try {
-        const payload = await buildDashboardPayload();
-        const minimized = minimizeDashboardPayload(payload);
-        const dataStr = `data: ${JSON.stringify(minimized)}\n\n`;
-        sseClients.forEach((res) => res.write(dataStr));
-
-        // Log time-series snapshot every 60s
-        const now = Date.now();
-        if (now - lastSnapshotTime >= TSDB_SNAPSHOT_INTERVAL) {
-            lastSnapshotTime = now;
-            tsdbService.saveSnapshot(minimized.sys || {}, minimized.agents || []);
-        }
-    } catch (error) {
-        console.error('[SSE] Broadcast error:', error);
-    }
+    if (!sharedPayload) await updateSharedData();
+    
+    const dataStr = `data: ${JSON.stringify(sharedPayload)}\n\n`;
+    sseClients.forEach((res) => res.write(dataStr));
 }
 
 function startGlobalPolling() {
     if (isPolling) return;
     isPolling = true;
 
-    // Start watching physical JSON state files instead of polling CLI
     agentWatcherService.start();
-
-    // Event-driven listener (debounce to avoid IO spam)
-    agentWatcherService.on('state_update', () => {
-        if (broadcastTimeout) clearTimeout(broadcastTimeout);
-        broadcastTimeout = setTimeout(doBroadcast, 500); // 500ms debounce
+    agentWatcherService.on('state_update', async () => {
+        await updateSharedData();
+        doBroadcast();
     });
 
-    // Fallback heartbeat (mainly for system CPU/RAM trends)
-    setInterval(doBroadcast, 15000); // Every 15 seconds mostly for heartbeat if agents are idle
+    // Fallback timer: Refresh data every 15s regardless of file changes
+    setInterval(async () => {
+        await updateSharedData();
+        doBroadcast();
+    }, 15000);
 }
 
 class DashboardController {
     async getDashboard(req, res) {
         try {
-            const payload = await buildDashboardPayload();
-            res.json(minimizeDashboardPayload(payload));
+            if (!sharedPayload || Date.now() - lastUpdateTs > 5000) {
+                await updateSharedData();
+            }
+            res.json(sharedPayload);
         } catch (error) {
             res.status(500).json({ success: false, error: error.message });
         }
@@ -451,7 +437,7 @@ class DashboardController {
 
     async getHistory(req, res) {
         try {
-            const history = tsdbService.getSystemHistory(60); // Get last 60 points
+            const history = tsdbService.getSystemHistory(60);
             const topSpenders = tsdbService.getAgentTopTokens(5);
             res.json({ success: true, history, topSpenders });
         } catch (error) {
@@ -469,11 +455,8 @@ class DashboardController {
         sseClients.add(res);
         startGlobalPolling();
 
-        try {
-            const payload = await buildDashboardPayload();
-            res.write(`data: ${JSON.stringify(minimizeDashboardPayload(payload))}\n\n`);
-        } catch (e) {
-            console.error('[SSE] Initial load error:', e);
+        if (sharedPayload) {
+            res.write(`data: ${JSON.stringify(sharedPayload)}\n\n`);
         }
 
         req.on('close', () => {
@@ -483,7 +466,7 @@ class DashboardController {
 
     async getStatus(req, res) {
         try {
-            const { stdout, stderr } = await execPromise('/Users/openclaw/.openclaw/bin/openclaw status');
+            const { stdout, stderr } = await execFilePromise(OPENCLAW_BIN, ['status']);
             res.json({ success: true, output: (stdout || '') + (stderr || '') });
         } catch (error) {
             res.status(500).json({ success: false, error: error.message, output: (error.stdout || '') + (error.stderr || '') });
@@ -492,7 +475,7 @@ class DashboardController {
 
     async getModels(req, res) {
         try {
-            const { stdout, stderr } = await execPromise('/Users/openclaw/.openclaw/bin/openclaw models status');
+            const { stdout, stderr } = await execFilePromise(OPENCLAW_BIN, ['models', 'status']);
             res.json({ success: true, output: (stdout || '') + (stderr || '') });
         } catch (error) {
             res.status(500).json({ success: false, error: error.message, output: (error.stdout || '') + (error.stderr || '') });
@@ -501,7 +484,7 @@ class DashboardController {
 
     async getAgents(req, res) {
         try {
-            const { stdout, stderr } = await execPromise('/Users/openclaw/.openclaw/bin/openclaw agents list');
+            const { stdout, stderr } = await execFilePromise(OPENCLAW_BIN, ['agents', 'list']);
             res.json({ success: true, output: (stdout || '') + (stderr || '') });
         } catch (error) {
             res.status(500).json({ success: false, error: error.message, output: (error.stdout || '') + (error.stderr || '') });
