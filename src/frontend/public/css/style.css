@@ -4,37 +4,6 @@
    Mobile: Bottom tab navigation
    ======================================== */
 
-:root {
-    --bg: #f4f7fb;
-    --bg-card: #ffffff;
-    --bg-elevated: #ffffff;
-    --bg-input: #f1f5f9;
-    --bg-hover: #f8fafc;
-    --border: #e2e8f0;
-    --border-light: #f1f5f9;
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --text-muted: #94a3b8;
-    --accent: #3b82f6;
-    --accent-light: #dbeafe;
-    --green: #22c55e;
-    --green-light: #dcfce7;
-    --orange: #f59e0b;
-    --orange-light: #fef3c7;
-    --red: #ef4444;
-    --red-light: #fee2e2;
-    --purple: #8b5cf6;
-    --purple-light: #ede9fe;
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
-    --radius: 12px;
-    --radius-sm: 8px;
-    --radius-lg: 16px;
-    --nav-height: 72px;
-    --header-height: 60px;
-}
-
 * {
     margin: 0;
     padding: 0;
