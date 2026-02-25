@@ -1,4 +1,10 @@
+/* ========================================
+   OpenClaw Watch Pro - Theme System
+   CSS Custom Properties for light/dark modes
+   ======================================== */
+
 :root {
+    /* Light theme (default) */
     --bg: #f4f7fb;
     --bg-card: #ffffff;
     --bg-elevated: #ffffff;
@@ -22,8 +28,14 @@
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-lg: 16px;
+    --nav-height: 72px;
+    --header-height: 60px;
 }
 
+/* Dark theme via data attribute */
 [data-theme="dark"] {
     --bg: #0f172a;
     --bg-card: #1e293b;
@@ -43,4 +55,171 @@
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Light theme via data attribute (explicit) */
+[data-theme="light"] {
+    --bg: #f4f7fb;
+    --bg-card: #ffffff;
+    --bg-elevated: #ffffff;
+    --bg-input: #f1f5f9;
+    --bg-hover: #f8fafc;
+    --border: #e2e8f0;
+    --border-light: #f1f5f9;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --accent-light: #dbeafe;
+    --green-light: #dcfce7;
+    --orange-light: #fef3c7;
+    --red-light: #fee2e2;
+    --purple-light: #ede9fe;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Respect system preference when no data-theme is set */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+        --bg: #0f172a;
+        --bg-card: #1e293b;
+        --bg-elevated: #1e293b;
+        --bg-input: #334155;
+        --bg-hover: #334155;
+        --border: #334155;
+        --border-light: #1e293b;
+        --text-primary: #f1f5f9;
+        --text-secondary: #94a3b8;
+        --text-muted: #64748b;
+        --accent-light: rgba(59, 130, 246, 0.15);
+        --green-light: rgba(34, 197, 94, 0.15);
+        --orange-light: rgba(245, 158, 11, 0.15);
+        --red-light: rgba(239, 68, 68, 0.15);
+        --purple-light: rgba(139, 92, 246, 0.15);
+        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+        --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+        --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+}
+
+/* Accessibility: Ensure sufficient contrast ratios */
+[data-theme="dark"] .agent-card,
+[data-theme="dark"] .summary-card,
+[data-theme="dark"] .sys-card,
+[data-theme="dark"] .model-usage-item,
+[data-theme="dark"] .cmd-btn,
+[data-theme="dark"] .header-btn {
+    border-color: var(--border);
+}
+
+/* Ensure text contrast meets WCAG AA (4.5:1) */
+[data-theme="dark"] .text-primary,
+[data-theme="dark"] .text-secondary,
+[data-theme="dark"] .text-muted {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .text-secondary {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .text-muted {
+    color: var(--text-muted);
+}
+
+/* ========== Theme Toggle Button ========== */
+.theme-toggle-container {
+    display: inline-flex;
+    align-items: center;
+}
+
+.theme-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.theme-toggle-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.theme-toggle-icon {
+    font-size: 16px;
+}
+
+.theme-toggle-label {
+    font-size: 12px;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+    .theme-toggle-label {
+        display: none;
+    }
+    .theme-toggle-btn {
+        padding: 6px 10px;
+    }
+}
+
+/* Dark mode overrides for hardcoded colors */
+[data-theme="dark"] .error-banner {
+    background: linear-gradient(90deg, #b91c1c, #dc2626);
+}
+
+[data-theme="dark"] .error-fix-btn {
+    background: white;
+    color: #b91c1c;
+}
+
+[data-theme="dark"] .error-fix-btn:hover {
+    background: #fef2f2;
+}
+
+[data-theme="dark"] .error-sre-btn {
+    background: rgba(255, 255, 255, 0.9);
+    color: #6d28d9;
+}
+
+[data-theme="dark"] .error-sre-btn:hover {
+    background: #ede9fe;
+}
+
+[data-theme="dark"] .error-dismiss-btn {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .log-terminal,
+[data-theme="dark"] .cmd-output-content {
+    background: #0a0e1a;
+    color: #d1d5db;
+}
+
+[data-theme="dark"] .header-logo {
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+}
+
+/* Chart colors for dark mode */
+[data-theme="dark"] .progress-fill.blue {
+    background: linear-gradient(90deg, #60a5fa, #93c5fd);
+}
+
+[data-theme="dark"] .progress-fill.green {
+    background: linear-gradient(90deg, #4ade80, #86efac);
+}
+
+[data-theme="dark"] .progress-fill.amber {
+    background: linear-gradient(90deg, #fbbf24, #fcd34d);
 }
