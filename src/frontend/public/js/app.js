@@ -708,7 +708,7 @@ function renderDashboard(data) {
             <div class="agent-info-row" style="font-size:11px">
                 <span class="agent-info-label">模型 / 耗時</span>
                 <div style="display:flex; gap:4px; align-items:center">
-                    <span class="agent-info-value" style="font-size:10px; opacity:0.8">${esc(s.model.split('/').pop())}</span>
+                    <span class="agent-info-value" style="font-size:10px; opacity:0.8">${s.model ? esc(s.model.split('/').pop()) : 'unknown'}</span>
                     ${durationHtml}
                 </div>
             </div>
