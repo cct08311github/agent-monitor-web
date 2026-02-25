@@ -129,7 +129,7 @@ async function getSystemResources() {
         const totalMem = os.totalmem();
         const freeMem = os.freemem();
         const memUsage = ((totalMem - freeMem) / totalMem * 100).toFixed(1);
-        
+
         let diskUsage = '0';
         try {
             // Using execFile for df is safer
@@ -233,7 +233,7 @@ function detectDetailedActivity(agentId) {
                     if (isThisWeek(updatedAt)) detail.costs.week += sessionCost;
                     if (isThisMonth(updatedAt)) detail.costs.month += sessionCost;
                 }
-                
+
                 if (updatedAt >= latestSessionTime && s.model) {
                     latestSessionTime = updatedAt;
                     detail.activeModel = s.model;
@@ -329,8 +329,8 @@ async function buildDashboardPayload() {
 
     const agents = parseAgentsList(agentsResult.stdout || '').map(a => {
         const activity = detectDetailedActivity(a.id);
-        // Priority: activeModel from session > parsed model from agents list
-        return { ...a, ...activity, model: activity.activeModel || a.model };
+        // Priority: parsed model from agents config > activeModel from session
+        return { ...a, ...activity, model: a.model || activity.activeModel, activeModel: activity.activeModel };
     });
 
     let cronJobs = [];
@@ -402,7 +402,7 @@ async function updateSharedData() {
 async function doBroadcast() {
     if (sseClients.size === 0) return;
     if (!sharedPayload) await updateSharedData();
-    
+
     const dataStr = `data: ${JSON.stringify(sharedPayload)}\n\n`;
     sseClients.forEach((res) => res.write(dataStr));
 }

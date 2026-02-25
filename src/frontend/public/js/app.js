@@ -394,7 +394,10 @@ async function confirmModelSwitch() {
         if (!data.success) throw new Error(data.error || data.output || 'Failed');
         showToast(`✅ ${modelSwitchTarget} 已切換至 ${model}`, 'success');
         pushLog(`Model switched: ${modelSwitchTarget} → ${model}`, 'info');
-        update(true);
+        await update(true);
+        if (currentDesktopTab === 'detail' && modelSwitchTarget) {
+            showAgentDetail(modelSwitchTarget);
+        }
     } catch (e) {
         showToast(`❌ 切換失敗: ${e.message}`, 'error');
         pushLog(`Model switch failed: ${e.message}`, 'err');
@@ -545,7 +548,7 @@ function updateCostDisplay() {
     if (!latestDashboard) return;
     const range = document.getElementById('costRange').value;
     const agents = latestDashboard.agents || [];
-    
+
     // Use the periodic costs from backend if available, otherwise fallback to legacy total cost
     let totalUSD = 0;
     if (range === 'all') {
@@ -553,7 +556,7 @@ function updateCostDisplay() {
     } else {
         totalUSD = agents.reduce((s, a) => s + parseFloat(a.costs?.[range] ?? a.cost ?? 0), 0);
     }
-    
+
     const rangeLabel = { today: '今日', week: '本週', month: '月', all: '全部' }[range] || '月';
     document.getElementById('costLabel').textContent = `${rangeLabel}費用 (TWD)`;
     document.getElementById('totalCost').textContent = formatTWD(totalUSD);
@@ -564,12 +567,12 @@ function renderModelUsage(listId, summaryId, agents) {
     const range = document.getElementById('costRange')?.value || 'month';
     const allModelUsage = {};
     let totalCost = 0;
-    
+
     agents.forEach(a => {
         // Calculate total for the summary
         const agentPeriodCost = (range === 'all' ? (a.costs?.total ?? a.cost ?? 0) : (a.costs?.[range] ?? a.cost ?? 0));
         totalCost += parseFloat(agentPeriodCost);
-        
+
         if (a.modelUsage) {
             Object.entries(a.modelUsage).forEach(([model, u]) => {
                 if (!allModelUsage[model]) allModelUsage[model] = { total: 0, cost: 0, sessions: 0 };
@@ -686,7 +689,7 @@ function renderDashboard(data) {
         const sd = s.status === 'running' ? 'online' : (s.status === 'recent' ? 'running' : 'idle');
         const abt = s.abortedLastRun ? '<span style="color:var(--red);font-weight:600;font-size:10px"> ⚠️ ABORTED</span>' : '';
         const durationHtml = s.duration ? `<span class="agent-info-value" style="background:var(--bg-muted);padding:1px 4px;border-radius:4px">${s.duration}</span>` : '';
-        
+
         return `<div class="agent-card ${sc}" style="padding:12px">
             <div class="agent-card-header" style="margin-bottom:8px">
                 <div class="agent-card-name">
@@ -980,7 +983,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('themechange', () => {
         if (currentDesktopTab === 'system') updateCharts();
     });
-    
+
     // Ensure theme manager is initialized and button is properly connected
     if (typeof ThemeManager !== 'undefined') {
         console.log('ThemeManager detected, ensuring button connection');

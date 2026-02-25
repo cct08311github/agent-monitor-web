@@ -35,7 +35,7 @@ class LegacyControlController {
                 if (!agentId || !message || !/^[A-Za-z0-9_-]+$/.test(agentId)) {
                     return res.status(400).json({ success: false, error: 'bad_request', message: 'Invalid agent ID format.' });
                 }
-                
+
                 const { stdout, stderr } = await execFilePromise(OPENCLAW_BIN, ['agent', '--agent', agentId, '--message', message, '--no-color']);
                 return res.json({ success: true, output: stdout || stderr });
             }
@@ -49,15 +49,34 @@ class LegacyControlController {
                     return res.status(400).json({ success: false, error: 'bad_request', message: 'Invalid format.' });
                 }
 
-                const { stdout, stderr } = await execFilePromise(OPENCLAW_BIN, ['models', 'set', model, '--agent', agentId]);
-                return res.json({ success: true, output: stdout || stderr });
+                try {
+                    const configPath = path.join(OPENCLAW_ROOT, 'openclaw.json');
+                    const configData = require('fs').readFileSync(configPath, 'utf8');
+                    const config = JSON.parse(configData);
+                    let found = false;
+                    for (const a of config.agents.list) {
+                        if (a.id === agentId) {
+                            a.model.primary = model;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found) {
+                        require('fs').writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+                        return res.json({ success: true, output: `Model switched for ${agentId} to ${model}` });
+                    } else {
+                        return res.status(404).json({ success: false, error: 'not_found', message: `Agent ${agentId} not found in config` });
+                    }
+                } catch (err) {
+                    return res.status(500).json({ success: false, error: 'config_error', message: err.message });
+                }
             }
 
             // Case 3: System Operations (Restart/Update)
             if (command === 'restart' || command === 'update') {
                 const args = command === 'restart' ? ['gateway', 'restart'] : ['update'];
                 res.json({ success: true, output: `COMMAND_ACCEPTED: ${command.toUpperCase()} initiated.` });
-                
+
                 setTimeout(() => {
                     execFile(OPENCLAW_BIN, args, (error) => {
                         if (error) console.error(`[Control] ${command} failed:`, error.message);
