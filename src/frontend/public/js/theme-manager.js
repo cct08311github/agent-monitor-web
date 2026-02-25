@@ -58,12 +58,8 @@ const ThemeManager = {
         const effective = this.getEffectiveTheme();
         const root = document.documentElement;
 
-        // Set data-theme attribute (remove if auto)
-        if (this.currentTheme === this.THEMES.AUTO) {
-            root.removeAttribute('data-theme');
-        } else {
-            root.setAttribute('data-theme', this.currentTheme);
-        }
+        // Set data-theme attribute
+        root.setAttribute('data-theme', effective);
 
         // Update meta theme-color for mobile browsers
         this.updateThemeColor(effective);
