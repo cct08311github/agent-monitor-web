@@ -36,6 +36,84 @@ let chatSending = false;
 let cronJobs = [];
 let isCronLoading = false;
 
+// --- OpenClaw Live Log Streaming ---
+let ocLogSource = null;  // EventSource connection
+const OC_LOG_MAX_LINES = 500; // Rolling buffer limit
+
+function toggleOcLog() {
+    if (ocLogSource) {
+        stopOcLog();
+    } else {
+        startOcLog();
+    }
+}
+
+function startOcLog() {
+    const terminal = document.getElementById('ocLogTerminal');
+    const badge = document.getElementById('ocLogStatus');
+    const btn = document.getElementById('ocLogToggleBtn');
+    if (!terminal) return;
+
+    terminal.innerHTML = '<span class="oc-log-line info">連接中...</span>';
+    ocLogSource = new EventSource('/api/logs/stream');
+
+    ocLogSource.onopen = () => {
+        if (badge) { badge.textContent = '● 監看中'; badge.className = 'oc-log-badge live'; }
+        if (btn) btn.innerHTML = '⏹ 停止監看';
+    };
+
+    ocLogSource.onmessage = (e) => {
+        try {
+            const { line } = JSON.parse(e.data);
+            appendOcLogLine(terminal, line);
+        } catch (_) { }
+    };
+
+    ocLogSource.onerror = () => {
+        appendOcLogLine(terminal, '[連線中斷，請重新開始監看]');
+        stopOcLog();
+    };
+}
+
+function stopOcLog() {
+    if (ocLogSource) {
+        ocLogSource.close();
+        ocLogSource = null;
+    }
+    const badge = document.getElementById('ocLogStatus');
+    const btn = document.getElementById('ocLogToggleBtn');
+    if (badge) { badge.textContent = '● 已停止'; badge.className = 'oc-log-badge'; }
+    if (btn) btn.innerHTML = '▶ 開始監看';
+}
+
+function clearOcLog() {
+    const terminal = document.getElementById('ocLogTerminal');
+    if (terminal) terminal.innerHTML = '<span class="oc-log-line">日誌已清除</span>';
+}
+
+function appendOcLogLine(terminal, line) {
+    // Classify line for colour coding
+    const lower = line.toLowerCase();
+    let cls = '';
+    if (lower.includes('error') || lower.includes('err ') || lower.includes('[error]')) cls = ' err';
+    else if (lower.includes('warn') || lower.includes('[warn]')) cls = ' warn';
+    else if (lower.includes('info') || lower.includes('[info]')) cls = ' info';
+
+    const span = document.createElement('span');
+    span.className = 'oc-log-line' + cls;
+    span.textContent = line;
+    terminal.appendChild(span);
+
+    // Rolling buffer: trim oldest lines
+    const lines = terminal.querySelectorAll('.oc-log-line');
+    if (lines.length > OC_LOG_MAX_LINES) {
+        lines[0].remove();
+    }
+
+    // Auto-scroll to bottom
+    terminal.scrollTop = terminal.scrollHeight;
+}
+
 window.matchMedia('(max-width: 768px)').addEventListener('change', (e) => {
     isMobile = e.matches;
 });
@@ -97,12 +175,18 @@ function getStatusInfo(status) {
 // --- Navigation ---
 function switchDesktopTab(tab) {
     currentDesktopTab = tab;
-    document.querySelectorAll('.dtab-page').forEach(p => p.classList.remove('active'));
+    // Generic dtab pages (not chat tab)
+    document.querySelectorAll('.dtab-page:not(.chat-tab-page)').forEach(p => p.classList.remove('active'));
+    // Chat tab uses its own class
+    const chatPage = document.getElementById('dtabChat');
+    if (chatPage) chatPage.classList.toggle('active-tab', tab === 'chat');
+
     const pageId = { monitor: 'dtabMonitor', system: 'dtabSystem', logs: 'dtabLogs', detail: 'dtabDetail' }[tab];
     if (pageId) document.getElementById(pageId).classList.add('active');
     document.querySelectorAll('.desktop-tab').forEach(t => t.classList.toggle('active', t.dataset.dtab === tab));
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.page === tab));
     if (tab === 'system') setTimeout(updateCharts, 100);
+    if (tab === 'chat') initChatPage();
 }
 
 function switchSubTab(tab) {
@@ -112,6 +196,120 @@ function switchSubTab(tab) {
     const contentId = { agents: 'subTabAgents', subagents: 'subTabSubagents', cron: 'subTabCron' }[tab];
     if (contentId) document.getElementById(contentId).classList.add('active');
     if (tab === 'cron') fetchCronJobs();
+}
+
+// ========== Dedicated Chat Page ==========
+let chatPageAgent = 'main';
+let chatPageSending = false;
+let chatPageInited = false;
+
+function initChatPage() {
+    // Populate agent pills from latest dashboard data
+    const pillsEl = document.getElementById('chatAgentPills');
+    if (!pillsEl) return;
+    const agents = latestDashboard?.agents || [];
+    // Always include 'main', add others from dashboard
+    const agentIds = ['main', ...agents.map(a => a.id).filter(id => id !== 'main')];
+    pillsEl.innerHTML = agentIds.map(id => `
+        <button class="chat-agent-pill${id === chatPageAgent ? ' active' : ''}" data-agent="${esc(id)}" onclick="selectChatAgent('${esc(id)}')">
+            ${getAgentEmoji(id)} ${esc(id)}
+        </button>`).join('');
+
+    // Show empty state if no messages yet
+    const log = document.getElementById('chatPageLog');
+    if (log && !log.children.length) {
+        log.innerHTML = `<div class="chat-page-empty">
+            <div class="chat-page-empty-icon">💬</div>
+            <div class="chat-page-empty-text">與 <strong>${esc(chatPageAgent)}</strong> 開始對話<br><span style="font-size:12px;opacity:.6">輸入訊息後按 Shift+Enter 送出</span></div>
+        </div>`;
+    }
+
+    if (!chatPageInited) {
+        chatPageInited = true;
+        const input = document.getElementById('chatPageInput');
+        if (input) {
+            input.addEventListener('input', () => {
+                const counter = document.getElementById('chatPageCharCount');
+                if (counter) counter.textContent = `${input.value.length}/2000`;
+                autoGrowTextarea(input);
+            });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); sendChatPage(); }
+                else if (e.key === 'Enter' && isMobile) { e.preventDefault(); sendChatPage(); }
+            });
+        }
+        // Mobile: round arrow button
+        const sendBtn = document.getElementById('chatPageSendBtn');
+        if (sendBtn && isMobile) sendBtn.innerHTML = '↑';
+    }
+}
+
+function selectChatAgent(agentId) {
+    chatPageAgent = agentId;
+    document.querySelectorAll('.chat-agent-pill').forEach(p =>
+        p.classList.toggle('active', p.dataset.agent === agentId));
+    // Clear messages and show new empty state
+    const log = document.getElementById('chatPageLog');
+    if (log) {
+        log.innerHTML = `<div class="chat-page-empty">
+            <div class="chat-page-empty-icon">${getAgentEmoji(agentId)}</div>
+            <div class="chat-page-empty-text">與 <strong>${esc(agentId)}</strong> 開始對話<br><span style="font-size:12px;opacity:.6">輸入訊息後按 Shift+Enter 送出</span></div>
+        </div>`;
+    }
+    document.getElementById('chatPageInput')?.focus();
+}
+
+async function sendChatPage() {
+    if (chatPageSending) return;
+    const input = document.getElementById('chatPageInput');
+    const msg = input?.value.trim();
+    if (!msg) return;
+    if (msg.length > 2000) { showToast('❌ 訊息超過 2000 字', 'error'); return; }
+    if (!chatPageAgent || !/^[A-Za-z0-9_-]+$/.test(chatPageAgent)) { showToast('❌ 無效的 Agent ID', 'error'); return; }
+
+    chatPageSending = true;
+    const log = document.getElementById('chatPageLog');
+    // Remove empty state if present
+    log.querySelector('.chat-page-empty')?.remove();
+
+    appendChatPageMsg(log, msg, 'user');
+    input.value = '';
+    input.style.height = 'auto';
+    log.scrollTop = log.scrollHeight;
+
+    // Typing indicator
+    const typingId = `typing-${Date.now()}`;
+    const typingEl = document.createElement('div');
+    typingEl.id = typingId;
+    typingEl.className = 'chat-msg agent';
+    typingEl.innerHTML = '<span style="opacity:.5">···</span>';
+    log.appendChild(typingEl);
+    log.scrollTop = log.scrollHeight;
+
+    try {
+        const res = await fetch('/api/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command: 'talk', agentId: chatPageAgent, message: msg })
+        });
+        const data = await res.json();
+        document.getElementById(typingId)?.remove();
+        if (!data.success) throw new Error(data.error || 'Failed');
+        appendChatPageMsg(log, data.output, 'agent');
+    } catch (e) {
+        document.getElementById(typingId)?.remove();
+        appendChatPageMsg(log, `❌ ${e.message}`, 'error');
+        pushLog(`ChatPage error (${chatPageAgent}): ${e.message}`, 'err');
+    }
+    chatPageSending = false;
+    log.scrollTop = log.scrollHeight;
+}
+
+function appendChatPageMsg(log, text, type) {
+    const el = document.createElement('div');
+    el.className = `chat-msg ${type}`;
+    el.textContent = text;
+    log.appendChild(el);
 }
 
 // --- Log Terminal ---
@@ -283,15 +481,26 @@ function detectErrors(data) {
 function openChat(agentId) {
     if (!/^[A-Za-z0-9_-]+$/.test(agentId)) { showToast('❌ 無效的 Agent ID', 'error'); return; }
     currentTargetAgent = agentId;
-    document.getElementById('chatTitle').textContent = `💬 ${agentId.toUpperCase()}`;
-    document.getElementById('chatLog').innerHTML = '';
-    document.getElementById('chatInput').value = '';
+    // Title: show full name on desktop, compact on mobile
+    const emoji = getAgentEmoji(agentId);
+    document.getElementById('chatTitle').innerHTML = `${emoji} <strong>${agentId}</strong>`;
+    const log = document.getElementById('chatLog');
+    log.innerHTML = '';
+    const input = document.getElementById('chatInput');
+    input.value = '';
+    input.style.height = 'auto';
     updateCharCount();
+    // Update send button icon for mobile
+    const sendBtn = document.querySelector('#chatModal .chat-send');
+    if (sendBtn) sendBtn.innerHTML = isMobile ? '↑' : '發送';
     document.getElementById('chatModal').style.display = 'flex';
-    document.getElementById('chatInput').focus();
+    // Small delay to let modal render before focusing (critical for iOS keyboard)
+    setTimeout(() => {
+        input.focus();
+        log.scrollTop = log.scrollHeight;
+    }, 100);
 
     // Auto-send "hi"
-    const log = document.getElementById('chatLog');
     log.innerHTML += `<div class="chat-msg system">正在連接 ${agentId}...</div>`;
     autoSendHi(agentId);
 }
@@ -333,6 +542,11 @@ function updateCharCount() {
     if (input && counter) counter.textContent = `${input.value.length}/2000`;
 }
 
+function autoGrowTextarea(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+}
+
 async function sendChat() {
     if (chatSending) return;
     const input = document.getElementById('chatInput');
@@ -345,6 +559,7 @@ async function sendChat() {
     const log = document.getElementById('chatLog');
     log.innerHTML += `<div class="chat-msg user">${esc(msg)}</div>`;
     input.value = '';
+    input.style.height = 'auto'; // Reset textarea height
     updateCharCount();
     log.scrollTop = log.scrollHeight;
 
@@ -669,7 +884,7 @@ function renderDashboard(data) {
         const taskLabel = a.currentTask?.label || '';
         const isExecuting = taskLabel === 'EXECUTING';
         const taskHtml = taskText ? `<div class="agent-task-preview">
-            <div class="agent-task-header"><span class="agent-task-label ${isExecuting ? 'executing' : 'idle'}">${isExecuting ? '<span class="task-pulse"></span>執行中' : '💤 閒置'}</span></div>
+            <div class="agent-task-header"><span class="agent-task-label ${isExecuting ? 'executing' : 'idle'}">${isExecuting ? '<span class="task-pulse"></span>執行中' : '💤 閒置'}</span>${taskText.length > 80 ? '<span style="font-size:9px;color:var(--text-muted);margin-left:auto">點擊查看全文↗</span>' : ''}</div>
             <div class="agent-task-content" title="${esc(taskText)}">${esc(taskText)}</div></div>` : '';
         return `<div class="agent-card ${si.class}" onclick="showAgentDetail('${esc(a.id)}')">
             <div class="agent-card-header"><div class="agent-card-name"><div class="agent-avatar">${getAgentEmoji(a.id)}</div><div><div class="agent-name">${esc(a.id)}</div><div class="agent-hostname">${esc(a.model || 'N/A')}</div></div></div>
@@ -969,7 +1184,24 @@ async function manualRepair() {
 
 document.addEventListener('DOMContentLoaded', () => {
     const chatInput = document.getElementById('chatInput');
-    if (chatInput) chatInput.addEventListener('input', updateCharCount);
+    if (chatInput) {
+        chatInput.addEventListener('input', () => {
+            updateCharCount();
+            autoGrowTextarea(chatInput);
+        });
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.shiftKey) {
+                // Shift+Enter always sends (desktop shortcut)
+                e.preventDefault();
+                sendChat();
+            } else if (e.key === 'Enter' && isMobile) {
+                // On mobile, plain Enter also sends (like iMessage/WhatsApp)
+                e.preventDefault();
+                sendChat();
+            }
+            // Desktop plain Enter = newline (default textarea behavior)
+        });
+    }
     const sreInput = document.getElementById('sreInput');
     if (sreInput) sreInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendSREFollowUp(); });
     pushLog('OpenClaw Watch Pro v2.0.3 啟動（含 Watchdog）', 'info');

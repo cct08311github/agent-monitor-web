@@ -1,5 +1,10 @@
 const express = require('express');
 const router = express.Router();
+const { spawn } = require('child_process');
+const os = require('os');
+const path = require('path');
+
+const OPENCLAW_BIN = path.join(os.homedir(), '.openclaw', 'bin', 'openclaw');
 
 const agentController = require('../controllers/agentController');
 const securityController = require('../controllers/securityController');
@@ -78,6 +83,65 @@ router.post('/watchdog/toggle', auth.localhostOnlyControl, auth.rateLimit, (req,
         gatewayWatchdog.stop();
     }
     res.json({ success: true, watchdog: gatewayWatchdog.getStatus() });
+});
+
+// OpenClaw Logs Streaming (SSE)
+// Streams `openclaw logs --follow` output as Server-Sent Events
+router.get('/logs/stream', auth.localhostOnlyControl, (req, res) => {
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no'
+    });
+
+    // Send a heartbeat comment every 20s to keep connection alive
+    const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 20000);
+
+    const child = spawn(OPENCLAW_BIN, ['logs', '--follow'], {
+        env: { ...process.env, FORCE_COLOR: '0' },
+        stdio: ['ignore', 'pipe', 'pipe']
+    });
+
+    function sendLine(line) {
+        const trimmed = line.trimEnd();
+        if (!trimmed) return;
+        // SSE format: data: <payload>\n\n
+        res.write(`data: ${JSON.stringify({ line: trimmed, ts: Date.now() })}\n\n`);
+    }
+
+    let stdoutBuf = '';
+    child.stdout.on('data', (chunk) => {
+        stdoutBuf += chunk.toString();
+        const lines = stdoutBuf.split('\n');
+        stdoutBuf = lines.pop(); // keep incomplete last line
+        lines.forEach(sendLine);
+    });
+
+    let stderrBuf = '';
+    child.stderr.on('data', (chunk) => {
+        stderrBuf += chunk.toString();
+        const lines = stderrBuf.split('\n');
+        stderrBuf = lines.pop();
+        lines.forEach(sendLine);
+    });
+
+    child.on('close', (code) => {
+        clearInterval(heartbeat);
+        res.write(`data: ${JSON.stringify({ line: `[openclaw logs exited: code ${code}]`, ts: Date.now() })}\n\n`);
+        res.end();
+    });
+
+    child.on('error', (err) => {
+        clearInterval(heartbeat);
+        res.write(`data: ${JSON.stringify({ line: `[Error spawning openclaw: ${err.message}]`, ts: Date.now() })}\n\n`);
+        res.end();
+    });
+
+    req.on('close', () => {
+        clearInterval(heartbeat);
+        try { child.kill('SIGTERM'); } catch (_) { }
+    });
 });
 
 module.exports = router;

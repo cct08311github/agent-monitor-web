@@ -263,7 +263,7 @@ function detectDetailedActivity(agentId) {
                         let content = "";
                         if (msgObj.content && Array.isArray(msgObj.content)) content = msgObj.content.filter(c => c.type === 'text').map(c => c.text).join(' ');
                         else if (typeof msgObj.content === 'string') content = msgObj.content;
-                        if (content) detail.currentTask = { label: (Date.now() - mtime < 300000) ? 'EXECUTING' : 'IDLE', task: content.substring(0, 500) };
+                        if (content) detail.currentTask = { label: (Date.now() - mtime < 300000) ? 'EXECUTING' : 'IDLE', task: content.substring(0, 2000) };
                     } catch (e) { }
                 }
                 detail.minutesAgo = Math.floor((Date.now() - mtime) / 60000);
@@ -365,7 +365,7 @@ function minimizeDashboardPayload(payload) {
         const safeWorkspace = a && a.workspace ? '[REDACTED_WORKSPACE]' : a.workspace;
         const safeCurrentTask = a && a.currentTask ? {
             ...a.currentTask,
-            task: truncate(maskSensitivePaths(String(a.currentTask.task || '')), 120)
+            task: maskSensitivePaths(String(a.currentTask.task || ''))
         } : a.currentTask;
         return { ...a, workspace: safeWorkspace, currentTask: safeCurrentTask };
     }) : [];
