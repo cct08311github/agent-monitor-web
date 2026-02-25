@@ -51,6 +51,7 @@
                     <button class="desktop-tab" data-dtab="system" onclick="switchDesktopTab('system')">📊
                         系統/費用</button>
                     <button class="desktop-tab" data-dtab="logs" onclick="switchDesktopTab('logs')">⚙️ 操作/日誌</button>
+                    <button class="desktop-tab" data-dtab="chat" onclick="switchDesktopTab('chat')">💬 聊天室</button>
                 </div>
             </div>
             <div class="header-right">
@@ -250,6 +251,17 @@
                             <h2>📜 即時日誌</h2>
                         </div>
                         <div id="logTerminal" class="log-terminal">系統準備就緒...</div>
+
+                        <!-- OpenClaw Live Logs Panel -->
+                        <div class="section-header" style="margin-top:20px">
+                            <h2>🔭 OpenClaw 日誌監看</h2>
+                            <div style="display:flex;gap:8px;align-items:center">
+                                <span id="ocLogStatus" class="oc-log-badge">● 未連接</span>
+                                <button id="ocLogToggleBtn" class="cmd-btn" onclick="toggleOcLog()">▶ 開始監看</button>
+                                <button class="cmd-btn" onclick="clearOcLog()" title="清除日誌">🗑</button>
+                            </div>
+                        </div>
+                        <div id="ocLogTerminal" class="log-terminal oc-log-terminal">等待開始監看...</div>
                     </div>
                 </div>
             </div>
@@ -258,6 +270,29 @@
             <div id="dtabDetail" class="dtab-page">
                 <div class="detail-back" onclick="switchDesktopTab('monitor')">← 返回監控</div>
                 <div id="detailContent"></div>
+            </div>
+
+            <!-- TAB: Chat Room (全螢幕聊天室) -->
+            <div id="dtabChat" class="dtab-page chat-tab-page">
+                <!-- Agent Selector Pills -->
+                <div class="chat-agent-bar">
+                    <span class="chat-agent-bar-label">對話對象：</span>
+                    <div id="chatAgentPills" class="chat-agent-pills">
+                        <button class="chat-agent-pill active" data-agent="main" onclick="selectChatAgent('main')">🐾
+                            main</button>
+                    </div>
+                </div>
+                <!-- Message List -->
+                <div id="chatPageLog" class="chat-page-log"></div>
+                <!-- Input Bar -->
+                <div class="chat-page-input-row">
+                    <div class="chat-input-wrapper">
+                        <textarea id="chatPageInput" class="chat-input" rows="1"
+                            placeholder="輸入訊息... (Enter 換行，Shift+Enter 送出)" maxlength="2000"></textarea>
+                        <span id="chatPageCharCount" class="char-count">0/2000</span>
+                    </div>
+                    <button class="chat-send chat-page-send" id="chatPageSendBtn" onclick="sendChatPage()">發送</button>
+                </div>
             </div>
         </main>
 
@@ -270,10 +305,12 @@
                 </div>
                 <div id="chatLog" class="chat-log"></div>
                 <div class="chat-input-row">
-                    <input id="chatInput" class="chat-input" placeholder="輸入訊息..." maxlength="2000"
-                        onkeydown="if(event.key==='Enter') sendChat()">
-                    <span id="chatCharCount" class="char-count">0/2000</span>
-                    <button class="chat-send" onclick="sendChat()">發送</button>
+                    <div class="chat-input-wrapper">
+                        <textarea id="chatInput" class="chat-input" placeholder="輸入訊息... (Enter 換行，Shift+Enter 送出)"
+                            maxlength="2000" rows="1"></textarea>
+                        <span id="chatCharCount" class="char-count">0/2000</span>
+                    </div>
+                    <button class="chat-send" onclick="sendChat()" title="送出 (Shift+Enter)">發送</button>
                 </div>
             </div>
         </div>
@@ -373,6 +410,10 @@
             <button class="nav-btn" data-page="logs" onclick="switchDesktopTab('logs')">
                 <span class="nav-icon">⚙️</span>
                 <span class="nav-label">操作/日誌</span>
+            </button>
+            <button class="nav-btn" data-page="chat" onclick="switchDesktopTab('chat')">
+                <span class="nav-icon">💬</span>
+                <span class="nav-label">聊天</span>
             </button>
         </nav>
     </div>
