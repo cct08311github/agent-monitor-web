@@ -58,7 +58,7 @@ const ThemeManager = {
         const effective = this.getEffectiveTheme();
         const root = document.documentElement;
 
-        // Set data-theme attribute
+        // Always set data-theme attribute
         root.setAttribute('data-theme', effective);
 
         // Update meta theme-color for mobile browsers
@@ -127,18 +127,30 @@ const ThemeManager = {
 
     // Render theme toggle UI in header
     renderThemeToggle() {
+        // Use existing button if already in header
+        const existingBtn = document.getElementById('themeToggleBtn');
+        if (existingBtn) {
+            const effective = this.getEffectiveTheme();
+            const isAuto = this.currentTheme === this.THEMES.AUTO;
+            
+            let icon = '🌓'; // auto
+            if (this.currentTheme === this.THEMES.LIGHT) icon = '☀️';
+            if (this.currentTheme === this.THEMES.DARK) icon = '🌙';
+            
+            existingBtn.innerHTML = icon;
+            existingBtn.title = `切換深色/淺色模式 (目前: ${isAuto ? '自動' : effective === 'dark' ? '深色' : '淺色'})`;
+            return;
+        }
+        
+        // Fallback: create container if needed
         let toggleContainer = document.getElementById('themeToggleContainer');
         if (!toggleContainer) {
             toggleContainer = document.createElement('div');
             toggleContainer.id = 'themeToggleContainer';
             toggleContainer.className = 'theme-toggle-container';
-            // Insert into header-right
             const headerRight = document.querySelector('.header-right');
             if (headerRight) {
                 headerRight.insertBefore(toggleContainer, headerRight.firstChild);
-            } else {
-                // Fallback: insert before body end
-                document.body.appendChild(toggleContainer);
             }
         }
 
@@ -167,9 +179,12 @@ const ThemeManager = {
         return this.currentTheme;
     },
 
-    // Get effective theme for external use
-    getEffectiveTheme() {
-        return this.getEffectiveTheme();
+    // Get effective theme for external use (duplicate method name fixed)
+    getEffectiveThemeForExternal() {
+        if (this.currentTheme === this.THEMES.AUTO) {
+            return this.prefersDark() ? this.THEMES.DARK : this.THEMES.LIGHT;
+        }
+        return this.currentTheme;
     }
 };
 
