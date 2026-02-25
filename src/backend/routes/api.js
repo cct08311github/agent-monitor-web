@@ -23,6 +23,7 @@ router.get('/dashboard', legacyDashboardController.getDashboard); // very legacy
 // Cron Jobs
 router.get('/cron/jobs', cronController.getJobs);
 router.post('/cron/jobs/:id/toggle', auth.localhostOnlyControl, auth.rateLimit, cronController.toggleJob);
+router.post('/cron/jobs/:id/run', auth.localhostOnlyControl, auth.rateLimit, cronController.runJob);
 
 // Legacy Control Endpoints
 const controlRouter = express.Router();
