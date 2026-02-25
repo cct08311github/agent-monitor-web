@@ -1108,8 +1108,12 @@ body {
     font-size: 13px;
     color: var(--text-secondary);
     line-height: 1.6;
-    max-height: 150px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 300px;
     overflow-y: auto;
+}
+    line-height: 1.6;
     white-space: pre-wrap;
     word-break: break-word;
 }
