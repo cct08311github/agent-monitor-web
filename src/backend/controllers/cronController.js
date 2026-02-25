@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { exec } = require('child_process');
 
 const JOBS_FILE = '/Users/openclaw/.openclaw/cron/jobs.json';
 
@@ -52,6 +53,51 @@ class CronController {
             res.json({ success: true, job: data.jobs[jobIndex] });
         } catch (error) {
             console.error('更新 Cron 任務失敗:', error);
+            res.status(500).json({ success: false, error: error.message });
+        }
+    }
+
+    /**
+     * 立即執行指定 Cron 任務
+     */
+    async runJob(req, res) {
+        const { id } = req.params;
+        console.log(`[CronController] Manual run requested for job id: ${id}`);
+
+        try {
+            // 驗證任務存在
+            if (!fs.existsSync(JOBS_FILE)) {
+                throw new Error('任務文件不存在');
+            }
+            const data = JSON.parse(fs.readFileSync(JOBS_FILE, 'utf8'));
+            const job = data.jobs.find(j => j.id === id);
+            if (!job) {
+                return res.status(404).json({ success: false, error: '找不到該任務' });
+            }
+
+            // 使用 child_process.exec 執行 openclaw cron run <jobId>
+            const command = `openclaw cron run ${id}`;
+            console.log(`[CronController] Executing command: ${command}`);
+
+            exec(command, (error, stdout, stderr) => {
+                if (error) {
+                    console.error(`[CronController] Job execution failed: ${error.message}`);
+                    console.error(`[CronController] stderr: ${stderr}`);
+                    return res.status(500).json({ 
+                        success: false, 
+                        error: `執行失敗: ${error.message}`,
+                        details: stderr
+                    });
+                }
+                console.log(`[CronController] Job execution succeeded. stdout: ${stdout}`);
+                res.json({ 
+                    success: true, 
+                    message: '任務執行成功',
+                    output: stdout.trim()
+                });
+            });
+        } catch (error) {
+            console.error('[CronController] Unexpected error:', error);
             res.status(500).json({ success: false, error: error.message });
         }
     }
