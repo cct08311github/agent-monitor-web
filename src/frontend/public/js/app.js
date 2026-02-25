@@ -469,7 +469,9 @@ function drawSparkline(canvasId, data, labels) {
     const pad = { top: 22, right: 10, bottom: 24, left: 35 };
     const cw = w - pad.left - pad.right, ch = h - pad.top - pad.bottom;
     ctx.clearRect(0, 0, w, h);
-    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    // Detect dark mode from data-theme attribute or system preference
+    const theme = document.documentElement.getAttribute('data-theme');
+    const isDark = theme === 'dark' || (theme === null && window.matchMedia('(prefers-color-scheme: dark)').matches);
     ctx.fillStyle = isDark ? '#1e293b' : '#f8fafc';
     ctx.fillRect(0, 0, w, h);
 
@@ -974,4 +976,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(fetchHistory, 60000);
     setInterval(fetchWatchdogStatus, 15000); // Poll watchdog every 15s
     window.addEventListener('resize', () => setTimeout(updateCharts, 200));
+    // Redraw charts when theme changes
+    document.addEventListener('themechange', () => {
+        if (currentDesktopTab === 'system') updateCharts();
+    });
 });
