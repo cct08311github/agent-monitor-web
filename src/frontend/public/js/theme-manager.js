@@ -200,6 +200,12 @@ window.ThemeManager = ThemeManager;
 
 // Simple toggle function for inline onclick handler
 window.toggleTheme = function() {
+    console.log('toggleTheme called');
+    if (typeof ThemeManager === 'undefined') {
+        console.error('ThemeManager not defined');
+        if (typeof showToast === 'function') showToast('❌ 主題管理器未載入', 'error');
+        return;
+    }
     ThemeManager.cycleTheme();
     if (typeof showToast === 'function') {
         const effective = ThemeManager.getEffectiveTheme();
