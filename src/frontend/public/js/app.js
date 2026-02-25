@@ -667,7 +667,7 @@ function renderDashboard(data) {
         const isExecuting = taskLabel === 'EXECUTING';
         const taskHtml = taskText ? `<div class="agent-task-preview">
             <div class="agent-task-header"><span class="agent-task-label ${isExecuting ? 'executing' : 'idle'}">${isExecuting ? '<span class="task-pulse"></span>執行中' : '💤 閒置'}</span></div>
-            <div class="agent-task-content" title="${esc(taskText)}">${esc(taskText.length > 80 ? taskText.slice(0, 80) + '…' : taskText)}</div></div>` : '';
+            <div class="agent-task-content" title="${esc(taskText)}">${esc(taskText)}</div></div>` : '';
         return `<div class="agent-card ${si.class}" onclick="showAgentDetail('${esc(a.id)}')">
             <div class="agent-card-header"><div class="agent-card-name"><div class="agent-avatar">${getAgentEmoji(a.id)}</div><div><div class="agent-name">${esc(a.id)}</div><div class="agent-hostname">${esc(a.model || 'N/A')}</div></div></div>
             <div class="agent-status ${si.dotClass}"><span class="agent-status-dot"></span>${si.text}</div></div>
@@ -699,7 +699,7 @@ function renderDashboard(data) {
                 <div class="agent-status ${sd}" style="font-size:10px;padding:2px 8px"><span class="agent-status-dot"></span>${esc(s.status.toUpperCase())}</div>
             </div>
             <div class="agent-task-preview" style="margin: 4px 0 8px 0; background: rgba(0,0,0,0.03); border-radius: 4px; padding: 6px;">
-                <div class="agent-task-content" style="font-size:11px; color:var(--text); -webkit-line-clamp: 2; line-clamp: 2;">${esc(s.label)}</div>
+                <div class="agent-task-content" style="font-size:11px; color:var(--text); white-space: pre-wrap; word-break: break-word; max-height: 40px; overflow-y: auto;">${esc(s.label)}</div>
             </div>
             <div class="agent-info-row" style="font-size:11px; margin-bottom:2px">
                 <span class="agent-info-label">最後活動</span>
@@ -796,7 +796,7 @@ function renderCronJobs() {
                 </div>
             </div>
             <div class="agent-task-preview" style="margin-top:8px">
-                <div class="agent-task-content" style="-webkit-line-clamp: 3; line-clamp: 3;">${esc(job.description || '無描述')}</div>
+                <div class="agent-task-content" style="white-space: pre-wrap; word-break: break-word; max-height: 60px; overflow-y: auto;">${esc(job.description || '無描述')}</div>
             </div>
         </div>`;
     }).join('') || '<div style="color:var(--text-muted);padding:20px;text-align:center;grid-column: 1 / -1;">沒有 Cron 任務</div>';
