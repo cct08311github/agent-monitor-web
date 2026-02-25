@@ -184,10 +184,17 @@ if (document.readyState === 'loading') {
     ThemeManager.init();
 }
 
-// Export for module usage (if supported)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = ThemeManager;
-}
-
 // Global access
 window.ThemeManager = ThemeManager;
+
+// Simple toggle function for inline onclick handler
+window.toggleTheme = function() {
+    ThemeManager.cycleTheme();
+    if (typeof showToast === 'function') {
+        const effective = ThemeManager.getEffectiveTheme();
+        const isAuto = ThemeManager.getCurrentTheme() === 'auto';
+        const message = isAuto ? '主題: 自動 (跟隨系統)' : 
+                        effective === 'dark' ? '主題: 深色模式' : '主題: 淺色模式';
+        showToast(message, 'info');
+    }
+};
