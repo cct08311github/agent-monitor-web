@@ -637,6 +637,7 @@ function renderDashboard(data) {
         const prev = previousAgentsMap[a.id];
         if (!prev && a.status?.includes('active')) pushLog(`🟢 ${a.id} 上線 [${a.model}]`, 'info');
         else if (prev && prev.status !== a.status) pushLog(`${a.status?.includes('active') ? '🟢' : '⚪'} ${a.id}: ${prev.status} → ${a.status}`, 'info');
+        else if (prev && prev.model !== a.model) pushLog(`🔄 ${a.id}: 模型 ${prev.model || 'N/A'} → ${a.model || 'N/A'}`, 'info');
         previousAgentsMap[a.id] = a;
     });
 
