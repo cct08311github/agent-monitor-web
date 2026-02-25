@@ -980,4 +980,16 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('themechange', () => {
         if (currentDesktopTab === 'system') updateCharts();
     });
+    
+    // Ensure theme manager is initialized and button is properly connected
+    if (typeof ThemeManager !== 'undefined') {
+        console.log('ThemeManager detected, ensuring button connection');
+        const themeBtn = document.getElementById('themeToggleBtn');
+        if (themeBtn) {
+            // Remove existing onclick to avoid conflicts
+            themeBtn.removeAttribute('onclick');
+            themeBtn.addEventListener('click', window.toggleTheme);
+            console.log('Theme button reconnected programmatically');
+        }
+    }
 });
