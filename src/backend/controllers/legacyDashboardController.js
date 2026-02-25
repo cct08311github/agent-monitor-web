@@ -129,7 +129,7 @@ async function getSystemResources() {
         const totalMem = os.totalmem();
         const freeMem = os.freemem();
         const memUsage = ((totalMem - freeMem) / totalMem * 100).toFixed(1);
-        
+
         let diskUsage = '0';
         try {
             // Using execFile for df is safer
@@ -233,7 +233,7 @@ function detectDetailedActivity(agentId) {
                     if (isThisWeek(updatedAt)) detail.costs.week += sessionCost;
                     if (isThisMonth(updatedAt)) detail.costs.month += sessionCost;
                 }
-                
+
                 if (updatedAt >= latestSessionTime && s.model) {
                     latestSessionTime = updatedAt;
                     detail.activeModel = s.model;
@@ -263,7 +263,7 @@ function detectDetailedActivity(agentId) {
                         let content = "";
                         if (msgObj.content && Array.isArray(msgObj.content)) content = msgObj.content.filter(c => c.type === 'text').map(c => c.text).join(' ');
                         else if (typeof msgObj.content === 'string') content = msgObj.content;
-                        if (content) detail.currentTask = { label: (Date.now() - mtime < 300000) ? 'EXECUTING' : 'IDLE', task: content.substring(0, 500) };
+                        if (content) detail.currentTask = { label: (Date.now() - mtime < 300000) ? 'EXECUTING' : 'IDLE', task: content.substring(0, 2000) };
                     } catch (e) { }
                 }
                 detail.minutesAgo = Math.floor((Date.now() - mtime) / 60000);
@@ -364,7 +364,7 @@ function minimizeDashboardPayload(payload) {
         const safeWorkspace = a && a.workspace ? '[REDACTED_WORKSPACE]' : a.workspace;
         const safeCurrentTask = a && a.currentTask ? {
             ...a.currentTask,
-            task: truncate(maskSensitivePaths(String(a.currentTask.task || '')), 120)
+            task: maskSensitivePaths(String(a.currentTask.task || ''))
         } : a.currentTask;
         return { ...a, workspace: safeWorkspace, currentTask: safeCurrentTask };
     }) : [];
@@ -401,7 +401,7 @@ async function updateSharedData() {
 async function doBroadcast() {
     if (sseClients.size === 0) return;
     if (!sharedPayload) await updateSharedData();
-    
+
     const dataStr = `data: ${JSON.stringify(sharedPayload)}\n\n`;
     sseClients.forEach((res) => res.write(dataStr));
 }
