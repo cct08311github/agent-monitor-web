@@ -329,6 +329,7 @@ async function buildDashboardPayload() {
 
     const agents = parseAgentsList(agentsResult.stdout || '').map(a => {
         const activity = detectDetailedActivity(a.id);
+        // Priority: activeModel from session > parsed model from agents list
         return { ...a, ...activity, model: activity.activeModel || a.model };
     });
 
@@ -426,6 +427,11 @@ function startGlobalPolling() {
 class DashboardController {
     async getDashboard(req, res) {
         try {
+            // Clear cache if force refresh requested
+            if (req.query.force === '1') {
+                sharedPayload = null;
+                lastUpdateTs = 0;
+            }
             if (!sharedPayload || Date.now() - lastUpdateTs > 5000) {
                 await updateSharedData();
             }
