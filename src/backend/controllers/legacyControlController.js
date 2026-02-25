@@ -49,7 +49,7 @@ class LegacyControlController {
                     return res.status(400).json({ success: false, error: 'bad_request', message: 'Invalid format.' });
                 }
 
-                const { stdout, stderr } = await execFilePromise(OPENCLAW_BIN, ['agent', 'model', 'set', '--agent', agentId, '--model', model]);
+                const { stdout, stderr } = await execFilePromise(OPENCLAW_BIN, ['models', 'set', model, '--agent', agentId]);
                 return res.json({ success: true, output: stdout || stderr });
             }
 
