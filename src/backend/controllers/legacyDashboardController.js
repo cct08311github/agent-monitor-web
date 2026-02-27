@@ -11,7 +11,10 @@ const execFilePromise = util.promisify(execFile);
 const DASHBOARD_CACHE_TTL_MS = 3000;
 const HOME_DIR = os.homedir();
 const OPENCLAW_ROOT = path.join(HOME_DIR, '.openclaw');
-const OPENCLAW_BIN = path.join(OPENCLAW_ROOT, 'bin', 'openclaw');
+const DEFAULT_OPENCLAW_BIN = path.join(OPENCLAW_ROOT, 'bin', 'openclaw');
+// Some environments install OpenClaw via Homebrew/global npm. Prefer the managed bin if present;
+// otherwise fall back to PATH resolution.
+const OPENCLAW_BIN = fs.existsSync(DEFAULT_OPENCLAW_BIN) ? DEFAULT_OPENCLAW_BIN : 'openclaw';
 const AGENTS_ROOT = path.join(OPENCLAW_ROOT, 'agents');
 
 let dashboardCache = { ts: 0, payload: null };
@@ -320,10 +323,11 @@ async function buildDashboardPayload() {
         return dashboardCache.payload;
     }
 
-    const [sys, agentsResult, cronResult, exchangeRate] = await Promise.all([
+    const [sys, agentsResult, cronResult, openclawVersionResult, exchangeRate] = await Promise.all([
         getSystemResources(),
         execFilePromise(OPENCLAW_BIN, ['agents', 'list']).catch(() => ({ stdout: '' })),
         execFilePromise(OPENCLAW_BIN, ['cron', 'list', '--json']).catch(() => ({ stdout: '{"jobs":[]}' })),
+        execFilePromise(OPENCLAW_BIN, ['--version']).catch(() => ({ stdout: '' })),
         getExchangeRate()
     ]);
 
@@ -349,7 +353,9 @@ async function buildDashboardPayload() {
     const { fetchModelCooldowns } = require('../utils/modelMonitor');
     const cooldowns = await fetchModelCooldowns();
 
-    const payload = { success: true, sys, agents, cron, subagents, cooldowns, exchangeRate };
+    const openclawVersion = (openclawVersionResult.stdout || '').trim();
+
+    const payload = { success: true, openclaw: { version: openclawVersion || null }, sys, agents, cron, subagents, cooldowns, exchangeRate };
     dashboardCache = { ts: now, payload };
     return payload;
 }

@@ -847,6 +847,9 @@ function renderDashboard(data) {
     if (data.exchangeRate) {
         currentExchangeRate = data.exchangeRate;
     }
+    // OpenClaw version
+    const verEl = document.getElementById('openclawVersion');
+    if (verEl) verEl.textContent = data.openclaw?.version || 'unknown';
     const range = document.getElementById('costRange')?.value || 'month';
     const agents = data.agents || [];
     let totalCost = 0, activeCount = 0;
