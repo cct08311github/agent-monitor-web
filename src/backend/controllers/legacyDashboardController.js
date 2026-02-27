@@ -12,9 +12,58 @@ const DASHBOARD_CACHE_TTL_MS = 3000;
 const HOME_DIR = os.homedir();
 const OPENCLAW_ROOT = path.join(HOME_DIR, '.openclaw');
 const DEFAULT_OPENCLAW_BIN = path.join(OPENCLAW_ROOT, 'bin', 'openclaw');
-// Some environments install OpenClaw via Homebrew/global npm. Prefer the managed bin if present;
-// otherwise fall back to PATH resolution.
-const OPENCLAW_BIN = fs.existsSync(DEFAULT_OPENCLAW_BIN) ? DEFAULT_OPENCLAW_BIN : 'openclaw';
+
+// Some deployments run this dashboard under a different OS user (e.g. systemd/root), where
+// ~/.openclaw/bin/openclaw does not exist and PATH may be minimal. Resolve OpenClaw binary
+// defensively using common install locations.
+const OPENCLAW_BIN_CANDIDATES = [
+    process.env.OPENCLAW_BIN,
+    DEFAULT_OPENCLAW_BIN,
+    // Homebrew (Apple Silicon / Intel)
+    '/opt/homebrew/bin/openclaw',
+    '/usr/local/bin/openclaw',
+    // Linux
+    '/usr/bin/openclaw',
+    // Fallback to PATH
+    'openclaw'
+].filter(Boolean);
+
+let RESOLVED_OPENCLAW_BIN = null;
+async function resolveOpenclawBin() {
+    if (RESOLVED_OPENCLAW_BIN) return RESOLVED_OPENCLAW_BIN;
+
+    for (const cand of OPENCLAW_BIN_CANDIDATES) {
+        // Only check fs for absolute paths; for 'openclaw' rely on execFile resolution.
+        if (cand.startsWith('/') && !fs.existsSync(cand)) continue;
+        try {
+            // Quick smoke test: can we execute and get a version output?
+            const { stdout, stderr } = await execFilePromise(cand, ['--version']);
+            const out = ((stdout || '') + (stderr || '')).trim();
+            if (out) {
+                RESOLVED_OPENCLAW_BIN = cand;
+                return RESOLVED_OPENCLAW_BIN;
+            }
+        } catch (e) {
+            // try next candidate
+        }
+    }
+
+    // Worst-case: keep using PATH fallback so other commands still attempt to run.
+    RESOLVED_OPENCLAW_BIN = 'openclaw';
+    return RESOLVED_OPENCLAW_BIN;
+}
+
+function parseOpenclawVersionOutput(stdout, stderr) {
+    const raw = ((stdout || '') + (stderr || '')).trim();
+    if (!raw) return null;
+    // Prefer the last version-like token in the output (OpenClaw may print warnings before the version).
+    const matches = raw.match(/\b\d+\.\d+\.\d+(?:[-a-zA-Z0-9._]+)?\b/g);
+    if (matches && matches.length) return matches[matches.length - 1];
+    // Fallback: return last non-empty line
+    const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+    return lines.length ? lines[lines.length - 1] : null;
+}
+
 const AGENTS_ROOT = path.join(OPENCLAW_ROOT, 'agents');
 
 let dashboardCache = { ts: 0, payload: null };
@@ -323,11 +372,13 @@ async function buildDashboardPayload() {
         return dashboardCache.payload;
     }
 
+    const ocBin = await resolveOpenclawBin();
+
     const [sys, agentsResult, cronResult, openclawVersionResult, exchangeRate] = await Promise.all([
         getSystemResources(),
-        execFilePromise(OPENCLAW_BIN, ['agents', 'list']).catch(() => ({ stdout: '' })),
-        execFilePromise(OPENCLAW_BIN, ['cron', 'list', '--json']).catch(() => ({ stdout: '{"jobs":[]}' })),
-        execFilePromise(OPENCLAW_BIN, ['--version']).catch(() => ({ stdout: '' })),
+        execFilePromise(ocBin, ['agents', 'list']).catch(() => ({ stdout: '' })),
+        execFilePromise(ocBin, ['cron', 'list', '--json']).catch(() => ({ stdout: '{"jobs":[]}' })),
+        execFilePromise(ocBin, ['--version']).catch(() => ({ stdout: '' })),
         getExchangeRate()
     ]);
 
@@ -353,7 +404,7 @@ async function buildDashboardPayload() {
     const { fetchModelCooldowns } = require('../utils/modelMonitor');
     const cooldowns = await fetchModelCooldowns();
 
-    const openclawVersion = (openclawVersionResult.stdout || '').trim();
+    const openclawVersion = parseOpenclawVersionOutput(openclawVersionResult.stdout, openclawVersionResult.stderr);
 
     const payload = { success: true, openclaw: { version: openclawVersion || null }, sys, agents, cron, subagents, cooldowns, exchangeRate };
     dashboardCache = { ts: now, payload };
@@ -478,7 +529,8 @@ class DashboardController {
 
     async getStatus(req, res) {
         try {
-            const { stdout, stderr } = await execFilePromise(OPENCLAW_BIN, ['status']);
+            const ocBin = await resolveOpenclawBin();
+            const { stdout, stderr } = await execFilePromise(ocBin, ['status']);
             res.json({ success: true, output: (stdout || '') + (stderr || '') });
         } catch (error) {
             res.status(500).json({ success: false, error: error.message, output: (error.stdout || '') + (error.stderr || '') });
@@ -487,7 +539,8 @@ class DashboardController {
 
     async getModels(req, res) {
         try {
-            const { stdout, stderr } = await execFilePromise(OPENCLAW_BIN, ['models', 'status']);
+            const ocBin = await resolveOpenclawBin();
+            const { stdout, stderr } = await execFilePromise(ocBin, ['models', 'status']);
             res.json({ success: true, output: (stdout || '') + (stderr || '') });
         } catch (error) {
             res.status(500).json({ success: false, error: error.message, output: (error.stdout || '') + (error.stderr || '') });
@@ -496,7 +549,7 @@ class DashboardController {
 
     async getAgents(req, res) {
         try {
-            const { stdout, stderr } = await execFilePromise(OPENCLAW_BIN, ['agents', 'list']);
+            const { stdout, stderr } = await execFilePromise(ocBin, ['agents', 'list']);
             res.json({ success: true, output: (stdout || '') + (stderr || '') });
         } catch (error) {
             res.status(500).json({ success: false, error: error.message, output: (error.stdout || '') + (error.stderr || '') });
