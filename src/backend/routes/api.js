@@ -98,14 +98,40 @@ router.get('/logs/stream', auth.localhostOnlyControl, (req, res) => {
     // Send a heartbeat comment every 20s to keep connection alive
     const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 20000);
 
-    const child = spawn(OPENCLAW_BIN, ['logs', '--follow'], {
+    // NOTE: `openclaw logs` tails the Gateway log file. In some environments that file
+    // may contain large structured JSON dumps (e.g. cron jobs listing that *looks like*
+    // jobs.json). Those dumps drown out the realtime logs in the UI, so we suppress them.
+    const child = spawn(OPENCLAW_BIN, ['logs', '--follow', '--plain'], {
         env: { ...process.env, FORCE_COLOR: '0' },
         stdio: ['ignore', 'pipe', 'pipe']
     });
 
+    // Suppress large cron-jobs JSON dumps that start with a { ... "jobs": [...] ... }
+    // block and can span hundreds of lines.
+    let suppressJobsJson = false;
+
+    function shouldStartJobsSuppress(trimmed) {
+        return trimmed.includes('\"jobs\": [') || trimmed.includes("'jobs': [") || /^\s*\"jobs\"\s*:\s*\[/.test(trimmed);
+    }
+
     function sendLine(line) {
         const trimmed = line.trimEnd();
         if (!trimmed) return;
+
+        if (!suppressJobsJson && shouldStartJobsSuppress(trimmed)) {
+            suppressJobsJson = true;
+            res.write(`data: ${JSON.stringify({ line: '[cron jobs JSON dump suppressed]', ts: Date.now() })}\n\n`);
+            return;
+        }
+
+        if (suppressJobsJson) {
+            // End suppression when the JSON object closes.
+            if (trimmed === '}' || trimmed === '},' || trimmed === '}]' || trimmed === ']}' || trimmed === ']') {
+                suppressJobsJson = false;
+            }
+            return;
+        }
+
         // SSE format: data: <payload>\n\n
         res.write(`data: ${JSON.stringify({ line: trimmed, ts: Date.now() })}\n\n`);
     }
