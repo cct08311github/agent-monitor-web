@@ -1,0 +1,132 @@
+
+/* ════════════════════════════════════════
+   TaskHub Module Styles
+   ════════════════════════════════════════ */
+
+/* Stats Bar */
+.taskhub-stats-bar { margin-bottom: 12px; }
+.th-stat-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.th-stat-card {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 14px; font-size: 13px;
+}
+.th-stat-domain { font-weight: 600; color: var(--text); }
+.th-stat-active { color: var(--text-muted); font-size: 12px; }
+.th-stat-badge {
+    font-size: 11px; padding: 2px 7px; border-radius: 20px; font-weight: 500;
+}
+
+/* Toolbar */
+.taskhub-toolbar {
+    display: flex; align-items: center; gap: 10px;
+    flex-wrap: wrap; margin-bottom: 14px;
+}
+.taskhub-domain-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.th-domain-btn {
+    padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border);
+    background: var(--card-bg); color: var(--text-muted); cursor: pointer;
+    font-size: 12px; font-weight: 500; transition: all .15s;
+}
+.th-domain-btn:hover { border-color: var(--accent); color: var(--accent); }
+.th-domain-btn.active {
+    background: var(--accent); border-color: var(--accent);
+    color: #fff; box-shadow: 0 0 0 2px var(--accent-light);
+}
+.taskhub-filters { display: flex; gap: 8px; flex-wrap: wrap; }
+.taskhub-filters select, .th-search-input {
+    padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--card-bg); color: var(--text); font-size: 12px;
+}
+.th-search-input { min-width: 160px; }
+.th-search-input:focus, .taskhub-filters select:focus {
+    outline: none; border-color: var(--accent);
+}
+
+/* Task Grid */
+.taskhub-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px;
+}
+.th-loading, .th-empty {
+    color: var(--text-muted); padding: 30px; text-align: center;
+    grid-column: 1 / -1; font-size: 14px;
+}
+
+/* Task Card */
+.th-task-card {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px; cursor: pointer;
+    transition: transform .1s, box-shadow .1s;
+    display: flex; flex-direction: column; gap: 8px;
+}
+.th-task-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0,0,0,.12);
+    border-color: var(--accent);
+}
+.th-task-header { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.th-domain-badge {
+    font-size: 10px; padding: 2px 7px; border-radius: 20px;
+    background: var(--bg-muted); color: var(--text-muted); font-weight: 500;
+}
+.th-status-badge, .th-priority-badge {
+    font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 500;
+}
+
+/* Status colours */
+.th-s-active  { background: rgba(34,197,94,.15);  color: #22c55e; }
+.th-s-idle    { background: rgba(148,163,184,.15); color: var(--text-muted); }
+.th-s-blocked { background: rgba(239,68,68,.15);  color: #ef4444; }
+.th-s-done    { background: rgba(99,102,241,.15);  color: #6366f1; }
+.th-s-muted   { background: var(--bg-muted);       color: var(--text-muted); }
+
+/* Priority colours */
+.th-p-urgent { background: rgba(239,68,68,.15);   color: #ef4444; }
+.th-p-high   { background: rgba(249,115,22,.15);  color: #f97316; }
+.th-p-medium { background: rgba(234,179,8,.15);   color: #eab308; }
+.th-p-low    { background: rgba(34,197,94,.15);   color: #22c55e; }
+
+.th-task-title { font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.4; }
+.th-task-meta  { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11px; }
+.th-project { background: var(--bg-muted); color: var(--text-muted); padding: 1px 6px; border-radius: 4px; }
+.th-due { color: var(--text-muted); }
+.th-due.th-due-urgent { color: #ef4444; font-weight: 600; }
+.th-gh-link { color: var(--accent); text-decoration: none; font-size: 11px; }
+.th-gh-link:hover { text-decoration: underline; }
+.th-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.th-tag {
+    font-size: 10px; padding: 1px 6px; border-radius: 4px;
+    background: var(--bg-muted); color: var(--text-muted);
+}
+.th-task-notes { font-size: 12px; color: var(--text-muted); line-height: 1.4; }
+.th-task-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+.th-action-btn {
+    padding: 3px 10px; border-radius: 5px; border: none; cursor: pointer;
+    font-size: 11px; font-weight: 500; transition: opacity .15s;
+}
+.th-action-btn:hover { opacity: .8; }
+.th-btn-start  { background: rgba(34,197,94,.2);  color: #22c55e; }
+.th-btn-done   { background: rgba(99,102,241,.2);  color: #6366f1; }
+.th-btn-block  { background: rgba(239,68,68,.2);  color: #ef4444; }
+.th-btn-edit   { background: var(--bg-muted); color: var(--text-muted); }
+
+/* Add Task Form */
+.th-form-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.th-form-row label { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+.th-form-row input, .th-form-row select, .th-form-row textarea {
+    padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--card-bg); color: var(--text); font-size: 13px;
+}
+.th-form-row textarea { resize: vertical; min-height: 64px; }
+.th-form-row input:focus, .th-form-row select:focus, .th-form-row textarea:focus {
+    outline: none; border-color: var(--accent);
+}
+
+@media (max-width: 768px) {
+    .taskhub-toolbar { flex-direction: column; align-items: stretch; }
+    .taskhub-filters { flex-direction: column; }
+    .taskhub-grid { grid-template-columns: 1fr; }
+    .th-stat-row { flex-direction: column; }
+}
