@@ -11,6 +11,7 @@ const securityController = require('../controllers/securityController');
 const complianceController = require('../controllers/complianceController');
 const systemController = require('../controllers/systemController');
 const cronController = require('../controllers/cronController');
+const taskHubController = require('../controllers/taskHubController');
 const legacyDashboardController = require('../controllers/legacyDashboardController');
 const legacyControlController = require('../controllers/legacyControlController');
 const auth = require('../middlewares/auth');
@@ -24,6 +25,13 @@ router.get('/read/status', legacyDashboardController.getStatus);
 router.get('/read/models', legacyDashboardController.getModels);
 router.get('/read/agents', legacyDashboardController.getAgents);
 router.get('/dashboard', legacyDashboardController.getDashboard); // very legacy
+
+// TaskHub
+router.get('/taskhub/stats', taskHubController.getStats);
+router.get('/taskhub/tasks', taskHubController.getTasks);
+router.post('/taskhub/tasks', auth.localhostOnlyControl, auth.rateLimit, taskHubController.createTask);
+router.patch('/taskhub/tasks/:domain/:id', auth.localhostOnlyControl, auth.rateLimit, taskHubController.updateTask);
+router.delete('/taskhub/tasks/:domain/:id', auth.localhostOnlyControl, auth.rateLimit, taskHubController.deleteTask);
 
 // Cron Jobs
 router.get('/cron/jobs', cronController.getJobs);
