@@ -140,15 +140,15 @@ function setLogFilter(text) { logFilterText = text; applyLogFilter(); }
 function toggleErrorOnly() {
     logShowError = !logShowError;
     if (logShowError) logShowWarn = false;
-    document.getElementById('logFilterError')?.classList.toggle('active', logShowError);
-    document.getElementById('logFilterWarn')?.classList.toggle('active', false);
+    document.getElementById('logFilterError')?.classList.toggle('active-error', logShowError);
+    document.getElementById('logFilterWarn')?.classList.remove('active-warn');
     applyLogFilter();
 }
 
 function toggleWarnOnly() {
     logShowWarn = !logShowWarn;
     if (logShowWarn) logShowError = false;
-    document.getElementById('logFilterWarn')?.classList.toggle('active', logShowWarn);
-    document.getElementById('logFilterError')?.classList.toggle('active', false);
+    document.getElementById('logFilterWarn')?.classList.toggle('active-warn', logShowWarn);
+    document.getElementById('logFilterError')?.classList.remove('active-error');
     applyLogFilter();
 }
