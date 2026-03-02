@@ -510,7 +510,8 @@ async function openAlertConfig() {
 }
 
 function closeAlertConfig() {
-    document.getElementById('alertConfigModal').style.display = 'none';
+    const modal = document.getElementById('alertConfigModal');
+    if (modal) modal.style.display = 'none';
 }
 
 async function saveAlertConfig() {
@@ -519,15 +520,16 @@ async function saveAlertConfig() {
         const patch = { rules: {} };
         for (const rule of Object.keys(_alertConfigCache.rules)) {
             patch.rules[rule] = {
-                threshold: parseFloat(document.getElementById(`thr_${rule}`)?.value ?? _alertConfigCache.rules[rule].threshold),
+                threshold: (() => { const v = document.getElementById(`thr_${rule}`)?.value; return (v !== undefined && v !== '') ? parseFloat(v) : _alertConfigCache.rules[rule].threshold; })(),
                 enabled: document.getElementById(`en_${rule}`)?.checked ?? _alertConfigCache.rules[rule].enabled,
             };
         }
-        await fetch('/api/alerts/config', {
+        const saveRes = await fetch('/api/alerts/config', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(patch)
         });
+        if (!saveRes.ok) { showToast('儲存失敗', 'error'); return; }
         showToast('✅ 警報設定已儲存', 'success');
         closeAlertConfig();
     } catch (e) { showToast('儲存失敗', 'error'); }

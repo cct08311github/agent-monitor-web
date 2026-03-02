@@ -506,7 +506,9 @@ async function updateSharedData() {
         const firedAlerts = alertEngine.evaluate(sharedPayload);
         if (firedAlerts.length > 0) {
             const alertStr = `event: alert\ndata: ${JSON.stringify({ alerts: firedAlerts })}\n\n`;
-            sseClients.forEach((client) => client.write(alertStr));
+            sseClients.forEach((client) => {
+                try { client.write(alertStr); } catch (e) { sseClients.delete(client); }
+            });
         }
 
         return true;
@@ -521,7 +523,9 @@ async function doBroadcast() {
     if (!sharedPayload) await updateSharedData();
 
     const dataStr = `data: ${JSON.stringify(sharedPayload)}\n\n`;
-    sseClients.forEach((res) => res.write(dataStr));
+    sseClients.forEach((res) => {
+        try { res.write(dataStr); } catch (e) { sseClients.delete(res); }
+    });
 }
 
 function startGlobalPolling() {
