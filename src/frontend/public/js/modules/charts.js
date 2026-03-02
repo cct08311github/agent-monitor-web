@@ -88,7 +88,7 @@ async function fetchHistory() {
         const data = await res.json();
         if (data.success && data.history) { sysHistoryData = data.history; if (typeof currentDesktopTab !== 'undefined' && currentDesktopTab === 'system') updateCharts(); }
         if (data.costHistory) { costHistoryData = data.costHistory; if (typeof currentDesktopTab !== 'undefined' && currentDesktopTab === 'system') updateCharts(); }
-        if (data.agentActivity && typeof renderAgentActivityBanner === 'function') renderAgentActivityBanner(data.agentActivity);
+
     } catch (e) { /* silent */ }
 }
 
