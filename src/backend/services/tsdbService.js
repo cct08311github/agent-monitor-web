@@ -76,8 +76,8 @@ function runCleanup() {
     }
 }
 
-// Automatically prune daily
-setInterval(runCleanup, 1000 * 60 * 60 * 24);
+// Automatically prune daily — .unref() so this timer doesn't block process/test exit
+setInterval(runCleanup, 1000 * 60 * 60 * 24).unref();
 
 // Retrieve past N snapshots for sparklines
 function getSystemHistory(limit = 60) {

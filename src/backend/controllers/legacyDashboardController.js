@@ -359,15 +359,28 @@ function detectDetailedActivity(agentId) {
             if (files.length > 0) {
                 const mtime = files[0].time;
                 const lines = fs.readFileSync(path.join(agentDir, files[0].name), 'utf8').trim().split('\n');
-                if (lines.length > 0) {
-                    try {
-                        const lastLog = JSON.parse(lines[lines.length - 1]);
-                        const msgObj = lastLog.message || lastLog;
-                        let content = "";
-                        if (msgObj.content && Array.isArray(msgObj.content)) content = msgObj.content.filter(c => c.type === 'text').map(c => c.text).join(' ');
-                        else if (typeof msgObj.content === 'string') content = msgObj.content;
-                        if (content) detail.currentTask = { label: (Date.now() - mtime < 300000) ? 'EXECUTING' : 'IDLE', task: content.substring(0, 2000) };
-                    } catch (e) { }
+                // 優先取 assistant 文字，fallback 到非 user/toolResult 的其他訊息
+                const isExecuting = Date.now() - mtime < 300000;
+                let found = false;
+                for (const roleFilter of ['assistant', null]) {
+                    for (let i = lines.length - 1; i >= 0 && i >= lines.length - 30; i--) {
+                        try {
+                            const logObj = JSON.parse(lines[i]);
+                            const msgObj = logObj.message || logObj;
+                            if (roleFilter && msgObj.role !== roleFilter) continue;
+                            if (msgObj.role === 'toolResult') continue; // 跳過工具結果
+                            if (msgObj.role === 'user') continue;       // 跳過使用者輸入（含記憶注入）
+                            let content = "";
+                            if (msgObj.content && Array.isArray(msgObj.content)) content = msgObj.content.filter(c => c.type === 'text').map(c => c.text).join(' ').trim();
+                            else if (typeof msgObj.content === 'string') content = msgObj.content.trim();
+                            if (content) {
+                                detail.currentTask = { label: isExecuting ? 'EXECUTING' : 'IDLE', task: content.substring(0, 2000) };
+                                found = true;
+                                break;
+                            }
+                        } catch (e) { }
+                    }
+                    if (found) break;
                 }
                 detail.minutesAgo = Math.floor((Date.now() - mtime) / 60000);
                 detail.lastActivity = detail.minutesAgo < 9999 ? `${detail.minutesAgo}m ago` : 'never';

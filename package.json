@@ -39,6 +39,9 @@
     },
     "moduleNameMapper": {
       "^chokidar$": "<rootDir>/tests/__mocks__/chokidar.js"
-    }
+    },
+    "collectCoverageFrom": [
+      "src/backend/**/*.js"
+    ]
   }
 }

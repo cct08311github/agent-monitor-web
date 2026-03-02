@@ -1,7 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { execFile } = require('child_process');
+const { execFile, spawn } = require('child_process');
 
 const JOBS_FILE = '/Users/openclaw/.openclaw/cron/jobs.json';
 const OPENCLAW_BIN = path.join(os.homedir(), '.openclaw', 'bin', 'openclaw');
@@ -101,24 +101,18 @@ class CronController {
                 return res.status(404).json({ success: false, error: '找不到該任務' });
             }
 
-            console.log(`[CronController] Executing: ${OPENCLAW_BIN} cron run ${id}`);
+            console.log(`[CronController] Spawning: ${OPENCLAW_BIN} cron run ${id}`);
 
-            execFile(OPENCLAW_BIN, ['cron', 'run', id], (error, stdout, stderr) => {
-                if (error) {
-                    console.error(`[CronController] Job execution failed: ${error.message}`);
-                    console.error(`[CronController] stderr: ${stderr}`);
-                    return res.status(500).json({
-                        success: false,
-                        error: `執行失敗: ${error.message}`,
-                        details: stderr
-                    });
-                }
-                console.log(`[CronController] Job execution succeeded. stdout: ${stdout}`);
-                res.json({
-                    success: true,
-                    message: '任務執行成功',
-                    output: stdout.trim()
-                });
+            const child = spawn(OPENCLAW_BIN, ['cron', 'run', id], {
+                detached: true,
+                stdio: 'ignore'
+            });
+            child.unref();
+
+            res.json({
+                success: true,
+                message: '任務已觸發（在背景執行中）',
+                jobId: id
             });
         } catch (error) {
             console.error('[CronController] Unexpected error:', error);

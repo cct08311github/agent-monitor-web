@@ -99,6 +99,17 @@ class OpenClawService {
         }
       }
 
+      // 補查 isolated cron sessions（不寫入 workspace，只寫 sessions/*.jsonl）
+      const sessionsDir = path.join('/Users/openclaw/.openclaw/agents', agentId, 'sessions');
+      if (fs.existsSync(sessionsDir)) {
+        const sessionFiles = fs.readdirSync(sessionsDir)
+          .filter(f => f.endsWith('.jsonl'));
+        for (const f of sessionFiles) {
+          const mtime = fs.statSync(path.join(sessionsDir, f)).mtimeMs;
+          latestModification = Math.max(latestModification, mtime);
+        }
+      }
+
       const now = Date.now();
       const minutesAgo = latestModification > 0 ? Math.floor((now - latestModification) / (60 * 1000)) : 9999;
 
