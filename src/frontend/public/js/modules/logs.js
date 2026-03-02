@@ -127,7 +127,8 @@ function applyLogFilter() {
     while (terminal.firstChild) terminal.removeChild(terminal.firstChild);
     logBuffer.filter(e => lineMatchesFilter(e.line)).forEach(e => {
         const div = document.createElement('div');
-        div.className = `log-line ${e.level}`;
+        const cls = e.level === 'error' ? ' err' : e.level === 'warn' ? ' warn' : ' info';
+        div.className = `log-line ${e.level} oc-log-line${cls}`;
         div.appendChild(buildHighlightedNode(e.line, logFilterText));
         terminal.appendChild(div);
     });
