@@ -43,6 +43,7 @@ router.delete('/taskhub/tasks/:domain/:id', auth.localhostOnlyControl, auth.rate
 router.get('/cron/jobs', cronController.getJobs);
 router.post('/cron/jobs/:id/toggle', auth.localhostOnlyControl, auth.rateLimit, cronController.toggleJob);
 router.post('/cron/jobs/:id/run', auth.localhostOnlyControl, auth.rateLimit, cronController.runJob);
+router.delete('/cron/jobs/:id', auth.localhostOnlyControl, auth.rateLimit, cronController.deleteJob);
 
 // Legacy Control Endpoints
 const controlRouter = express.Router();
