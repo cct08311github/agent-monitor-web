@@ -2196,3 +2196,26 @@ mark { background: rgba(255, 200, 0, 0.35); color: inherit; border-radius: 2px; 
 
 /* ── Agent Activity Banner ──────────────────────── */
 .agent-activity-banner { font-size: 11px; color: var(--text-muted); padding: 4px 8px; background: var(--bg-card); border-radius: 4px; margin-bottom: 8px; min-height: 0; }
+
+/* Agent groups */
+.agent-group-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 2px; margin: 12px 0 8px;
+    font-size: 12px; font-weight: 600; color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+}
+.agent-group-header:first-child { margin-top: 0; }
+.agent-group-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.agent-group-dot.online { background: var(--green); }
+.agent-group-dot.idle   { background: var(--text-muted); }
+.agent-group-details > summary { cursor: pointer; list-style: none; }
+.agent-group-details > summary::-webkit-details-marker { display: none; }
+.agent-group-details > summary::before { content: '▶ '; font-size: 10px; }
+.agent-group-details[open] > summary::before { content: '▼ '; }
+.agent-grid-inner {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px; margin-bottom: 4px;
+}
