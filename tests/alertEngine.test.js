@@ -24,6 +24,12 @@ describe('AlertEngine', () => {
         expect(alerts.some(a => a.rule === 'no_active_agents')).toBe(true);
     });
 
+    it('does NOT fire no_active_agents on cold start when agents are already offline', () => {
+        // prevActiveCount starts at -1 after reset, so dropping to 0 should not fire
+        const alerts = alertEngine.evaluate({ sys: { cpu: 20, memory: 50, disk: 40 }, agents: [] });
+        expect(alerts.some(a => a.rule === 'no_active_agents')).toBe(false);
+    });
+
     it('respects cooldown: same rule does not fire twice within 5 minutes', () => {
         alertEngine.evaluate({ sys: { cpu: 96, memory: 50, disk: 40 }, agents: [] });
         const second = alertEngine.evaluate({ sys: { cpu: 97, memory: 50, disk: 40 }, agents: [] });

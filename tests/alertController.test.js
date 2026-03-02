@@ -1,7 +1,10 @@
 const request = require('supertest');
 const app = require('../src/backend/app');
+const alertEngine = require('../src/backend/services/alertEngine');
 
 describe('Alert API', () => {
+    beforeEach(() => alertEngine.resetForTesting());
+
     it('GET /api/alerts/config returns config with rules', async () => {
         const res = await request(app).get('/api/alerts/config');
         expect(res.statusCode).toBe(200);

@@ -9,7 +9,6 @@ const DEFAULT_CONFIG = {
         cpu_critical:      { enabled: true, threshold: 95,  severity: 'critical', label: 'CPU 危急' },
         memory_high:       { enabled: true, threshold: 85,  severity: 'warning',  label: '記憶體偏高' },
         no_active_agents:  { enabled: true, threshold: 0,   severity: 'critical', label: 'Agent 全部離線' },
-        agent_went_offline:{ enabled: true, threshold: 0,   severity: 'info',     label: 'Agent 離線' },
     }
 };
 
@@ -38,7 +37,9 @@ function getConfig() { return config; }
 
 function updateConfig(patch) {
     for (const [rule, updates] of Object.entries(patch.rules || {})) {
-        if (config.rules[rule]) Object.assign(config.rules[rule], updates);
+        if (!config.rules[rule]) continue;
+        if (typeof updates.enabled === 'boolean') config.rules[rule].enabled = updates.enabled;
+        if (typeof updates.threshold === 'number' && isFinite(updates.threshold)) config.rules[rule].threshold = updates.threshold;
     }
     saveConfig();
     return config;
@@ -64,14 +65,17 @@ function evaluate(payload) {
     const sys = payload.sys || {};
     const agents = payload.agents || [];
 
-    if (rules.cpu_critical?.enabled && sys.cpu > rules.cpu_critical.threshold && canFire('cpu_critical')) {
-        fired.push(fire('cpu_critical', `CPU ${sys.cpu.toFixed(1)}% — 超過危急閾值 ${rules.cpu_critical.threshold}%`, 'critical', { cpu: sys.cpu }));
-    } else if (rules.cpu_high?.enabled && sys.cpu > rules.cpu_high.threshold && canFire('cpu_high')) {
-        fired.push(fire('cpu_high', `CPU ${sys.cpu.toFixed(1)}% — 超過警告閾值 ${rules.cpu_high.threshold}%`, 'warning', { cpu: sys.cpu }));
+    const cpu = typeof sys.cpu === 'number' ? sys.cpu : Number(sys.cpu);
+    const memory = typeof sys.memory === 'number' ? sys.memory : Number(sys.memory);
+
+    if (rules.cpu_critical?.enabled && cpu > rules.cpu_critical.threshold && canFire('cpu_critical')) {
+        fired.push(fire('cpu_critical', `CPU ${cpu.toFixed(1)}% — 超過危急閾值 ${rules.cpu_critical.threshold}%`, 'critical', { cpu }));
+    } else if (rules.cpu_high?.enabled && cpu > rules.cpu_high.threshold && cpu <= (rules.cpu_critical?.threshold ?? Infinity) && canFire('cpu_high')) {
+        fired.push(fire('cpu_high', `CPU ${cpu.toFixed(1)}% — 超過警告閾值 ${rules.cpu_high.threshold}%`, 'warning', { cpu }));
     }
 
-    if (rules.memory_high?.enabled && sys.memory > rules.memory_high.threshold && canFire('memory_high')) {
-        fired.push(fire('memory_high', `記憶體 ${sys.memory.toFixed(1)}% — 超過閾值 ${rules.memory_high.threshold}%`, 'warning', { memory: sys.memory }));
+    if (rules.memory_high?.enabled && memory > rules.memory_high.threshold && canFire('memory_high')) {
+        fired.push(fire('memory_high', `記憶體 ${memory.toFixed(1)}% — 超過閾值 ${rules.memory_high.threshold}%`, 'warning', { memory }));
     }
 
     const activeNow = agents.filter(a => a.status?.includes('active')).length;
@@ -90,6 +94,7 @@ function resetForTesting() {
     alertsBuffer = [];
     prevActiveCount = -1;
     config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+    try { if (fs.existsSync(CONFIG_PATH)) fs.unlinkSync(CONFIG_PATH); } catch (e) { /* ignore */ }
 }
 
 module.exports = { evaluate, getConfig, updateConfig, getRecent, resetForTesting };
