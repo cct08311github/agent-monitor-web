@@ -2197,3 +2197,15 @@ input:checked+.toggle-slider:before {
 .btn-primary:hover { opacity: 0.9; }
 .btn-secondary { background: var(--bg-hover, #f1f5f9); color: var(--text-primary); border: 1px solid var(--border); border-radius: 6px; padding: 8px 16px; cursor: pointer; font-size: 13px; }
 .btn-secondary:hover { background: var(--border); }
+
+/* ── Log Search Filter ──────────────────────────── */
+.log-filter-bar { display: flex; gap: 6px; align-items: center; padding: 6px 0; }
+.log-search-input { flex: 1; background: var(--bg-input, var(--bg-card)); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; color: var(--text-primary); font-size: 12px; }
+.log-filter-btn { background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; font-size: 11px; cursor: pointer; color: var(--text-muted); transition: .15s; }
+.log-filter-btn.active { border-color: var(--red); color: var(--red); background: var(--red-light, #fde8e8); }
+.log-line.error { color: var(--red, #e74c3c); }
+.log-line.warn  { color: var(--orange, #e67e22); }
+mark { background: rgba(255, 200, 0, 0.35); color: inherit; border-radius: 2px; }
+
+/* ── Agent Activity Banner ──────────────────────── */
+.agent-activity-banner { font-size: 11px; color: var(--text-muted); padding: 4px 8px; background: var(--bg-card); border-radius: 4px; margin-bottom: 8px; min-height: 0; }

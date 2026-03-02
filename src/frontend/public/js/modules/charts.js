@@ -1,5 +1,6 @@
 // --- Charts ---
 let sysHistoryData = [];
+let costHistoryData = [];
 
 function drawSparkline(canvasId, data, labels) {
     const canvas = document.getElementById(canvasId);
@@ -76,13 +77,18 @@ function updateCharts() {
     if (sysHistoryData.length < 2) return;
     drawSparkline('sysChart', [sysHistoryData.map(d => d.cpu), sysHistoryData.map(d => d.memory)],
         sysHistoryData.map(d => { if (!d.timestamp) return ''; const t = new Date(d.timestamp + 'Z'); return `${t.getHours().toString().padStart(2, '0')}:${t.getMinutes().toString().padStart(2, '0')}`; }));
+    if (document.getElementById('costSparkline') && costHistoryData.length > 1) {
+        drawSparkline('costSparkline', [costHistoryData.map(r => r.total_cost || 0)], costHistoryData.map(r => (r.ts || '').slice(11, 16)));
+    }
 }
 
 async function fetchHistory() {
     try {
         const res = await fetch('/api/read/history');
         const data = await res.json();
-        if (data.success && data.history) { sysHistoryData = data.history; if (currentDesktopTab === 'system') updateCharts(); }
+        if (data.success && data.history) { sysHistoryData = data.history; if (typeof currentDesktopTab !== 'undefined' && currentDesktopTab === 'system') updateCharts(); }
+        if (data.costHistory) { costHistoryData = data.costHistory; if (typeof currentDesktopTab !== 'undefined' && currentDesktopTab === 'system') updateCharts(); }
+        if (data.agentActivity && typeof renderAgentActivityBanner === 'function') renderAgentActivityBanner(data.agentActivity);
     } catch (e) { /* silent */ }
 }
 

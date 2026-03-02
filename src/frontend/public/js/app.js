@@ -488,6 +488,15 @@ function showAgentDetail(agentId) {
     switchDesktopTab('detail');
 }
 
+function renderAgentActivityBanner(agentActivity) {
+    const el = document.getElementById('agentActivityBanner');
+    if (!el || !agentActivity?.length) return;
+    const total = agentActivity.length;
+    const active = agentActivity.filter(a => a.active_minutes > 0).length;
+    const lastSeen = agentActivity.reduce((max, a) => (a.last_seen > max ? a.last_seen : max), '');
+    el.textContent = `過去 24h：${total} 個 Agent，${active} 個曾活躍｜最後活動：${lastSeen ? lastSeen.slice(11, 16) : '-'}`;
+}
+
 function renderDashboard(data) {
     if (!data || !data.success) return;
     latestDashboard = data;
