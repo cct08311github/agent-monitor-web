@@ -37,6 +37,11 @@
 .taskhub-filters select, .th-search-input {
     padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border);
     background: var(--card-bg); color: var(--text); font-size: 12px;
+    color-scheme: light dark;
+}
+.taskhub-filters select option {
+    background: var(--card-bg);
+    color: var(--text);
 }
 .th-search-input { min-width: 160px; }
 .th-search-input:focus, .taskhub-filters select:focus {
@@ -118,6 +123,11 @@
 .th-form-row input, .th-form-row select, .th-form-row textarea {
     padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border);
     background: var(--card-bg); color: var(--text); font-size: 13px;
+    color-scheme: light dark;
+}
+.th-form-row select option {
+    background: var(--card-bg);
+    color: var(--text);
 }
 .th-form-row textarea { resize: vertical; min-height: 64px; }
 .th-form-row input:focus, .th-form-row select:focus, .th-form-row textarea:focus {
