@@ -114,6 +114,10 @@
 .th-gh-link { color: var(--accent); text-decoration: none; font-size: 11px; }
 .th-gh-link:hover { text-decoration: underline; }
 
+/* Sortable column headers */
+.th-task-table th.th-sortable { cursor: pointer; user-select: none; }
+.th-task-table th.th-sortable:hover { color: var(--accent); }
+
 /* Action buttons */
 .th-col-actions .th-action-btn { margin-left: 4px; }
 .th-action-btn {

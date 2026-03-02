@@ -5,6 +5,8 @@
 let thDomain = 'all';
 let thTasks = [];
 let thSearchTimer = null;
+let thSortCol = null;
+let thSortDir = 'asc';
 
 const TH_STATUS_MAP = {
     not_started: { label: '未開始', cls: 'th-s-idle' },
@@ -98,6 +100,25 @@ async function fetchTasks() {
     }
 }
 
+const _PRIORITY_ORDER = { urgent: 0, high: 1, medium: 2, low: 3 };
+const _STATUS_ORDER   = { in_progress: 0, blocked: 1, not_started: 2, draft: 3, done: 4, archived: 5, cancelled: 6 };
+
+function _sortTasks(tasks) {
+    if (!thSortCol) return tasks;
+    return [...tasks].sort((a, b) => {
+        let cmp = 0;
+        if (thSortCol === 'priority') {
+            cmp = (_PRIORITY_ORDER[a.priority] ?? 99) - (_PRIORITY_ORDER[b.priority] ?? 99);
+        } else if (thSortCol === 'due_date') {
+            const da = a.due_date || '9999', db = b.due_date || '9999';
+            cmp = da < db ? -1 : da > db ? 1 : 0;
+        } else if (thSortCol === 'status') {
+            cmp = (_STATUS_ORDER[a.status] ?? 99) - (_STATUS_ORDER[b.status] ?? 99);
+        }
+        return thSortDir === 'asc' ? cmp : -cmp;
+    });
+}
+
 function renderTasks(tasks) {
     const grid = document.getElementById('taskhubGrid');
     if (!grid) return;
@@ -112,14 +133,29 @@ function renderTasks(tasks) {
 
     const thead = table.createTHead();
     const hRow = thead.insertRow();
+    const SORT_COLS = { '優先': 'priority', '狀態': 'status', '到期': 'due_date' };
     ['優先', '標題', '狀態', 'Domain', '專案', '到期', '操作'].forEach(h => {
         const th = document.createElement('th');
-        th.textContent = h;
+        const sortKey = SORT_COLS[h];
+        const arrow = thSortCol === sortKey ? (thSortDir === 'asc' ? ' ↑' : ' ↓') : '';
+        th.textContent = h + arrow;
+        if (sortKey) {
+            th.className = 'th-sortable';
+            th.addEventListener('click', () => {
+                if (thSortCol === sortKey) {
+                    thSortDir = thSortDir === 'asc' ? 'desc' : 'asc';
+                } else {
+                    thSortCol = sortKey;
+                    thSortDir = 'asc';
+                }
+                renderTasks(thTasks);
+            });
+        }
         hRow.appendChild(th);
     });
 
     const tbody = table.createTBody();
-    tasks.forEach(t => tbody.appendChild(_buildTaskRow(t)));
+    _sortTasks(tasks).forEach(t => tbody.appendChild(_buildTaskRow(t)));
 
     grid.replaceChildren(table);
 }
