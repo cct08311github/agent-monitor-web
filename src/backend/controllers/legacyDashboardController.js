@@ -429,7 +429,9 @@ async function buildDashboardPayload() {
         getSystemResources(),
         execFilePromise(ocBin, ['agents', 'list']).catch(() => ({ stdout: '' })),
         execFilePromise(ocBin, ['cron', 'list', '--json']).catch(() => ({ stdout: '{"jobs":[]}' })),
-        execFilePromise(ocBin, ['--version']).catch(() => ({ stdout: '' })),
+        cachedOcVersion
+            ? Promise.resolve({ stdout: cachedOcVersion, stderr: '' })
+            : execFilePromise(ocBin, ['--version']).catch(() => ({ stdout: '' })),
         getExchangeRate()
     ]);
 
@@ -456,6 +458,7 @@ async function buildDashboardPayload() {
     const cooldowns = await fetchModelCooldowns();
 
     const openclawVersion = parseOpenclawVersionOutput(openclawVersionResult.stdout, openclawVersionResult.stderr);
+    if (openclawVersion && !cachedOcVersion) cachedOcVersion = openclawVersion;
 
     const payload = { success: true, openclaw: { version: openclawVersion || null }, sys, agents, cron, subagents, cooldowns, exchangeRate };
     dashboardCache = { ts: now, payload };
@@ -489,8 +492,10 @@ const alertEngine = require('../services/alertEngine');
 
 let sharedPayload = null;
 let lastUpdateTs = 0;
+let pendingUpdate = null;
+let cachedOcVersion = null;
 
-async function updateSharedData() {
+async function _doUpdateSharedData() {
     try {
         const payload = await buildDashboardPayload();
         sharedPayload = minimizeDashboardPayload(payload);
@@ -518,6 +523,12 @@ async function updateSharedData() {
     }
 }
 
+async function updateSharedData() {
+    if (pendingUpdate) return pendingUpdate;
+    pendingUpdate = _doUpdateSharedData().finally(() => { pendingUpdate = null; });
+    return pendingUpdate;
+}
+
 async function doBroadcast() {
     if (sseClients.size === 0) return;
     if (!sharedPayload) await updateSharedData();
@@ -533,15 +544,19 @@ function startGlobalPolling() {
     isPolling = true;
 
     agentWatcherService.start();
-    agentWatcherService.on('state_update', async () => {
-        await updateSharedData();
-        doBroadcast();
+    let watcherDebounceTimer = null;
+    agentWatcherService.on('state_update', () => {
+        clearTimeout(watcherDebounceTimer);
+        watcherDebounceTimer = setTimeout(async () => {
+            await updateSharedData();
+            doBroadcast().catch(e => console.error('[Poller] Broadcast error:', e));
+        }, 300);
     });
 
     // Fallback timer: Refresh data every 15s regardless of file changes
     setInterval(async () => {
         await updateSharedData();
-        doBroadcast();
+        doBroadcast().catch(e => console.error('[Poller] Broadcast error:', e));
     }, 15000);
 }
 
@@ -613,6 +628,7 @@ class DashboardController {
 
     async getAgents(req, res) {
         try {
+            const ocBin = await resolveOpenclawBin();
             const { stdout, stderr } = await execFilePromise(ocBin, ['agents', 'list']);
             res.json({ success: true, output: (stdout || '') + (stderr || '') });
         } catch (error) {
