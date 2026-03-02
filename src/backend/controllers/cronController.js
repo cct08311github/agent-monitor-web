@@ -1,8 +1,10 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
 
 const JOBS_FILE = '/Users/openclaw/.openclaw/cron/jobs.json';
+const OPENCLAW_BIN = path.join(os.homedir(), '.openclaw', 'bin', 'openclaw');
 
 class CronController {
     /**
@@ -75,23 +77,21 @@ class CronController {
                 return res.status(404).json({ success: false, error: '找不到該任務' });
             }
 
-            // 使用 child_process.exec 執行 openclaw cron run <jobId>
-            const command = `openclaw cron run ${id}`;
-            console.log(`[CronController] Executing command: ${command}`);
+            console.log(`[CronController] Executing: ${OPENCLAW_BIN} cron run ${id}`);
 
-            exec(command, (error, stdout, stderr) => {
+            execFile(OPENCLAW_BIN, ['cron', 'run', id], (error, stdout, stderr) => {
                 if (error) {
                     console.error(`[CronController] Job execution failed: ${error.message}`);
                     console.error(`[CronController] stderr: ${stderr}`);
-                    return res.status(500).json({ 
-                        success: false, 
+                    return res.status(500).json({
+                        success: false,
                         error: `執行失敗: ${error.message}`,
                         details: stderr
                     });
                 }
                 console.log(`[CronController] Job execution succeeded. stdout: ${stdout}`);
-                res.json({ 
-                    success: true, 
+                res.json({
+                    success: true,
                     message: '任務執行成功',
                     output: stdout.trim()
                 });
