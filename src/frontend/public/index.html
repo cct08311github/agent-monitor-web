@@ -308,6 +308,11 @@
                                 <button class="cmd-btn" onclick="clearOcLog()" title="清除日誌">🗑</button>
                             </div>
                         </div>
+                        <div class="log-filter-bar">
+                            <input type="text" id="logSearch" placeholder="搜尋 log..." oninput="setLogFilter(this.value)" class="log-search-input">
+                            <button id="logFilterError" onclick="toggleErrorOnly()" class="log-filter-btn">ERROR</button>
+                            <button id="logFilterWarn" onclick="toggleWarnOnly()" class="log-filter-btn">WARN</button>
+                        </div>
                         <div id="ocLogTerminal" class="log-terminal oc-log-terminal">等待開始監看...</div>
                     </div>
                 </div>
