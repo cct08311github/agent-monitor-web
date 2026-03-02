@@ -143,6 +143,7 @@
                     </button>
                 </div>
                 <div id="subTabAgents" class="sub-tab-content active">
+                    <div id="agentActivityBanner" class="agent-activity-banner"></div>
                     <div id="agentGrid" class="agent-grid"></div>
                 </div>
                 <div id="subTabSubagents" class="sub-tab-content">
@@ -227,6 +228,10 @@
                         <div class="chart-container" style="margin-top:16px">
                             <canvas id="sysChart" width="600" height="200"></canvas>
                         </div>
+                        <div class="metric-card" style="margin-top:12px">
+                            <div class="metric-label">成本趨勢 (60m USD)</div>
+                            <canvas id="costSparkline" height="40"></canvas>
+                        </div>
                     </div>
                     <div class="system-right">
                         <div class="section-header">
@@ -307,6 +312,11 @@
                                 <button id="ocLogToggleBtn" class="cmd-btn" onclick="toggleOcLog()">▶ 開始監看</button>
                                 <button class="cmd-btn" onclick="clearOcLog()" title="清除日誌">🗑</button>
                             </div>
+                        </div>
+                        <div class="log-filter-bar">
+                            <input type="text" id="logSearch" placeholder="搜尋 log..." oninput="setLogFilter(this.value)" class="log-search-input">
+                            <button id="logFilterError" onclick="toggleErrorOnly()" class="log-filter-btn">ERROR</button>
+                            <button id="logFilterWarn" onclick="toggleWarnOnly()" class="log-filter-btn">WARN</button>
                         </div>
                         <div id="ocLogTerminal" class="log-terminal oc-log-terminal">等待開始監看...</div>
                     </div>
