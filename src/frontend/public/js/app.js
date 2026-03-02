@@ -536,6 +536,96 @@ function renderAgentActivityBanner(agentActivity) {
     el.textContent = `過去 24h：${total} 個 Agent，${active} 個曾活躍｜最後活動：${lastSeen ? lastSeen.slice(11, 16) : '-'}`;
 }
 
+function _buildAgentCardEl(a, cost) {
+    const si = getStatusInfo(a.status);
+    const card = document.createElement('div');
+    card.className = 'agent-card ' + si.class;
+    card.addEventListener('click', () => showAgentDetail(a.id));
+
+    // Header: avatar + name/model + status
+    const hdr = document.createElement('div');
+    hdr.className = 'agent-card-header';
+    const nameWrap = document.createElement('div');
+    nameWrap.className = 'agent-card-name';
+    const av = document.createElement('div');
+    av.className = 'agent-avatar';
+    av.textContent = getAgentEmoji(a.id);
+    const nameInfo = document.createElement('div');
+    const nameEl = document.createElement('div');
+    nameEl.className = 'agent-name';
+    nameEl.textContent = a.id;
+    const mdl = document.createElement('div');
+    mdl.className = 'agent-hostname';
+    mdl.textContent = a.model || 'N/A';
+    nameInfo.append(nameEl, mdl);
+    nameWrap.append(av, nameInfo);
+    const statusEl = document.createElement('div');
+    statusEl.className = 'agent-status ' + si.dotClass;
+    const dot = document.createElement('span');
+    dot.className = 'agent-status-dot';
+    statusEl.append(dot, document.createTextNode(si.text));
+    hdr.append(nameWrap, statusEl);
+
+    // Body: cost, tokens, activity
+    const body = document.createElement('div');
+    body.className = 'agent-card-body';
+    function infoRow(lbl, val) {
+        const row = document.createElement('div');
+        row.className = 'agent-info-row';
+        const l = document.createElement('span');
+        l.className = 'agent-info-label';
+        l.textContent = lbl;
+        const v = document.createElement('span');
+        v.className = 'agent-info-value';
+        v.textContent = val;
+        row.append(l, v);
+        return row;
+    }
+    body.append(
+        infoRow('費用',   formatTWD(cost)),
+        infoRow('Tokens', formatTokens(a.tokens?.total)),
+        infoRow('活動',   a.lastActivity || '-'),
+    );
+
+    // Task preview
+    const taskText = a.currentTask?.task || '';
+    const isExec = a.currentTask?.label === 'EXECUTING';
+    if (taskText) {
+        const preview = document.createElement('div');
+        preview.className = 'agent-task-preview';
+        const taskHdr = document.createElement('div');
+        taskHdr.className = 'agent-task-header';
+        const lbl = document.createElement('span');
+        lbl.className = 'agent-task-label ' + (isExec ? 'executing' : 'idle');
+        if (isExec) { const p = document.createElement('span'); p.className = 'task-pulse'; lbl.appendChild(p); }
+        lbl.append(document.createTextNode(isExec ? '執行中' : '💤 閒置'));
+        taskHdr.appendChild(lbl);
+        const content = document.createElement('div');
+        content.className = 'agent-task-content';
+        content.title = taskText;
+        content.textContent = taskText;
+        preview.append(taskHdr, content);
+        body.appendChild(preview);
+    }
+
+    // Actions
+    const actions = document.createElement('div');
+    actions.className = 'agent-card-actions';
+    actions.addEventListener('click', e => e.stopPropagation());
+    const chatBtn = document.createElement('button');
+    chatBtn.className = 'agent-action-btn';
+    chatBtn.textContent = '💬 對話';
+    chatBtn.addEventListener('click', () => openChat(a.id));
+    const mdlBtn = document.createElement('button');
+    mdlBtn.className = 'agent-action-btn';
+    mdlBtn.textContent = '🔄 模型';
+    mdlBtn.addEventListener('click', () => openModelModal(a.id, a.model || ''));
+    actions.append(chatBtn, mdlBtn);
+
+    card.append(hdr, body, actions);
+    return card;
+}
+
 function renderDashboard(data) {
     if (!data || !data.success) return;
     latestDashboard = data;
