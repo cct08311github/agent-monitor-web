@@ -71,37 +71,37 @@
             <div class="summary-card">
                 <div class="summary-card-content">
                     <div>
-                        <div class="summary-label">總 Agents</div>
+                        <div class="summary-label" id="sc1Label">總 Agents</div>
                         <div class="summary-value" id="totalAgents">0</div>
                     </div>
-                    <div class="summary-icon blue">🤖</div>
+                    <div class="summary-icon blue" id="sc1Icon">🤖</div>
                 </div>
             </div>
             <div class="summary-card">
                 <div class="summary-card-content">
                     <div>
-                        <div class="summary-label">執行中</div>
+                        <div class="summary-label" id="sc2Label">執行中</div>
                         <div class="summary-value" id="activeAgents">0</div>
                     </div>
-                    <div class="summary-icon green">🟢</div>
+                    <div class="summary-icon green" id="sc2Icon">🟢</div>
                 </div>
             </div>
             <div class="summary-card">
                 <div class="summary-card-content">
                     <div>
-                        <div class="summary-label">Sub-Agents</div>
+                        <div class="summary-label" id="sc3Label">Sub-Agents</div>
                         <div class="summary-value" id="totalSubagents">0</div>
                     </div>
-                    <div class="summary-icon orange">🔗</div>
+                    <div class="summary-icon orange" id="sc3Icon">🔗</div>
                 </div>
             </div>
             <div class="summary-card">
                 <div class="summary-card-content">
                     <div>
-                        <div class="summary-label" id="costLabel">月費用 (TWD)</div>
+                        <div class="summary-label" id="sc4Label">月費用 (TWD)</div>
                         <div class="summary-value cost" id="totalCost">NT$0</div>
                     </div>
-                    <div class="summary-icon purple">💰</div>
+                    <div class="summary-icon purple" id="sc4Icon">💰</div>
                 </div>
                 <div class="cost-range-selector">
                     <select id="costRange" onchange="updateCostDisplay()">
