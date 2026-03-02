@@ -449,6 +449,7 @@ function closeSREModal() { document.getElementById('sreModal').style.display = '
 
 // --- Alert Badge ---
 let unreadAlertCount = 0;
+let _alertConfigCache = null;
 function incrementAlertBadge(n) {
     unreadAlertCount += n;
     const badge = document.getElementById('p0AlertBadge');
@@ -466,6 +467,7 @@ async function openAlertConfig() {
     try {
         const res = await fetch('/api/alerts/config');
         const { config } = await res.json();
+        _alertConfigCache = config;
         const modal = document.getElementById('alertConfigModal');
         const tbody = document.getElementById('alertConfigBody');
 
@@ -512,14 +514,13 @@ function closeAlertConfig() {
 }
 
 async function saveAlertConfig() {
+    if (!_alertConfigCache) { showToast('請先開啟設定', 'error'); return; }
     try {
-        const res = await fetch('/api/alerts/config');
-        const { config } = await res.json();
         const patch = { rules: {} };
-        for (const rule of Object.keys(config.rules)) {
+        for (const rule of Object.keys(_alertConfigCache.rules)) {
             patch.rules[rule] = {
-                threshold: parseFloat(document.getElementById(`thr_${rule}`)?.value ?? config.rules[rule].threshold),
-                enabled: document.getElementById(`en_${rule}`)?.checked ?? config.rules[rule].enabled,
+                threshold: parseFloat(document.getElementById(`thr_${rule}`)?.value ?? _alertConfigCache.rules[rule].threshold),
+                enabled: document.getElementById(`en_${rule}`)?.checked ?? _alertConfigCache.rules[rule].enabled,
             };
         }
         await fetch('/api/alerts/config', {
