@@ -107,6 +107,7 @@ function switchDesktopTab(tab) {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.page === tab));
     if (tab === 'system') setTimeout(updateCharts, 100);
     if (tab === 'chat') initChatPage();
+    updateSummaryCards(tab);
 }
 
 function switchSubTab(tab) {
@@ -117,6 +118,48 @@ function switchSubTab(tab) {
     if (contentId) document.getElementById(contentId).classList.add('active');
     if (tab === 'cron') fetchCronJobs();
     if (tab === 'taskhub') { fetchTaskhubStats(); fetchTasks(); }
+}
+
+function updateSummaryCards(tab) {
+    const section = document.getElementById('summarySection');
+    if (!section) return;
+    if (tab === 'chat') { section.style.display = 'none'; return; }
+    section.style.display = '';
+
+    function setSlot(n, label, icon, iconCls) {
+        const lbl = document.getElementById('sc' + n + 'Label');
+        const ico = document.getElementById('sc' + n + 'Icon');
+        if (lbl) lbl.textContent = label;
+        if (ico) { ico.textContent = icon; ico.className = 'summary-icon ' + iconCls; }
+    }
+
+    const sys = latestDashboard?.sys || {};
+
+    if (tab === 'monitor') {
+        setSlot(1, '總 Agents',  '🤖', 'blue');
+        setSlot(2, '執行中',     '🟢', 'green');
+        setSlot(3, 'Sub-Agents', '🔗', 'orange');
+        setSlot(4, '本月費用',   '💰', 'purple');
+    } else if (tab === 'system') {
+        setSlot(1, 'CPU',    '💻', 'blue');
+        setSlot(2, '記憶體', '🧠', 'green');
+        setSlot(3, '磁碟',   '💾', 'orange');
+        setSlot(4, '本月費用', '💰', 'purple');
+        const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+        set('totalAgents',    (sys.cpu    || 0) + '%');
+        set('activeAgents',   (sys.memory || 0) + '%');
+        set('totalSubagents', (sys.disk   || 0) + '%');
+    } else if (tab === 'logs') {
+        setSlot(1, 'OC 版本',  '📦', 'blue');
+        setSlot(2, 'Watchdog', '🐕', 'green');
+        setSlot(3, '本月費用', '💰', 'orange');
+        setSlot(4, 'Sub-Agents', '🔗', 'purple');
+        const ver = document.getElementById('openclawVersion')?.textContent || '-';
+        const wd  = document.getElementById('watchdogStateText')?.textContent || '-';
+        const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+        set('totalAgents',  ver);
+        set('activeAgents', wd);
+    }
 }
 
 // --- Log Terminal ---
