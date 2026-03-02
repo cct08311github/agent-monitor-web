@@ -106,6 +106,6 @@ function updateCostDisplay() {
     }
 
     const rangeLabel = { today: '今日', week: '本週', month: '月', all: '全部' }[range] || '月';
-    document.getElementById('costLabel').textContent = `${rangeLabel}費用 (TWD)`;
+    document.getElementById('sc4Label').textContent = `${rangeLabel}費用 (TWD)`;
     document.getElementById('totalCost').textContent = formatTWD(totalUSD);
 }
