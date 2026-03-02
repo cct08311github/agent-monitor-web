@@ -102,8 +102,46 @@ function getAgentTopTokens(limit = 5) {
     }
 }
 
+function getCostHistory(limit = 60) {
+    const stmt = db.prepare(`
+        SELECT strftime('%Y-%m-%dT%H:%M:00Z', timestamp) as ts,
+               ROUND(SUM(cost), 6) as total_cost
+        FROM agent_metrics
+        GROUP BY strftime('%Y-%m-%dT%H:%M:00Z', timestamp)
+        ORDER BY ts DESC
+        LIMIT ?
+    `);
+    try {
+        return stmt.all(limit).reverse();
+    } catch (e) {
+        return [];
+    }
+}
+
+function getAgentActivitySummary() {
+    const stmt = db.prepare(`
+        SELECT agent_id,
+               MAX(timestamp) as last_seen,
+               SUM(CASE WHEN status LIKE '%active%' THEN 1 ELSE 0 END) as active_snapshots
+        FROM agent_metrics
+        WHERE timestamp >= datetime('now', '-24 hours')
+        GROUP BY agent_id
+    `);
+    try {
+        return stmt.all().map(r => ({
+            agent_id: r.agent_id,
+            active_minutes: r.active_snapshots,
+            last_seen: r.last_seen,
+        }));
+    } catch (e) {
+        return [];
+    }
+}
+
 module.exports = {
     saveSnapshot,
     getSystemHistory,
-    getAgentTopTokens
+    getAgentTopTokens,
+    getCostHistory,
+    getAgentActivitySummary
 };

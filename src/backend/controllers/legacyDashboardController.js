@@ -581,7 +581,9 @@ class DashboardController {
         try {
             const history = tsdbService.getSystemHistory(60);
             const topSpenders = tsdbService.getAgentTopTokens(5);
-            res.json({ success: true, history, topSpenders });
+            const costHistory = tsdbService.getCostHistory(60);
+            const agentActivity = tsdbService.getAgentActivitySummary();
+            res.json({ success: true, history, topSpenders, costHistory, agentActivity });
         } catch (error) {
             res.status(500).json({ success: false, error: error.message });
         }
