@@ -489,8 +489,9 @@ const alertEngine = require('../services/alertEngine');
 
 let sharedPayload = null;
 let lastUpdateTs = 0;
+let pendingUpdate = null;
 
-async function updateSharedData() {
+async function _doUpdateSharedData() {
     try {
         const payload = await buildDashboardPayload();
         sharedPayload = minimizeDashboardPayload(payload);
@@ -516,6 +517,12 @@ async function updateSharedData() {
         console.error('[Poller] Update failed:', e);
         return false;
     }
+}
+
+async function updateSharedData() {
+    if (pendingUpdate) return pendingUpdate;
+    pendingUpdate = _doUpdateSharedData().finally(() => { pendingUpdate = null; });
+    return pendingUpdate;
 }
 
 async function doBroadcast() {
