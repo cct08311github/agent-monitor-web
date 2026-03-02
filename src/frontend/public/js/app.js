@@ -664,28 +664,64 @@ function renderDashboard(data) {
     });
 
     const gridEl = document.getElementById('agentGrid');
-    gridEl.innerHTML = agents.map(a => {
-        const agentPeriodCost = (range === 'all' ? (a.costs?.total ?? a.cost ?? 0) : (a.costs?.[range] ?? a.cost ?? 0));
-        const cost = parseFloat(agentPeriodCost); totalCost += cost;
-        if (a.status === 'active_executing' || a.status === 'active_recent') activeCount++;
-        const si = getStatusInfo(a.status);
-        const taskText = a.currentTask?.task || '';
-        const taskLabel = a.currentTask?.label || '';
-        const isExecuting = taskLabel === 'EXECUTING';
-        const taskHtml = taskText ? `<div class="agent-task-preview">
-            <div class="agent-task-header"><span class="agent-task-label ${isExecuting ? 'executing' : 'idle'}">${isExecuting ? '<span class="task-pulse"></span>執行中' : '💤 閒置'}</span>${taskText.length > 80 ? '<span style="font-size:9px;color:var(--text-muted);margin-left:auto">點擊查看全文↗</span>' : ''}</div>
-            <div class="agent-task-content" title="${esc(taskText)}">${esc(taskText)}</div></div>` : '';
-        return `<div class="agent-card ${si.class}" onclick="showAgentDetail('${esc(a.id)}')">
-            <div class="agent-card-header"><div class="agent-card-name"><div class="agent-avatar">${getAgentEmoji(a.id)}</div><div><div class="agent-name">${esc(a.id)}</div><div class="agent-hostname">${esc(a.model || 'N/A')}</div></div></div>
-            <div class="agent-status ${si.dotClass}"><span class="agent-status-dot"></span>${si.text}</div></div>
-            <div class="agent-card-body"><div class="agent-info-row"><span class="agent-info-label">費用</span><span class="agent-info-value">${formatTWD(cost)}</span></div>
-            <div class="agent-info-row"><span class="agent-info-label">Tokens</span><span class="agent-info-value">${formatTokens(a.tokens?.total)}</span></div>
-            <div class="agent-info-row"><span class="agent-info-label">活動</span><span class="agent-info-value">${esc(a.lastActivity || '-')}</span></div></div>
-            ${taskHtml}
-            <div class="agent-card-actions" onclick="event.stopPropagation()">
-                <button class="agent-action-btn" onclick="openChat('${esc(a.id)}')">💬 對話</button>
-                <button class="agent-action-btn" onclick="openModelModal('${esc(a.id)}', '${esc(a.model || '')}')">🔄 模型</button></div></div>`;
-    }).join('') || '<div style="color:var(--text-muted);padding:20px;text-align:center;">沒有 Agent</div>';
+    const activeAgents2 = agents.filter(a => a.status === 'active_executing' || a.status === 'active_recent');
+    const inactiveAgents = agents.filter(a => a.status !== 'active_executing' && a.status !== 'active_recent');
+
+    function buildAgentCost(a) {
+        return parseFloat(range === 'all' ? (a.costs?.total ?? a.cost ?? 0) : (a.costs?.[range] ?? a.cost ?? 0));
+    }
+
+    const frag = document.createDocumentFragment();
+
+    if (agents.length === 0) {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'color:var(--text-muted);padding:20px;text-align:center;';
+        empty.textContent = '沒有 Agent';
+        frag.appendChild(empty);
+    } else {
+        if (activeAgents2.length > 0) {
+            const grpHdr = document.createElement('div');
+            grpHdr.className = 'agent-group-header';
+            const dot2 = document.createElement('span');
+            dot2.className = 'agent-group-dot online';
+            const lbl = document.createElement('span');
+            lbl.textContent = `執行中 (${activeAgents2.length})`;
+            grpHdr.append(dot2, lbl);
+            frag.appendChild(grpHdr);
+            const activeGrid = document.createElement('div');
+            activeGrid.className = 'agent-grid-inner';
+            activeAgents2.forEach(a => {
+                const cost = buildAgentCost(a);
+                totalCost += cost;
+                activeCount++;
+                activeGrid.appendChild(_buildAgentCardEl(a, cost));
+            });
+            frag.appendChild(activeGrid);
+        }
+
+        if (inactiveAgents.length > 0) {
+            const details = document.createElement('details');
+            details.className = 'agent-group-details';
+            const summary = document.createElement('summary');
+            summary.className = 'agent-group-header agent-group-summary';
+            const dot2 = document.createElement('span');
+            dot2.className = 'agent-group-dot idle';
+            const lbl = document.createElement('span');
+            lbl.textContent = `閒置 (${inactiveAgents.length})`;
+            summary.append(dot2, lbl);
+            details.appendChild(summary);
+            const inactiveGrid = document.createElement('div');
+            inactiveGrid.className = 'agent-grid-inner';
+            inactiveAgents.forEach(a => {
+                const cost = buildAgentCost(a);
+                totalCost += cost;
+                inactiveGrid.appendChild(_buildAgentCardEl(a, cost));
+            });
+            details.appendChild(inactiveGrid);
+            frag.appendChild(details);
+        }
+    }
+    gridEl.replaceChildren(frag);
 
     const subagents = (data.subagents || []).sort((a, b) => ({ running: 0, recent: 1, idle: 2 }[a.status] ?? 3) - ({ running: 0, recent: 1, idle: 2 }[b.status] ?? 3));
     document.getElementById('subagentGrid').innerHTML = subagents.slice(0, 40).map(s => {
