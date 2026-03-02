@@ -206,7 +206,7 @@ async function runCronJob(id) {
         });
         const data = await res.json();
         if (data.success) {
-            showToast('✅ 任務執行成功', 'success');
+            showToast(`✅ ${data.message || '任務已觸發（在背景執行中）'}`, 'success');
             // 刷新任務列表以更新最後執行時間
             fetchCronJobs();
         } else {
