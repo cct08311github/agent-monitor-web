@@ -2178,3 +2178,22 @@ input:checked+.toggle-slider:before {
 ::-webkit-scrollbar-thumb:hover {
     background: var(--text-muted);
 }
+
+/* ── Alert System ─────────────────────────────── */
+.alert-config-btn { position: relative; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 14px; color: var(--text-primary); }
+.alert-config-btn .alert-badge { position: absolute; top: -6px; right: -6px; background: var(--red); color: #fff; border-radius: 10px; font-size: 10px; min-width: 16px; height: 16px; line-height: 16px; text-align: center; padding: 0 3px; display: none; }
+.alert-severity { border-radius: 4px; padding: 2px 6px; font-size: 11px; font-weight: 600; }
+.alert-severity.warning { background: var(--orange-light, #fff3cd); color: var(--orange, #e67e22); }
+.alert-severity.critical { background: var(--red-light, #fde8e8); color: var(--red, #e74c3c); }
+.alert-severity.info { background: var(--blue-light, #e8f4fd); color: var(--blue, #2980b9); }
+.alert-config-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.alert-config-table th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); color: var(--text-muted); font-weight: 500; }
+.alert-config-table td { padding: 8px; border-bottom: 1px solid var(--border-light, var(--border)); }
+.toggle-switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.modal-box { background: var(--bg-card); border-radius: 12px; width: 100%; max-width: 520px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; }
+.modal-footer { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 20px; border-top: 1px solid var(--border); }
+.btn-primary { background: var(--accent, #3b82f6); color: #fff; border: none; border-radius: 6px; padding: 8px 16px; cursor: pointer; font-size: 13px; font-weight: 500; }
+.btn-primary:hover { opacity: 0.9; }
+.btn-secondary { background: var(--bg-hover, #f1f5f9); color: var(--text-primary); border: 1px solid var(--border); border-radius: 6px; padding: 8px 16px; cursor: pointer; font-size: 13px; }
+.btn-secondary:hover { background: var(--border); }

@@ -15,9 +15,15 @@ const taskHubController = require('../controllers/taskHubController');
 const legacyDashboardController = require('../controllers/legacyDashboardController');
 const legacyControlController = require('../controllers/legacyControlController');
 const auth = require('../middlewares/auth');
+const alertController = require('../controllers/alertController');
 
 // Legacy Read Endpoints
 router.get('/read/health', (req, res) => res.json({ success: true, ts: new Date().toISOString() }));
+
+// Alerts
+router.get('/alerts/config', alertController.getConfig);
+router.patch('/alerts/config', auth.localhostOnlyControl, auth.rateLimit, alertController.updateConfig);
+router.get('/alerts/recent', alertController.getRecent);
 router.get('/read/dashboard', legacyDashboardController.getDashboard);
 router.get('/read/stream', legacyDashboardController.streamDashboard);
 router.get('/read/history', legacyDashboardController.getHistory);

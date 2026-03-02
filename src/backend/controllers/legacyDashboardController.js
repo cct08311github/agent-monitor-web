@@ -485,6 +485,7 @@ let lastSnapshotTime = 0;
 const TSDB_SNAPSHOT_INTERVAL = 60000;
 const tsdbService = require('../services/tsdbService');
 const agentWatcherService = require('../services/agentWatcherService');
+const alertEngine = require('../services/alertEngine');
 
 let sharedPayload = null;
 let lastUpdateTs = 0;
@@ -500,6 +501,16 @@ async function updateSharedData() {
             lastSnapshotTime = lastUpdateTs;
             tsdbService.saveSnapshot(sharedPayload.sys || {}, sharedPayload.agents || []);
         }
+
+        // Alert evaluation — push to SSE if any fired
+        const firedAlerts = alertEngine.evaluate(sharedPayload);
+        if (firedAlerts.length > 0) {
+            const alertStr = `event: alert\ndata: ${JSON.stringify({ alerts: firedAlerts })}\n\n`;
+            sseClients.forEach((client) => {
+                try { client.write(alertStr); } catch (e) { sseClients.delete(client); }
+            });
+        }
+
         return true;
     } catch (e) {
         console.error('[Poller] Update failed:', e);
@@ -512,7 +523,9 @@ async function doBroadcast() {
     if (!sharedPayload) await updateSharedData();
 
     const dataStr = `data: ${JSON.stringify(sharedPayload)}\n\n`;
-    sseClients.forEach((res) => res.write(dataStr));
+    sseClients.forEach((res) => {
+        try { res.write(dataStr); } catch (e) { sseClients.delete(res); }
+    });
 }
 
 function startGlobalPolling() {
