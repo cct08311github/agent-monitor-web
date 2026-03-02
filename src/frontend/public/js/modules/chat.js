@@ -1,6 +1,7 @@
 // ========== Chat & Model Switch Module ==========
 let chatPageAgent = 'main';
 let chatPageSending = false;
+let chatModalSending = false;
 let chatPageInited = false;
 let currentTargetAgent = null;
 let modelSwitchTarget = null;
@@ -187,14 +188,14 @@ function autoGrowTextarea(el) {
 }
 
 async function sendChat() {
-    if (chatSending) return;
+    if (chatModalSending) return;
     const input = document.getElementById('chatInput');
     const msg = input.value.trim();
     if (!msg) return;
     if (msg.length > 2000) { showToast('❌ 訊息超過 2000 字', 'error'); return; }
     if (!currentTargetAgent || !/^[A-Za-z0-9_-]+$/.test(currentTargetAgent)) { showToast('❌ 無效的 Agent ID', 'error'); return; }
 
-    chatSending = true;
+    chatModalSending = true;
     const log = document.getElementById('chatLog');
     log.innerHTML += `<div class="chat-msg user">${esc(msg)}</div>`;
     input.value = '';
@@ -219,7 +220,7 @@ async function sendChat() {
         log.innerHTML += `<div class="chat-msg error">❌ ${esc(e.message)}</div>`;
         pushLog(`Chat error (${currentTargetAgent}): ${e.message}`, 'err');
     }
-    chatSending = false;
+    chatModalSending = false;
     log.scrollTop = log.scrollHeight;
 }
 
