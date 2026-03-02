@@ -429,7 +429,9 @@ async function buildDashboardPayload() {
         getSystemResources(),
         execFilePromise(ocBin, ['agents', 'list']).catch(() => ({ stdout: '' })),
         execFilePromise(ocBin, ['cron', 'list', '--json']).catch(() => ({ stdout: '{"jobs":[]}' })),
-        execFilePromise(ocBin, ['--version']).catch(() => ({ stdout: '' })),
+        cachedOcVersion
+            ? Promise.resolve({ stdout: cachedOcVersion, stderr: '' })
+            : execFilePromise(ocBin, ['--version']).catch(() => ({ stdout: '' })),
         getExchangeRate()
     ]);
 
@@ -456,6 +458,7 @@ async function buildDashboardPayload() {
     const cooldowns = await fetchModelCooldowns();
 
     const openclawVersion = parseOpenclawVersionOutput(openclawVersionResult.stdout, openclawVersionResult.stderr);
+    if (openclawVersion && !cachedOcVersion) cachedOcVersion = openclawVersion;
 
     const payload = { success: true, openclaw: { version: openclawVersion || null }, sys, agents, cron, subagents, cooldowns, exchangeRate };
     dashboardCache = { ts: now, payload };
@@ -490,6 +493,7 @@ const alertEngine = require('../services/alertEngine');
 let sharedPayload = null;
 let lastUpdateTs = 0;
 let pendingUpdate = null;
+let cachedOcVersion = null;
 
 async function _doUpdateSharedData() {
     try {
