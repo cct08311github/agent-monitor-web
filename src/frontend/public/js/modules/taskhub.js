@@ -32,6 +32,8 @@ function setThDomain(domain) {
     document.querySelectorAll('.th-domain-btn').forEach(b =>
         b.classList.toggle('active', b.dataset.domain === domain));
     fetchTasks();
+    const grid = document.getElementById('taskhubGrid');
+    if (grid) grid.classList.toggle('th-hide-domain', domain !== 'all');
 }
 
 function debounceThSearch() {
@@ -258,24 +260,55 @@ function _buildTaskRow(t) {
     return tr;
 }
 
+function _mkBtn(container, cls, text, fn) {
+    const btn = document.createElement('button');
+    btn.className = 'th-action-btn ' + cls;
+    btn.textContent = text;
+    btn.addEventListener('click', fn);
+    container.appendChild(btn);
+}
+
 function _appendActionButtons(container, task) {
-    function mkBtn(cls, text, onClickFn) {
-        const btn = document.createElement('button');
-        btn.className = 'th-action-btn ' + cls;
-        btn.textContent = text;
-        btn.addEventListener('click', onClickFn);
-        container.appendChild(btn);
-    }
     if (task.status === 'not_started')
-        mkBtn('th-btn-start', '▶ 開始', () => quickUpdateStatus(task.domain, task.id, 'in_progress'));
+        _mkBtn(container, 'th-btn-start', '▶ 開始', () => quickUpdateStatus(task.domain, task.id, 'in_progress'));
+    else if (task.status === 'in_progress')
+        _mkBtn(container, 'th-btn-done', '✓ 完成', () => quickUpdateStatus(task.domain, task.id, 'done'));
+    else if (task.status === 'blocked')
+        _mkBtn(container, 'th-btn-start', '▶ 恢復', () => quickUpdateStatus(task.domain, task.id, 'in_progress'));
+
+    if (['done', 'archived', 'cancelled'].includes(task.status)) return;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'th-dropdown';
+
+    const trigger = document.createElement('button');
+    trigger.className = 'th-action-btn th-btn-more';
+    trigger.textContent = '⋯';
+    trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const open = wrap.classList.toggle('th-dropdown-open');
+        if (open) {
+            const close = () => { wrap.classList.remove('th-dropdown-open'); document.removeEventListener('click', close); };
+            setTimeout(() => document.addEventListener('click', close), 0);
+        }
+    });
+
+    const menu = document.createElement('div');
+    menu.className = 'th-dropdown-menu';
+
     if (task.status === 'in_progress') {
-        mkBtn('th-btn-done',  '✓ 完成', () => quickUpdateStatus(task.domain, task.id, 'done'));
-        mkBtn('th-btn-block', '⛔ 封鎖', () => quickUpdateStatus(task.domain, task.id, 'blocked'));
+        const blockItem = document.createElement('button');
+        blockItem.textContent = '⛔ 封鎖';
+        blockItem.addEventListener('click', () => quickUpdateStatus(task.domain, task.id, 'blocked'));
+        menu.appendChild(blockItem);
     }
-    if (task.status === 'blocked')
-        mkBtn('th-btn-start', '▶ 恢復', () => quickUpdateStatus(task.domain, task.id, 'in_progress'));
-    if (!['done', 'archived', 'cancelled'].includes(task.status))
-        mkBtn('th-btn-edit', '✏️ 編輯', () => openTaskDetail(task.domain, task.id));
+    const editItem = document.createElement('button');
+    editItem.textContent = '✏️ 編輯';
+    editItem.addEventListener('click', () => openTaskDetail(task.domain, task.id));
+    menu.appendChild(editItem);
+
+    wrap.append(trigger, menu);
+    container.appendChild(wrap);
 }
 
 function isDueUrgent(dateStr) {
