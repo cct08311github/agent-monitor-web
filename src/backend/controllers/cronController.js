@@ -60,6 +60,30 @@ class CronController {
     }
 
     /**
+     * 刪除指定 Cron 任務
+     */
+    async deleteJob(req, res) {
+        const { id } = req.params;
+        try {
+            if (!fs.existsSync(JOBS_FILE)) {
+                throw new Error('任務文件不存在');
+            }
+            const data = JSON.parse(fs.readFileSync(JOBS_FILE, 'utf8'));
+            const before = data.jobs.length;
+            data.jobs = data.jobs.filter(j => j.id !== id);
+            if (data.jobs.length === before) {
+                return res.status(404).json({ success: false, error: '找不到該任務' });
+            }
+            fs.writeFileSync(JOBS_FILE, JSON.stringify(data, null, 2), 'utf8');
+            console.log(`[CronController] Deleted job ${id}`);
+            res.json({ success: true });
+        } catch (error) {
+            console.error('[CronController] Delete failed:', error);
+            res.status(500).json({ success: false, error: error.message });
+        }
+    }
+
+    /**
      * 立即執行指定 Cron 任務
      */
     async runJob(req, res) {

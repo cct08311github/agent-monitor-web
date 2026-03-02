@@ -107,56 +107,139 @@ function renderTasks(tasks) {
         return;
     }
 
-    grid.innerHTML = tasks.map(t => {
-        const sm = TH_STATUS_MAP[t.status] || { label: t.status, cls: '' };
-        const pm = TH_PRIORITY_MAP[t.priority] || { label: t.priority, cls: '' };
-        const domEmoji = TH_DOMAIN_EMOJI[t.domain] || '📋';
-        const dueHtml = t.due_date
-            ? `<span class="th-due ${isDueUrgent(t.due_date) ? 'th-due-urgent' : ''}"
-                title="到期日">📅 ${t.due_date}</span>`
-            : '';
-        const ghHtml = t.github_issue_id
-            ? `<a class="th-gh-link" href="https://github.com/${esc(t.github_repo || '')}/issues/${t.github_issue_id}" target="_blank" title="GitHub Issue">#${t.github_issue_id}</a>`
-            : '';
-        const projectHtml = t.project ? `<span class="th-project">${esc(t.project)}</span>` : '';
-        const tags = (t.tags || []).slice(0, 3).map(tag => `<span class="th-tag">${esc(tag)}</span>`).join('');
+    const table = document.createElement('table');
+    table.className = 'th-task-table';
 
-        // Quick status change buttons (show next logical actions)
-        const quickActions = buildQuickActions(t);
+    const thead = table.createTHead();
+    const hRow = thead.insertRow();
+    ['優先', '標題', '狀態', 'Domain', '專案', '到期', '操作'].forEach(h => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        hRow.appendChild(th);
+    });
 
-        return `<div class="th-task-card" onclick="openTaskDetail('${esc(t.domain)}', '${esc(t.id)}')">
-            <div class="th-task-header">
-                <span class="th-domain-badge">${domEmoji} ${esc(t.domain)}</span>
-                <span class="th-status-badge ${sm.cls}">${sm.label}</span>
-                <span class="th-priority-badge ${pm.cls}">${pm.label}</span>
-            </div>
-            <div class="th-task-title">${esc(t.title)}</div>
-            <div class="th-task-meta">
-                ${projectHtml}${dueHtml}${ghHtml}
-                <div class="th-tags">${tags}</div>
-            </div>
-            ${t.notes ? `<div class="th-task-notes">${esc(t.notes.slice(0, 80))}${t.notes.length > 80 ? '…' : ''}</div>` : ''}
-            <div class="th-task-actions" onclick="event.stopPropagation()">${quickActions}</div>
-        </div>`;
-    }).join('');
+    const tbody = table.createTBody();
+    tasks.forEach(t => tbody.appendChild(_buildTaskRow(t)));
+
+    grid.replaceChildren(table);
 }
 
-function buildQuickActions(task) {
-    const buttons = [];
-    if (task.status === 'not_started') {
-        buttons.push(`<button class="th-action-btn th-btn-start" onclick="quickUpdateStatus('${task.domain}','${task.id}','in_progress')">▶ 開始</button>`);
+function _buildTaskRow(t) {
+    const sm = TH_STATUS_MAP[t.status] || { label: t.status, cls: '' };
+    const pm = TH_PRIORITY_MAP[t.priority] || { label: t.priority, cls: '' };
+    const domEmoji = TH_DOMAIN_EMOJI[t.domain] || '📋';
+
+    const tr = document.createElement('tr');
+    tr.className = 'th-task-row';
+    tr.addEventListener('click', () => openTaskDetail(t.domain, t.id));
+
+    // Priority
+    const tdPri = document.createElement('td');
+    tdPri.className = 'th-col-priority';
+    const priSpan = document.createElement('span');
+    priSpan.className = 'th-priority-badge ' + pm.cls;
+    priSpan.textContent = pm.label;
+    tdPri.appendChild(priSpan);
+
+    // Title + notes preview
+    const tdTitle = document.createElement('td');
+    tdTitle.className = 'th-col-title';
+    const titleSpan = document.createElement('span');
+    titleSpan.className = 'th-row-title';
+    titleSpan.textContent = t.title;
+    tdTitle.appendChild(titleSpan);
+    if (t.notes) {
+        const notesSpan = document.createElement('span');
+        notesSpan.className = 'th-row-notes';
+        notesSpan.textContent = t.notes.slice(0, 60) + (t.notes.length > 60 ? '…' : '');
+        tdTitle.appendChild(notesSpan);
     }
+
+    // Status
+    const tdStatus = document.createElement('td');
+    tdStatus.className = 'th-col-status';
+    const statusSpan = document.createElement('span');
+    statusSpan.className = 'th-status-badge ' + sm.cls;
+    statusSpan.textContent = sm.label;
+    tdStatus.appendChild(statusSpan);
+
+    // Domain
+    const tdDomain = document.createElement('td');
+    tdDomain.className = 'th-col-domain';
+    const domSpan = document.createElement('span');
+    domSpan.className = 'th-domain-badge';
+    domSpan.textContent = domEmoji + ' ' + t.domain;
+    tdDomain.appendChild(domSpan);
+
+    // Project + GitHub link
+    const tdProject = document.createElement('td');
+    tdProject.className = 'th-col-project';
+    if (t.project) {
+        const projSpan = document.createElement('span');
+        projSpan.className = 'th-project';
+        projSpan.textContent = t.project;
+        tdProject.appendChild(projSpan);
+    }
+    if (t.github_issue_id) {
+        if (t.project) tdProject.append(' ');
+        const ghLink = document.createElement('a');
+        ghLink.className = 'th-gh-link';
+        ghLink.href = 'https://github.com/' + (t.github_repo || '') + '/issues/' + t.github_issue_id;
+        ghLink.target = '_blank';
+        ghLink.title = 'GitHub Issue';
+        ghLink.textContent = '#' + t.github_issue_id;
+        tdProject.appendChild(ghLink);
+    }
+    if (!t.project && !t.github_issue_id) {
+        const empty = document.createElement('span');
+        empty.className = 'th-due-empty';
+        empty.textContent = '—';
+        tdProject.appendChild(empty);
+    }
+
+    // Due date
+    const tdDue = document.createElement('td');
+    tdDue.className = 'th-col-due';
+    if (t.due_date) {
+        const dueSpan = document.createElement('span');
+        dueSpan.className = 'th-due' + (isDueUrgent(t.due_date) ? ' th-due-urgent' : '');
+        dueSpan.textContent = '📅 ' + t.due_date;
+        tdDue.appendChild(dueSpan);
+    } else {
+        const emptyDue = document.createElement('span');
+        emptyDue.className = 'th-due-empty';
+        emptyDue.textContent = '—';
+        tdDue.appendChild(emptyDue);
+    }
+
+    // Action buttons
+    const tdActions = document.createElement('td');
+    tdActions.className = 'th-col-actions';
+    tdActions.addEventListener('click', e => e.stopPropagation());
+    _appendActionButtons(tdActions, t);
+
+    tr.append(tdPri, tdTitle, tdStatus, tdDomain, tdProject, tdDue, tdActions);
+    return tr;
+}
+
+function _appendActionButtons(container, task) {
+    function mkBtn(cls, text, onClickFn) {
+        const btn = document.createElement('button');
+        btn.className = 'th-action-btn ' + cls;
+        btn.textContent = text;
+        btn.addEventListener('click', onClickFn);
+        container.appendChild(btn);
+    }
+    if (task.status === 'not_started')
+        mkBtn('th-btn-start', '▶ 開始', () => quickUpdateStatus(task.domain, task.id, 'in_progress'));
     if (task.status === 'in_progress') {
-        buttons.push(`<button class="th-action-btn th-btn-done" onclick="quickUpdateStatus('${task.domain}','${task.id}','done')">✓ 完成</button>`);
-        buttons.push(`<button class="th-action-btn th-btn-block" onclick="quickUpdateStatus('${task.domain}','${task.id}','blocked')">⛔ 封鎖</button>`);
+        mkBtn('th-btn-done',  '✓ 完成', () => quickUpdateStatus(task.domain, task.id, 'done'));
+        mkBtn('th-btn-block', '⛔ 封鎖', () => quickUpdateStatus(task.domain, task.id, 'blocked'));
     }
-    if (task.status === 'blocked') {
-        buttons.push(`<button class="th-action-btn th-btn-start" onclick="quickUpdateStatus('${task.domain}','${task.id}','in_progress')">▶ 恢復</button>`);
-    }
-    if (!['done', 'archived', 'cancelled'].includes(task.status)) {
-        buttons.push(`<button class="th-action-btn th-btn-edit" onclick="openTaskDetail('${task.domain}','${task.id}')">✏️ 編輯</button>`);
-    }
-    return buttons.join('');
+    if (task.status === 'blocked')
+        mkBtn('th-btn-start', '▶ 恢復', () => quickUpdateStatus(task.domain, task.id, 'in_progress'));
+    if (!['done', 'archived', 'cancelled'].includes(task.status))
+        mkBtn('th-btn-edit', '✏️ 編輯', () => openTaskDetail(task.domain, task.id));
 }
 
 function isDueUrgent(dateStr) {
