@@ -29,6 +29,8 @@ function saveErrorKeys(key, map) {
 let dismissedErrorMap = loadErrorKeys('oc_dismissed_errors');
 let shownErrorMap = loadErrorKeys('oc_shown_errors');
 let commandRunning = false;
+let lastSseTs = 0;
+let _connTimerHandle = null;
 let chatSending = false;
 
 
@@ -145,8 +147,6 @@ function showErrorBanner(msg) {
     if (!lastErrors.find(e => e.msg === msg)) {
         lastErrors.push({ msg, ts });
     }
-    document.getElementById('alertBadge').style.display = 'inline-flex';
-    document.getElementById('alertCount').textContent = lastErrors.length;
 }
 
 function dismissError() {
@@ -161,7 +161,6 @@ function dismissError() {
 
     banner.style.display = 'none';
     lastErrors = [];
-    document.getElementById('alertBadge').style.display = 'none';
 }
 
 function handleErrorFix() {
@@ -617,8 +616,15 @@ async function update(force = false) {
 function initRealtime() {
     pushLog('連接即時串流...', 'info');
     const es = new EventSource('/api/read/stream');
-    const live = document.getElementById('liveIndicator');
-    es.onmessage = (e) => { try { renderDashboard(JSON.parse(e.data)); live.innerHTML = '<span class="live-dot"></span>即時更新'; live.className = 'live-indicator'; } catch (x) { } };
+
+    es.onmessage = (e) => {
+        try {
+            renderDashboard(JSON.parse(e.data));
+            lastSseTs = Date.now();
+            _setConnDot('online');
+        } catch (x) { }
+    };
+
     es.addEventListener('alert', (e) => {
         try {
             const { alerts } = JSON.parse(e.data);
@@ -630,11 +636,31 @@ function initRealtime() {
             incrementAlertBadge(alerts.length);
         } catch (x) { }
     });
+
     es.onerror = () => {
-        pushLog('串流中斷，5s 後重連...', 'err'); es.close();
-        live.innerHTML = '⚠️ 已斷線'; live.style.background = 'var(--red-light)'; live.style.color = 'var(--red)';
+        pushLog('串流中斷，5s 後重連...', 'err');
+        es.close();
+        _setConnDot('offline');
         setTimeout(initRealtime, 5000);
     };
+}
+
+function _setConnDot(state) {
+    const dot = document.getElementById('connDot');
+    if (!dot) return;
+    dot.className = 'conn-dot conn-dot-' + state;
+}
+
+function startConnectionTimer() {
+    if (_connTimerHandle) clearInterval(_connTimerHandle);
+    _connTimerHandle = setInterval(() => {
+        const dot = document.getElementById('connDot');
+        if (!dot) return;
+        if (lastSseTs === 0) { _setConnDot('unknown'); return; }
+        const sec = Math.floor((Date.now() - lastSseTs) / 1000);
+        dot.title = sec < 60 ? `最後更新：${sec}s 前` : `最後更新：${Math.floor(sec / 60)}m 前`;
+        if (sec > 60) _setConnDot('offline');
+    }, 1000);
 }
 
 // --- Watchdog ---
@@ -749,7 +775,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const sreInput = document.getElementById('sreInput');
     if (sreInput) sreInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendSREFollowUp(); });
     pushLog('OpenClaw Watch Pro v2.0.3 啟動（含 Watchdog）', 'info');
+    update(true); // 立即載入一次資料，不等 SSE
     initRealtime();
+    startConnectionTimer();
     fetchHistory();
     fetchWatchdogStatus();
     setInterval(fetchHistory, 60000);
