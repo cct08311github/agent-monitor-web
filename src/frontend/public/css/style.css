@@ -2190,6 +2190,12 @@ input:checked+.toggle-slider:before {
 .log-search-input { flex: 1; background: var(--bg-input, var(--bg-card)); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; color: var(--text-primary); font-size: 12px; }
 .log-filter-btn { background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; font-size: 11px; cursor: pointer; color: var(--text-muted); transition: .15s; }
 .log-filter-btn.active { border-color: var(--red); color: var(--red); background: var(--red-light, #fde8e8); }
+.log-filter-btn.active-error {
+    background: rgba(239,68,68,.2); color: #ef4444; border-color: #ef4444;
+}
+.log-filter-btn.active-warn {
+    background: rgba(245,158,11,.2); color: #f59e0b; border-color: #f59e0b;
+}
 .log-line.error { color: var(--red, #e74c3c); }
 .log-line.warn  { color: var(--orange, #e67e22); }
 mark { background: rgba(255, 200, 0, 0.35); color: inherit; border-radius: 2px; }
