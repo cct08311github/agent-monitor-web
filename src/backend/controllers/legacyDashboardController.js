@@ -549,14 +549,14 @@ function startGlobalPolling() {
         clearTimeout(watcherDebounceTimer);
         watcherDebounceTimer = setTimeout(async () => {
             await updateSharedData();
-            doBroadcast();
+            doBroadcast().catch(e => console.error('[Poller] Broadcast error:', e));
         }, 300);
     });
 
     // Fallback timer: Refresh data every 15s regardless of file changes
     setInterval(async () => {
         await updateSharedData();
-        doBroadcast();
+        doBroadcast().catch(e => console.error('[Poller] Broadcast error:', e));
     }, 15000);
 }
 
@@ -628,6 +628,7 @@ class DashboardController {
 
     async getAgents(req, res) {
         try {
+            const ocBin = await resolveOpenclawBin();
             const { stdout, stderr } = await execFilePromise(ocBin, ['agents', 'list']);
             res.json({ success: true, output: (stdout || '') + (stderr || '') });
         } catch (error) {
