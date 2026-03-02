@@ -544,9 +544,13 @@ function startGlobalPolling() {
     isPolling = true;
 
     agentWatcherService.start();
-    agentWatcherService.on('state_update', async () => {
-        await updateSharedData();
-        doBroadcast();
+    let watcherDebounceTimer = null;
+    agentWatcherService.on('state_update', () => {
+        clearTimeout(watcherDebounceTimer);
+        watcherDebounceTimer = setTimeout(async () => {
+            await updateSharedData();
+            doBroadcast();
+        }, 300);
     });
 
     // Fallback timer: Refresh data every 15s regardless of file changes
