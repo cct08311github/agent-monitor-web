@@ -363,9 +363,6 @@ function detectErrors(data) {
                 lastErrors.push({ msg: e.msg, ts: fmtTime() });
             }
         });
-        if (lastErrors.length > 0) {
-            document.getElementById('alertCount').textContent = lastErrors.length;
-        }
     }
 }
 
