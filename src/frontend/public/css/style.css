@@ -2206,3 +2206,6 @@ input:checked+.toggle-slider:before {
 .log-line.error { color: var(--red, #e74c3c); }
 .log-line.warn  { color: var(--orange, #e67e22); }
 mark { background: rgba(255, 200, 0, 0.35); color: inherit; border-radius: 2px; }
+
+/* ── Agent Activity Banner ──────────────────────── */
+.agent-activity-banner { font-size: 11px; color: var(--text-muted); padding: 4px 8px; background: var(--bg-card); border-radius: 4px; margin-bottom: 8px; min-height: 0; }
