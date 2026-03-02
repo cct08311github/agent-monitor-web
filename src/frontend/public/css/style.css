@@ -242,38 +242,29 @@ body {
     }
 }
 
-.live-indicator {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 12px;
-    background: var(--green-light);
-    color: var(--green);
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.live-dot {
-    width: 6px;
-    height: 6px;
-    background: var(--green);
+/* Connection Dot Styles */
+.conn-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
-    animation: livePulse 2s infinite;
+    vertical-align: middle;
+    margin-left: 3px;
+    transition: background 0.3s;
 }
 
-@keyframes livePulse {
+.conn-dot-online {
+    background: var(--green);
+    box-shadow: 0 0 4px var(--green);
+}
 
-    0%,
-    100% {
-        opacity: 1;
-        transform: scale(1);
-    }
+.conn-dot-offline {
+    background: var(--text-muted);
+}
 
-    50% {
-        opacity: 0.5;
-        transform: scale(0.8);
-    }
+.conn-dot-unknown {
+    background: var(--text-muted);
+    opacity: 0.5;
 }
 
 .header-btn {
@@ -1980,10 +1971,6 @@ input:checked+.toggle-slider:before {
 
     .header-title h1 {
         font-size: 14px;
-    }
-
-    .live-indicator span:not(.live-dot) {
-        display: none;
     }
 
     .section-header h2 {
