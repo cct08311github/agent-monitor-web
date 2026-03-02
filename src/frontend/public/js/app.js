@@ -1137,6 +1137,10 @@ async function quickUpdateStatus(domain, id, status) {
     }
 }
 
+function closeTaskDetailModal() {
+    document.getElementById('taskDetailModal').style.display = 'none';
+}
+
 function openTaskDetail(domain, id) {
     const task = thTasks.find(t => t.id === id && t.domain === domain);
     if (!task) return;

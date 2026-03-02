@@ -173,13 +173,64 @@ function calculateCost(inputTokens, outputTokens, cacheRead, modelName) {
     return inputCost + cacheCost + outputCost;
 }
 
+let previousCpuInfo = null;
+
 async function getSystemResources() {
     try {
+        // CPU Usage Calculation via diff
         const cpus = os.cpus();
-        const load = os.loadavg();
-        const cpuUsage = Math.min(100, (load[0] / cpus.length * 100)).toFixed(1);
+        let idle = 0;
+        let total = 0;
+        for (const cpu of cpus) {
+            for (const type in cpu.times) {
+                total += cpu.times[type];
+            }
+            idle += cpu.times.idle;
+        }
+
+        let cpuUsage = 0;
+        if (previousCpuInfo && previousCpuInfo.total !== total) {
+            const idleDiff = idle - previousCpuInfo.idle;
+            const totalDiff = total - previousCpuInfo.total;
+            cpuUsage = Math.max(0, Math.min(100, 100 - (100 * idleDiff / totalDiff)));
+        } else {
+            const load = os.loadavg();
+            cpuUsage = Math.min(100, (load[0] / cpus.length * 100));
+        }
+        previousCpuInfo = { idle, total };
+
+        // Memory usage
         const totalMem = os.totalmem();
-        const freeMem = os.freemem();
+        let freeMem = os.freemem();
+
+        if (os.platform() === 'darwin') {
+            try {
+                const { stdout } = await execFilePromise('vm_stat');
+                const psMatch = stdout.match(/page size of (\d+) bytes/);
+                const pageSize = psMatch ? parseInt(psMatch[1], 10) : 4096;
+                const getVal = (key) => {
+                    const match = stdout.match(new RegExp(`${key}:\\s+(\\d+)`));
+                    return match ? parseInt(match[1], 10) * pageSize : 0;
+                };
+                const active = getVal('Pages active');
+                const wired = getVal('Pages wired down');
+                const occupied = getVal('Pages occupied by compressor');
+                const usedMem = active + wired + occupied;
+                if (usedMem > 0) {
+                    freeMem = Math.max(0, totalMem - usedMem);
+                }
+            } catch (e) { }
+        } else if (os.platform() === 'linux') {
+            try {
+                const { stdout } = await execFilePromise('free', ['-b']);
+                // `free` outputs table. "Mem:" line, 7th column is "available"
+                const memMatch = stdout.match(/Mem:\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+(\d+)/);
+                if (memMatch) {
+                    freeMem = parseInt(memMatch[1], 10);
+                }
+            } catch (e) { }
+        }
+
         const memUsage = ((totalMem - freeMem) / totalMem * 100).toFixed(1);
 
         let diskUsage = '0';
@@ -195,7 +246,7 @@ async function getSystemResources() {
         const hours = Math.floor(uptimeSeconds / 3600);
         const minutes = Math.floor((uptimeSeconds % 3600) / 60);
         return {
-            cpu: parseFloat(cpuUsage),
+            cpu: parseFloat(cpuUsage.toFixed(1)),
             memory: parseFloat(memUsage),
             memoryUsedGB: ((totalMem - freeMem) / (1024 ** 3)).toFixed(2),
             memoryTotalGB: (totalMem / (1024 ** 3)).toFixed(0),
