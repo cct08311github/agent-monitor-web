@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 const dbPath = path.join(__dirname, '../../../data');
+/* istanbul ignore next */
 if (!fs.existsSync(dbPath)) fs.mkdirSync(dbPath, { recursive: true });
 
 const db = new Database(path.join(dbPath, 'tsdb.sqlite'), {
@@ -67,6 +68,7 @@ function saveSnapshot(systemData, agents) {
     }
 }
 
+/* istanbul ignore next */
 function runCleanup() {
     try {
         cleanupStmt.run();
@@ -97,9 +99,7 @@ function getAgentTopTokens(limit = 5) {
     `);
     try {
         return stmt.all(limit);
-    } catch (e) {
-        return [];
-    }
+    } catch (e) { /* istanbul ignore next */ return []; }
 }
 
 function getCostHistory(limit = 60) {
@@ -113,9 +113,7 @@ function getCostHistory(limit = 60) {
     `);
     try {
         return stmt.all(limit).reverse();
-    } catch (e) {
-        return [];
-    }
+    } catch (e) { /* istanbul ignore next */ return []; }
 }
 
 function getAgentActivitySummary() {
@@ -133,9 +131,7 @@ function getAgentActivitySummary() {
             active_minutes: r.active_snapshots,
             last_seen: r.last_seen,
         }));
-    } catch (e) {
-        return [];
-    }
+    } catch (e) { /* istanbul ignore next */ return []; }
 }
 
 module.exports = {

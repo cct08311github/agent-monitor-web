@@ -2,42 +2,42 @@
   {
     "id": "T1660",
     "name": "指令覆蓋攻擊",
-    "pattern": {},
+    "pattern": "ignore.*previous.*instructions",
     "severity": "critical",
     "description": "嘗試覆蓋系統指令"
   },
   {
     "id": "T1659",
     "name": "系統提示洩露",
-    "pattern": {},
+    "pattern": "system.*prompt",
     "severity": "high",
     "description": "嘗試獲取系統提示"
   },
   {
     "id": "T1661",
     "name": "上下文污染",
-    "pattern": {},
+    "pattern": "as.*a.*developer",
     "severity": "high",
     "description": "嘗試污染對話上下文"
   },
   {
     "id": "T1059",
     "name": "命令注入",
-    "pattern": {},
+    "pattern": "eval\\(|exec\\(|`.*`",
     "severity": "critical",
     "description": "嘗試執行系統命令"
   },
   {
     "id": "T1083",
     "name": "路徑遍歷",
-    "pattern": {},
+    "pattern": "\\.\\./",
     "severity": "high",
     "description": "嘗試訪問系統文件"
   },
   {
     "id": "T1662",
     "name": "模型操縱",
-    "pattern": {},
+    "pattern": "change.*behavior|modify.*model",
     "severity": "critical",
     "description": "嘗試操縱 AI 模型行為"
   }
