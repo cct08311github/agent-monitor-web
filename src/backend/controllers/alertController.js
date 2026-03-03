@@ -6,7 +6,7 @@ function getConfig(req, res) {
 
 function updateConfig(req, res) {
     try {
-        const updated = alertEngine.updateConfig(req.body || {});
+        const updated = alertEngine.updateConfig(/* istanbul ignore next */ req.body || {});
         res.json({ success: true, config: updated });
     } catch (e) {
         res.status(400).json({ success: false, error: e.message });

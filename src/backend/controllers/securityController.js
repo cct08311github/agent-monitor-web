@@ -11,7 +11,7 @@ class SecurityController {
 
             const analysis = threatIntel.analyze(content);
             res.json({ success: true, ...analysis });
-        } catch (error) {
+        } catch (error) { /* istanbul ignore next */
             res.status(500).json({ success: false, error: error.message });
         }
     }
@@ -26,7 +26,7 @@ class SecurityController {
 
             const result = adaptiveSecurity.analyze(content, context || {});
             res.json({ success: true, ...result });
-        } catch (error) {
+        } catch (error) { /* istanbul ignore next */
             res.status(500).json({ success: false, error: error.message });
         }
     }

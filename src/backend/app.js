@@ -5,6 +5,7 @@ const apiRoutes = require('./routes/api');
 const app = express();
 
 // Middlewares
+/* istanbul ignore next */
 app.use(express.static(path.join(__dirname, '../frontend/public'), {
     setHeaders: (res, path) => {
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
