@@ -200,6 +200,36 @@ describe('rateLimit', () => {
     });
 });
 
+// ─── requireBearerToken CONTROL_TOKEN env path ─────────
+
+describe('requireBearerToken with CONTROL_TOKEN set', () => {
+    let authWithToken;
+
+    beforeAll(() => {
+        jest.isolateModules(() => {
+            process.env.HUD_CONTROL_TOKEN = 'my-secret-token';
+            authWithToken = require('../src/backend/middlewares/auth');
+            delete process.env.HUD_CONTROL_TOKEN;
+        });
+    });
+
+    it('accepts correct CONTROL_TOKEN', () => {
+        const req = mockReq({ headers: { host: 'localhost', authorization: 'Bearer my-secret-token' } });
+        const res = mockRes();
+        const n = jest.fn();
+        authWithToken.requireBearerToken(req, res, n);
+        expect(n).toHaveBeenCalled();
+    });
+
+    it('rejects wrong token when CONTROL_TOKEN is set', () => {
+        const req = mockReq({ headers: { host: 'localhost', authorization: 'Bearer wrong-token' } });
+        const res = mockRes();
+        const n = jest.fn();
+        authWithToken.requireBearerToken(req, res, n);
+        expect(res.status).toHaveBeenCalledWith(401);
+    });
+});
+
 // ─── controlAuditMiddleware ────────────────────────────
 
 describe('controlAuditMiddleware', () => {
@@ -242,5 +272,33 @@ describe('controlAuditMiddleware', () => {
         const res = mockRes();
         auth.controlAuditMiddleware(req, res, next);
         expect(() => res._finishCb && res._finishCb()).not.toThrow();
+    });
+
+    it('records failed status code (>=400) in audit log', () => {
+        const req = mockReq({ headers: { host: 'localhost', authorization: 'Bearer testtoken' }, body: { command: 'status' } });
+        const res = mockRes();
+        auth.controlAuditMiddleware(req, res, next);
+        res.statusCode = 500;
+        res._finishCb && res._finishCb();
+        const fs = require('fs');
+        const call = fs.appendFileSync.mock.calls.at(-1);
+        const logged = JSON.parse(call[1]);
+        expect(logged.success).toBe(false);
+    });
+
+    it('handles missing req.body in audit log gracefully', () => {
+        const req = { ip: '127.0.0.1', connection: { remoteAddress: '127.0.0.1' }, headers: { host: 'localhost' }, originalUrl: '/api/test', url: '/api/test' };
+        const res = mockRes();
+        auth.controlAuditMiddleware(req, res, next);
+        expect(() => res._finishCb && res._finishCb()).not.toThrow();
+    });
+
+    it('falls back to req.url when req.originalUrl is missing (covers || req.url branch)', () => {
+        const req = mockReq({ originalUrl: undefined });
+        const res = mockRes();
+        auth.controlAuditMiddleware(req, res, next);
+        res._finishCb && res._finishCb();
+        const fs = require('fs');
+        expect(fs.appendFileSync).toHaveBeenCalled();
     });
 });

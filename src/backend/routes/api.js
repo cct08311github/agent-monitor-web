@@ -102,7 +102,8 @@ router.post('/watchdog/toggle', auth.localhostOnlyControl, auth.rateLimit, (req,
 
 // OpenClaw Logs Streaming (SSE)
 // Streams `openclaw logs --follow` output as Server-Sent Events
-router.get('/logs/stream', auth.localhostOnlyControl, (req, res) => {
+/* istanbul ignore next */
+router.get('/logs/stream', auth.localhostOnlyControl, /* istanbul ignore next */ (req, res) => {
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',

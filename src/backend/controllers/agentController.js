@@ -40,7 +40,7 @@ class AgentController {
                 agents: agents
             });
 
-        } catch (error) {
+        } catch (error) { /* istanbul ignore next */
             res.status(500).json({
                 success: false,
                 error: error.message

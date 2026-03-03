@@ -158,6 +158,7 @@ class ThreatIntelligence {
   }
 }
 
+/* istanbul ignore next */
 // 測試
 async function test() {
   console.log('🧪 測試威脅情報系統');
@@ -189,6 +190,7 @@ async function test() {
   console.log('✅ 測試完成');
 }
 
+/* istanbul ignore next */
 // 主函數
 if (require.main === module) {
   console.log('🔒 威脅情報集成系統 v1.1');

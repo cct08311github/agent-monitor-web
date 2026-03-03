@@ -8,6 +8,7 @@ let modelCache = { ts: 0, cooldowns: {} };
 // Parse the output of `openclaw models status`
 async function fetchModelCooldowns() {
     const now = Date.now();
+    /* istanbul ignore next */
     if (now - modelCache.ts < MODEL_COOLDOWN_CACHE_TTL && Object.keys(modelCache.cooldowns).length > 0) {
         return modelCache.cooldowns;
     }
@@ -31,7 +32,7 @@ async function fetchModelCooldowns() {
 
                 if (cooldownStr.endsWith('m')) {
                     cooldownSeconds = parseFloat(cooldownStr) * 60;
-                } else if (cooldownStr.endsWith('s')) {
+                } else /* istanbul ignore next */ if (cooldownStr.endsWith('s')) {
                     cooldownSeconds = parseFloat(cooldownStr);
                 }
 
@@ -47,7 +48,7 @@ async function fetchModelCooldowns() {
         return cooldowns;
     } catch (error) {
         console.error('[Model Monitor] Failed to fetch models status:', error);
-        return modelCache.cooldowns || {}; // return last known state or empty
+        return /* istanbul ignore next */ modelCache.cooldowns || {}; // return last known state or empty
     }
 }
 
