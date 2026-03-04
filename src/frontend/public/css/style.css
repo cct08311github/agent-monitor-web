@@ -2226,4 +2226,5 @@ mark { background: rgba(255, 200, 0, 0.35); color: inherit; border-radius: 2px; 
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 12px; margin-bottom: 4px;
+    grid-column: 1 / -1;
 }
