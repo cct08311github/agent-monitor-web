@@ -31,6 +31,7 @@ router.get('/read/status', legacyDashboardController.getStatus);
 router.get('/read/models', legacyDashboardController.getModels);
 router.get('/read/agents', legacyDashboardController.getAgents);
 router.get('/agents/:agentId/sessions', legacyDashboardController.getSessions);
+router.get('/agents/:agentId/sessions/:sessionId', legacyDashboardController.getSessionContent);
 router.get('/dashboard', legacyDashboardController.getDashboard); // very legacy
 
 // TaskHub

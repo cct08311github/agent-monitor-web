@@ -441,6 +441,58 @@ describe('detectDetailedActivity — logObj without message wrapper', () => {
     });
 });
 
+// --- getSessionContent ---
+
+describe('getSessionContent', () => {
+    it('returns 400 when agentId or sessionId is empty', async () => {
+        const res = mockRes();
+        await ctrl.getSessionContent({ params: { agentId: '', sessionId: '' } }, res);
+        expect(res.status).toHaveBeenCalledWith(400);
+    });
+
+    it('returns 404 when session file does not exist', async () => {
+        mockFs.existsSync.mockReturnValue(false);
+        const res = mockRes();
+        await ctrl.getSessionContent({ params: { agentId: 'main', sessionId: 'abc123' } }, res);
+        expect(res.status).toHaveBeenCalledWith(404);
+    });
+
+    it('parses messages from JSONL and extracts text and toolUses', async () => {
+        mockFs.existsSync.mockReturnValue(true);
+        const lines = [
+            JSON.stringify({ type: 'session', id: 'abc123' }),
+            JSON.stringify({ type: 'message', timestamp: '2026-03-01T10:00:00Z', message: { role: 'user', content: [{ type: 'text', text: 'Hello' }] } }),
+            JSON.stringify({ type: 'message', timestamp: '2026-03-01T10:00:01Z', message: { role: 'assistant', content: [{ type: 'text', text: 'Hi' }, { type: 'tool_use', name: 'bash' }] } }),
+        ].join('\n');
+        mockFs.readFileSync.mockReturnValue(lines);
+        const res = mockRes();
+        await ctrl.getSessionContent({ params: { agentId: 'main', sessionId: 'abc123' } }, res);
+        const payload = res.json.mock.calls[0][0];
+        expect(payload.success).toBe(true);
+        expect(payload.messages).toHaveLength(2);
+        expect(payload.messages[0].text).toBe('Hello');
+        expect(payload.messages[1].toolUses).toContain('bash');
+    });
+
+    it('handles string content (non-array)', async () => {
+        mockFs.existsSync.mockReturnValue(true);
+        const line = JSON.stringify({ type: 'message', message: { role: 'user', content: 'plain text' } });
+        mockFs.readFileSync.mockReturnValue(line);
+        const res = mockRes();
+        await ctrl.getSessionContent({ params: { agentId: 'main', sessionId: 's1' } }, res);
+        const payload = res.json.mock.calls[0][0];
+        expect(payload.messages[0].text).toBe('plain text');
+    });
+
+    it('returns 500 on readFileSync error', async () => {
+        mockFs.existsSync.mockReturnValue(true);
+        mockFs.readFileSync.mockImplementation(() => { throw new Error('io'); });
+        const res = mockRes();
+        await ctrl.getSessionContent({ params: { agentId: 'main', sessionId: 's1' } }, res);
+        expect(res.status).toHaveBeenCalledWith(500);
+    });
+});
+
 // --- getSessions ---
 
 describe('getSessions', () => {
