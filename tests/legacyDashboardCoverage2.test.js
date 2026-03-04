@@ -440,3 +440,80 @@ describe('detectDetailedActivity — logObj without message wrapper', () => {
         }
     });
 });
+
+// --- getSessions ---
+
+describe('getSessions', () => {
+    it('returns 400 for invalid agentId', async () => {
+        const res = mockRes();
+        await ctrl.getSessions({ params: { agentId: '' } }, res);
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: 'invalid_agent_id' }));
+    });
+
+    it('returns empty sessions when directory does not exist', async () => {
+        mockFs.existsSync.mockReturnValue(false);
+        const res = mockRes();
+        await ctrl.getSessions({ params: { agentId: 'main' } }, res);
+        expect(res.json).toHaveBeenCalledWith({ success: true, sessions: [] });
+    });
+
+    it('returns sessions list when directory has jsonl files', async () => {
+        mockFs.existsSync.mockImplementation((p) => p.includes('sessions'));
+        mockFs.readdirSync.mockReturnValue(['sess-001.jsonl', 'sess-002.jsonl', 'notes.txt']);
+        const line1 = JSON.stringify({ ts: '2026-03-01T10:00:00' });
+        const line2 = JSON.stringify({ ts: '2026-03-02T12:00:00' });
+        mockFs.readFileSync.mockImplementation((p) => {
+            if (p.includes('sess-001')) return `${line1}\n${JSON.stringify({ role: 'user' })}\n`;
+            return `${line2}\n`;
+        });
+        const res = mockRes();
+        await ctrl.getSessions({ params: { agentId: 'main' } }, res);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+        const payload = res.json.mock.calls[0][0];
+        expect(Array.isArray(payload.sessions)).toBe(true);
+        expect(payload.sessions.length).toBe(2);
+        expect(payload.sessions[0].messageCount).toBeGreaterThan(0);
+    });
+
+    it('handles readFileSync error gracefully for a session file', async () => {
+        mockFs.existsSync.mockReturnValue(true);
+        mockFs.readdirSync.mockReturnValue(['bad.jsonl']);
+        mockFs.readFileSync.mockImplementation(() => { throw new Error('perm denied'); });
+        const res = mockRes();
+        await ctrl.getSessions({ params: { agentId: 'main' } }, res);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+        const payload = res.json.mock.calls[0][0];
+        expect(payload.sessions[0].messageCount).toBe(0);
+    });
+
+    it('strips path traversal chars from agentId, treats sanitized id as valid', async () => {
+        // '../../etc/passwd' → strip non [a-zA-Z0-9_-] → 'etcpasswd' (non-empty, valid)
+        // sessions dir won't exist for that sanitized id
+        mockFs.existsSync.mockReturnValue(false);
+        const res = mockRes();
+        await ctrl.getSessions({ params: { agentId: '../../etc/passwd' } }, res);
+        // Should return empty sessions (not 400), path traversal prevented by sanitization
+        expect(res.json).toHaveBeenCalledWith({ success: true, sessions: [] });
+    });
+
+    it('extracts lastTs from timestamp field if ts is absent', async () => {
+        mockFs.existsSync.mockReturnValue(true);
+        mockFs.readdirSync.mockReturnValue(['s.jsonl']);
+        const line = JSON.stringify({ timestamp: '2026-02-15T08:30:00' });
+        mockFs.readFileSync.mockReturnValue(line);
+        const res = mockRes();
+        await ctrl.getSessions({ params: { agentId: 'main' } }, res);
+        const payload = res.json.mock.calls[0][0];
+        expect(payload.sessions[0].lastTs).toBe('2026-02-15T08:30:00');
+    });
+
+    it('returns 500 when readdirSync throws', async () => {
+        mockFs.existsSync.mockReturnValue(true);
+        mockFs.readdirSync.mockImplementation(() => { throw new Error('io error'); });
+        const res = mockRes();
+        await ctrl.getSessions({ params: { agentId: 'main' } }, res);
+        expect(res.status).toHaveBeenCalledWith(500);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
+    });
+});

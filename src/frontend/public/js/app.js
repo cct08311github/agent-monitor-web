@@ -15,6 +15,8 @@ let previousAgentsMap = {};
 let currentDesktopTab = 'monitor';
 let currentSubTab = 'agents';
 let isMobile = window.matchMedia('(max-width: 768px)').matches;
+let agentSearchQuery = '';
+function onAgentSearch(val) { agentSearchQuery = (val || '').trim(); if (latestDashboard) renderDashboard(latestDashboard); }
 let lastErrors = [];
 // Persist dismissed/shown errors in localStorage so they survive page refresh
 function loadErrorKeys(key) {
@@ -105,7 +107,7 @@ function switchDesktopTab(tab) {
     if (pageId) document.getElementById(pageId).classList.add('active');
     document.querySelectorAll('.desktop-tab').forEach(t => t.classList.toggle('active', t.dataset.dtab === tab));
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.page === tab));
-    if (tab === 'system') setTimeout(updateCharts, 100);
+    if (tab === 'system') { setTimeout(updateCharts, 100); setTimeout(updateCostDisplay, 150); }
     if (tab === 'chat') initChatPage();
     updateSummaryCards(tab);
 }
@@ -487,8 +489,13 @@ function renderModelUsage(listId, summaryId, agents) {
     });
     const listEl = document.getElementById(listId);
     if (listEl) {
-        listEl.innerHTML = Object.entries(allModelUsage).sort((a, b) => b[1].cost - a[1].cost)
-            .map(([model, u]) => `<div class="model-usage-item"><div><span class="model-usage-name">${esc(model)}</span><span class="model-usage-sessions">(${u.sessions})</span></div><div class="model-usage-stats"><div class="model-usage-tokens">${formatTokens(u.total)}</div><div class="model-usage-cost">${formatTWD(u.cost)}</div></div></div>`).join('')
+        const sorted = Object.entries(allModelUsage).sort((a, b) => b[1].cost - a[1].cost);
+        const maxCost = sorted.length > 0 ? (sorted[0][1].cost || 0.000001) : 0.000001;
+        listEl.innerHTML = sorted
+            .map(([model, u]) => {
+                const pct = Math.round((u.cost / maxCost) * 100);
+                return `<div class="model-usage-item"><div><span class="model-usage-name">${esc(model)}</span><span class="model-usage-sessions">(${u.sessions})</span></div><div class="model-usage-bar" style="height:3px;border-radius:2px;background:var(--border);margin:3px 0"><div style="width:${pct}%;height:100%;border-radius:2px;background:var(--blue)"></div></div><div class="model-usage-stats"><div class="model-usage-tokens">${formatTokens(u.total)}</div><div class="model-usage-cost">${formatTWD(u.cost)}</div></div></div>`;
+            }).join('')
             || '<div style="color:var(--text-muted);padding:8px;font-size:12px;">尚無資料</div>';
     }
     const summaryEl = document.getElementById(summaryId);
@@ -523,8 +530,47 @@ function showAgentDetail(agentId) {
         <div style="display:flex;gap:8px;margin-top:12px">
             <button class="ctrl-btn accent" style="flex:1" onclick="openChat('${esc(agent.id)}')">💬 對話</button>
             <button class="ctrl-btn" style="flex:1" onclick="openModelModal('${esc(agent.id)}', '${esc(agent.model || '')}')">🔄 切換模型</button>
-        </div>`;
+        </div>
+        <div class="detail-card"><div class="detail-card-title">Sessions</div><div id="sessionListBody" style="color:var(--text-muted);font-size:12px;padding:4px 0">載入中…</div></div>`;
     switchDesktopTab('detail');
+    _loadSessionList(agentId);
+}
+
+function _loadSessionList(agentId) {
+    fetch(`/api/agents/${encodeURIComponent(agentId)}/sessions`)
+        .then(r => r.json())
+        .then(d => {
+            const body = document.getElementById('sessionListBody');
+            if (!body) return;
+            while (body.firstChild) body.removeChild(body.firstChild);
+            const sessions = d.success && d.sessions ? d.sessions : [];
+            if (sessions.length === 0) {
+                const empty = document.createElement('div');
+                empty.textContent = '無 session 記錄';
+                empty.style.cssText = 'color:var(--text-muted);font-size:12px';
+                body.appendChild(empty);
+                return;
+            }
+            sessions.forEach(s => {
+                const row = document.createElement('div');
+                row.className = 'detail-row';
+                const label = document.createElement('span');
+                label.className = 'detail-row-label';
+                label.style.cssText = 'font-family:monospace;font-size:11px';
+                label.textContent = s.id.slice(-16);
+                const val = document.createElement('span');
+                val.className = 'detail-row-value';
+                val.style.cssText = 'color:var(--text-muted);font-size:11px';
+                val.textContent = `${s.messageCount} 則${s.lastTs ? ' · ' + s.lastTs.slice(0, 10) : ''}`;
+                row.appendChild(label);
+                row.appendChild(val);
+                body.appendChild(row);
+            });
+        })
+        .catch(() => {
+            const body = document.getElementById('sessionListBody');
+            if (body) body.textContent = '載入失敗';
+        });
 }
 
 function renderAgentActivityBanner(agentActivity) {
@@ -663,9 +709,16 @@ function renderDashboard(data) {
         return (prio[a.status] ?? 4) - (prio[b.status] ?? 4) || a.id.localeCompare(b.id);
     });
 
+    const q = agentSearchQuery.toLowerCase();
+    const filteredAgents = q ? agents.filter(a =>
+        (a.id || '').toLowerCase().includes(q) ||
+        (a.model || '').toLowerCase().includes(q) ||
+        (a.status || '').toLowerCase().includes(q)
+    ) : agents;
+
     const gridEl = document.getElementById('agentGrid');
-    const activeAgents2 = agents.filter(a => a.status === 'active_executing' || a.status === 'active_recent');
-    const inactiveAgents = agents.filter(a => a.status !== 'active_executing' && a.status !== 'active_recent');
+    const activeAgents2 = filteredAgents.filter(a => a.status === 'active_executing' || a.status === 'active_recent');
+    const inactiveAgents = filteredAgents.filter(a => a.status !== 'active_executing' && a.status !== 'active_recent');
 
     function buildAgentCost(a) {
         return parseFloat(range === 'all' ? (a.costs?.total ?? a.cost ?? 0) : (a.costs?.[range] ?? a.cost ?? 0));
@@ -673,10 +726,10 @@ function renderDashboard(data) {
 
     const frag = document.createDocumentFragment();
 
-    if (agents.length === 0) {
+    if (filteredAgents.length === 0) {
         const empty = document.createElement('div');
         empty.style.cssText = 'color:var(--text-muted);padding:20px;text-align:center;';
-        empty.textContent = '沒有 Agent';
+        empty.textContent = q ? '找不到符合的 Agent' : '沒有 Agent';
         frag.appendChild(empty);
     } else {
         if (activeAgents2.length > 0) {

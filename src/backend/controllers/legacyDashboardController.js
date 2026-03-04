@@ -661,6 +661,49 @@ class DashboardController {
             res.status(500).json({ success: false, error: error.message, output: (error.stdout || '') + (error.stderr || '') });
         }
     }
+
+    async getSessions(req, res) {
+        try {
+            const agentId = (req.params.agentId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+            if (!agentId) return res.status(400).json({ success: false, error: 'invalid_agent_id' });
+
+            const sessionsDir = path.join(OPENCLAW_ROOT, 'agents', agentId, 'sessions');
+            if (!fs.existsSync(sessionsDir)) {
+                return res.json({ success: true, sessions: [] });
+            }
+
+            const files = fs.readdirSync(sessionsDir)
+                .filter(f => f.endsWith('.jsonl'))
+                .sort()
+                .reverse()
+                .slice(0, 20);
+
+            const sessions = files.map(f => {
+                const filePath = path.join(sessionsDir, f);
+                let messageCount = 0;
+                let lastTs = null;
+                try {
+                    const content = fs.readFileSync(filePath, 'utf8');
+                    const lines = content.split('\n').filter(l => l.trim());
+                    messageCount = lines.length;
+                    for (let i = lines.length - 1; i >= 0; i--) {
+                        try {
+                            const obj = JSON.parse(lines[i]);
+                            if (obj.ts || obj.timestamp || obj.created_at) {
+                                lastTs = obj.ts || obj.timestamp || obj.created_at;
+                                break;
+                            }
+                        } catch (_) { /* skip */ }
+                    }
+                } catch (_) { /* skip unreadable */ }
+                return { id: f.replace('.jsonl', ''), messageCount, lastTs };
+            });
+
+            res.json({ success: true, sessions });
+        } catch (error) {
+            res.status(500).json({ success: false, error: error.message });
+        }
+    }
 }
 
 module.exports = new DashboardController();
