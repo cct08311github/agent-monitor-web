@@ -5,7 +5,7 @@ const path = require('path');
 const CONTROL_RATE_LIMIT_PER_MINUTE = 30;
 const CONTROL_TOKEN_ENV = process.env.HUD_CONTROL_TOKEN || process.env.OPENCLAW_HUD_CONTROL_TOKEN || '';
 const CONTROL_TOKEN = String(CONTROL_TOKEN_ENV || '').trim();
-const CONTROL_PASSWORD_HASH = '6b277d013fa68756e3c4cd0fe34f13c8deee437e939487e5c1f5ac5774db91b8'; // sha256('810778')
+const CONTROL_PASSWORD_HASH = '6b277d013fa68756e3c4cd0fe34f13c8deee437e939487e5c1f5ac5774db91b8';
 
 function tokenHashPrefix(token) {
     try {
