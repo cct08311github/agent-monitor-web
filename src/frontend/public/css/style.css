@@ -2209,6 +2209,7 @@ mark { background: rgba(255, 200, 0, 0.35); color: inherit; border-radius: 2px; 
     padding: 6px 2px; margin: 12px 0 8px;
     font-size: 12px; font-weight: 600; color: var(--text-secondary);
     border-bottom: 1px solid var(--border);
+    grid-column: 1 / -1;
 }
 .agent-group-header:first-child { margin-top: 0; }
 .agent-group-dot {
@@ -2216,6 +2217,7 @@ mark { background: rgba(255, 200, 0, 0.35); color: inherit; border-radius: 2px; 
 }
 .agent-group-dot.online { background: var(--green); }
 .agent-group-dot.idle   { background: var(--text-muted); }
+.agent-group-details { grid-column: 1 / -1; }
 .agent-group-details > summary { cursor: pointer; list-style: none; }
 .agent-group-details > summary::-webkit-details-marker { display: none; }
 .agent-group-details > summary::before { content: '▶ '; font-size: 10px; }
