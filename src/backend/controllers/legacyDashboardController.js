@@ -662,6 +662,35 @@ class DashboardController {
         }
     }
 
+    async getSessionContent(req, res) {
+        try {
+            const agentId = (req.params.agentId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+            const sessionId = (req.params.sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+            if (!agentId || !sessionId) return res.status(400).json({ success: false, error: 'invalid_params' });
+
+            const filePath = path.join(OPENCLAW_ROOT, 'agents', agentId, 'sessions', `${sessionId}.jsonl`);
+            if (!fs.existsSync(filePath)) return res.status(404).json({ success: false, error: 'not_found' });
+
+            const content = fs.readFileSync(filePath, 'utf8');
+            const messages = [];
+            for (const line of content.split('\n')) {
+                if (!line.trim()) continue;
+                try {
+                    const obj = JSON.parse(line);
+                    if (obj.type !== 'message' || !obj.message) continue;
+                    const { role, content: msgContent, timestamp } = obj.message;
+                    const blocks = Array.isArray(msgContent) ? msgContent : [{ type: 'text', text: String(msgContent || '') }];
+                    const text = blocks.filter(b => b.type === 'text').map(b => b.text || '').join('');
+                    const toolUses = blocks.filter(b => b.type === 'tool_use').map(b => b.name || '').filter(Boolean);
+                    messages.push({ role, text, toolUses, ts: obj.timestamp || null });
+                } catch (_) { /* skip */ }
+            }
+            res.json({ success: true, sessionId, messages });
+        } catch (error) {
+            res.status(500).json({ success: false, error: error.message });
+        }
+    }
+
     async getSessions(req, res) {
         try {
             const agentId = (req.params.agentId || '').replace(/[^a-zA-Z0-9_-]/g, '');

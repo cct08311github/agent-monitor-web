@@ -16,6 +16,7 @@ let currentDesktopTab = 'monitor';
 let currentSubTab = 'agents';
 let isMobile = window.matchMedia('(max-width: 768px)').matches;
 let agentSearchQuery = '';
+let _currentDetailAgentId = '';
 function onAgentSearch(val) { agentSearchQuery = (val || '').trim(); if (latestDashboard) renderDashboard(latestDashboard); }
 let lastErrors = [];
 // Persist dismissed/shown errors in localStorage so they survive page refresh
@@ -505,6 +506,7 @@ function renderModelUsage(listId, summaryId, agents) {
 function showAgentDetail(agentId) {
     const data = latestDashboard;
     if (!data) return;
+    _currentDetailAgentId = agentId;
     const range = document.getElementById('costRange')?.value || 'month';
     const agent = data.agents.find(a => a.id === agentId);
     if (!agent) return;
@@ -554,6 +556,10 @@ function _loadSessionList(agentId) {
             sessions.forEach(s => {
                 const row = document.createElement('div');
                 row.className = 'detail-row';
+                row.style.cssText = 'cursor:pointer;border-radius:4px;padding:2px 4px;margin:-2px -4px';
+                row.addEventListener('mouseenter', () => row.style.background = 'var(--bg-muted)');
+                row.addEventListener('mouseleave', () => row.style.background = '');
+                row.addEventListener('click', () => openSessionView(_currentDetailAgentId, s.id));
                 const label = document.createElement('span');
                 label.className = 'detail-row-label';
                 label.style.cssText = 'font-family:monospace;font-size:11px';
@@ -571,6 +577,58 @@ function _loadSessionList(agentId) {
             const body = document.getElementById('sessionListBody');
             if (body) body.textContent = '載入失敗';
         });
+}
+
+function closeSessionView() {
+    const m = document.getElementById('sessionViewModal');
+    if (m) m.style.display = 'none';
+}
+
+function openSessionView(agentId, sessionId) {
+    const modal = document.getElementById('sessionViewModal');
+    const body = document.getElementById('sessionViewBody');
+    const title = document.getElementById('sessionViewTitle');
+    if (!modal || !body) return;
+
+    title.textContent = `💬 ${sessionId.slice(-12)}`;
+    body.textContent = '載入中…';
+    modal.style.display = 'flex';
+
+    fetch(`/api/agents/${encodeURIComponent(agentId)}/sessions/${encodeURIComponent(sessionId)}`)
+        .then(r => r.json())
+        .then(d => {
+            while (body.firstChild) body.removeChild(body.firstChild);
+            if (!d.success || !d.messages || d.messages.length === 0) {
+                const empty = document.createElement('div');
+                empty.style.cssText = 'color:var(--text-muted);padding:16px;text-align:center';
+                empty.textContent = '無訊息記錄';
+                body.appendChild(empty);
+                return;
+            }
+            d.messages.forEach(msg => {
+                const bubble = document.createElement('div');
+                const isUser = msg.role === 'user';
+                bubble.style.cssText = `margin-bottom:10px;padding:8px 12px;border-radius:8px;font-size:13px;line-height:1.5;max-width:90%;${isUser ? 'margin-left:auto;background:var(--blue);color:#fff;' : 'background:var(--bg-muted);color:var(--text-primary);'}`;
+                const roleLabel = document.createElement('div');
+                roleLabel.style.cssText = `font-size:10px;font-weight:600;margin-bottom:4px;opacity:0.7`;
+                roleLabel.textContent = msg.role.toUpperCase();
+                bubble.appendChild(roleLabel);
+                if (msg.text) {
+                    const textEl = document.createElement('div');
+                    textEl.style.cssText = 'white-space:pre-wrap;word-break:break-word';
+                    textEl.textContent = msg.text.slice(0, 2000) + (msg.text.length > 2000 ? '\n…（已截斷）' : '');
+                    bubble.appendChild(textEl);
+                }
+                if (msg.toolUses && msg.toolUses.length > 0) {
+                    const tools = document.createElement('div');
+                    tools.style.cssText = 'margin-top:4px;font-size:11px;opacity:0.75;font-family:monospace';
+                    tools.textContent = '🔧 ' + msg.toolUses.join(', ');
+                    bubble.appendChild(tools);
+                }
+                body.appendChild(bubble);
+            });
+        })
+        .catch(() => { body.textContent = '載入失敗'; });
 }
 
 function renderAgentActivityBanner(agentActivity) {
