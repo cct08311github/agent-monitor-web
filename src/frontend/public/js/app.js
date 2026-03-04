@@ -754,6 +754,7 @@ function renderDashboard(data) {
 
         if (inactiveAgents.length > 0) {
             const details = document.createElement('details');
+            details.open = true;
             details.className = 'agent-group-details';
             const summary = document.createElement('summary');
             summary.className = 'agent-group-header agent-group-summary';
