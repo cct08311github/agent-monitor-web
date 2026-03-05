@@ -57,14 +57,69 @@ const SYSTEM_OPUS_REVIEW = `你是獨立技術顧問，負責審查 agent-monito
 
 保持批判立場，不要為草案辯護。每項以 ### 分節。`;
 
+const SYSTEM_OPUS_CODE_REVIEW = `你是資深後端工程師，負責 agent-monitor-web 的 Code Review 與 QA。
+專案路徑：${PROJECT_PATH}
+
+審查以下實際源碼，輸出結構化報告。每個問題格式：
+
+### [類別] 檔案名稱：簡述
+- **優先級**：P0/P1/P2
+- **問題**：...
+- **建議**：...
+
+類別：BUG / SECURITY / ERROR_HANDLING / PERFORMANCE / TEST_COVERAGE
+
+重點審查：
+1. 潛在 bugs 與邊界條件
+2. 安全漏洞（注入、越權、資料洩漏）
+3. 錯誤處理不足
+4. 效能瓶頸
+5. 缺少測試的高風險邏輯
+
+只列出真實問題，不要無意義的建議。`;
+
+const TARGET_FILES = [
+    'src/backend/routes/api.js',
+    'src/backend/middlewares/auth.js',
+    'src/backend/services/alertEngine.js',
+    'src/backend/services/openclawService.js',
+    'src/backend/services/tsdbService.js',
+    'src/backend/services/optimizeService.js',
+    'src/backend/controllers/optimizeController.js',
+    'src/backend/controllers/legacyDashboardController.js',
+];
+
+function readSourceFiles() {
+    const MAX_CHARS = 3000;
+    return TARGET_FILES.map(rel => {
+        try {
+            const content = fs.readFileSync(path.join(PROJECT_PATH, rel), 'utf8');
+            const truncated = content.length > MAX_CHARS
+                ? content.slice(0, MAX_CHARS) + '\n... (truncated)'
+                : content;
+            return `### ${rel}\n\`\`\`js\n${truncated}\n\`\`\``;
+        } catch (_) {
+            return `### ${rel}\n(無法讀取)`;
+        }
+    }).join('\n\n');
+}
+
 const SYSTEM_SONNET_INTEGRATE = `你是 agent-monitor-web 的技術負責人。
 專案路徑：${PROJECT_PATH}
 
-將下列草案與 Opus 審查意見整合成最終優化方案：
-- 採納 Opus 的合理修改
-- 標註「[Opus 修訂]」的段落
-- 每項優化附上：問題、建議、Opus補充、優先級（P0/P1/P2）
+將以下資料整合成最終報告（兩大章節）：
+
+## 第一章：優化建議
+整合優化草案與 Opus 草案審查意見：
+- 採納 Opus 的合理修改，標註「[Opus 修訂]」
+- 每項附：問題、建議、Opus補充、優先級（P0/P1/P2）
 - 結尾附「實施順序建議」
+
+## 第二章：Code Review & QA
+整理 Opus code review 結果：
+- 依優先級排序（P0→P1→P2）
+- 標明每項對應檔案與修改建議
+- 結尾附「必修清單（P0 項目）」
 
 輸出：完整 markdown，可直接存為實施計畫。`;
 
@@ -96,8 +151,8 @@ async function runPipeline(data, onProgress) {
     });
     const draft = draftResp.content[0].text;
 
-    // Step 3: Opus 審查（失敗時降級）
-    onProgress(3, 'Opus 審查中...');
+    // Step 3: Opus 審查草案（失敗時降級）
+    onProgress(3, 'Opus 審查草案中...');
     let review = null;
     let opusFailed = false;
     try {
@@ -110,22 +165,41 @@ async function runPipeline(data, onProgress) {
         review = reviewResp.content[0].text;
     } catch (e) {
         opusFailed = true;
-        review = `（Opus 審查失敗：${e.message}，以下為降級報告）`;
+        review = `（Opus 草案審查失敗：${e.message}）`;
     }
 
-    // Step 4: Sonnet 整合
-    onProgress(4, 'Sonnet 整合中...');
-    const integrateSystem = SYSTEM_SONNET_INTEGRATE +
-        (opusFailed ? '\n\n注意：本報告未經 Opus 完整審查，請標註「[未經 Opus 審查]」。' : '');
+    // Step 4: Opus Code Review（失敗時降級）
+    onProgress(4, 'Opus Code Review 中...');
+    let codeReview = null;
+    let codeReviewFailed = false;
+    try {
+        const sourceCode = readSourceFiles();
+        const codeReviewResp = await client.messages.create({
+            model: 'claude-opus-4-6',
+            max_tokens: 4096,
+            system: SYSTEM_OPUS_CODE_REVIEW,
+            messages: [{ role: 'user', content: `源碼：\n${sourceCode}` }],
+        });
+        codeReview = codeReviewResp.content[0].text;
+    } catch (e) {
+        codeReviewFailed = true;
+        codeReview = `（Opus Code Review 失敗：${e.message}）`;
+    }
+
+    // Step 5: Sonnet 整合
+    onProgress(5, 'Sonnet 整合中...');
+    let integrateSystem = SYSTEM_SONNET_INTEGRATE;
+    if (opusFailed) integrateSystem += '\n\n注意：草案審查未完成，請標註「[未經 Opus 草案審查]」。';
+    if (codeReviewFailed) integrateSystem += '\n\n注意：Code Review 未完成，請標註「[Code Review 缺失]」。';
     const integrateResp = await client.messages.create({
         model: 'claude-sonnet-4-6',
-        max_tokens: 6000,
+        max_tokens: 8000,
         system: integrateSystem,
-        messages: [{ role: 'user', content: `草案：\n${draft}\n\nOpus審查：\n${review}` }],
+        messages: [{ role: 'user', content: `草案：\n${draft}\n\nOpus草案審查：\n${review}\n\nOpus Code Review：\n${codeReview}` }],
     });
     const report = integrateResp.content[0].text;
 
-    return { draft, review, report, opusFailed };
+    return { draft, review, codeReview, report, opusFailed: opusFailed || codeReviewFailed };
 }
 
 function execFileAsync(bin, args, opts) {
@@ -137,8 +211,8 @@ function execFileAsync(bin, args, opts) {
 }
 
 async function saveAndNotify(report, opusFailed, onProgress) {
-    // Step 5: 儲存
-    onProgress(5, '儲存報告...');
+    // Step 6: 儲存
+    onProgress(6, '儲存報告...');
     const date = TODAY();
     const filename = `${date}-auto-optimize.md`;
     const filepath = path.join(PLANS_DIR, filename);
@@ -149,8 +223,8 @@ async function saveAndNotify(report, opusFailed, onProgress) {
 
     fs.writeFileSync(filepath, header + report, 'utf8');
 
-    // Step 6: Telegram 推播
-    onProgress(6, 'Telegram 推播...');
+    // Step 7: Telegram 推播
+    onProgress(7, 'Telegram 推播...');
     const summary = report.split('\n').filter(l => l.startsWith('##')).slice(0, 3).join(' | ');
     const message = `🤖 自主優化報告已生成 (${date})\n${summary}\n📄 ${filename}`;
 

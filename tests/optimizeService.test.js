@@ -49,6 +49,7 @@ describe('optimizeService.runPipeline', () => {
                 create: jest.fn()
                     .mockResolvedValueOnce({ content: [{ text: '## 草案\n優化項目A' }] })
                     .mockResolvedValueOnce({ content: [{ text: '## Opus審查\n問題1' }] })
+                    .mockResolvedValueOnce({ content: [{ text: '### BUG api.js：問題A' }] })
                     .mockResolvedValueOnce({ content: [{ text: '## 最終報告\n整合完成' }] }),
             }
         }));
@@ -58,22 +59,24 @@ describe('optimizeService.runPipeline', () => {
         delete process.env.ANTHROPIC_API_KEY;
     });
 
-    it('returns { draft, review, report } on success', async () => {
+    it('returns { draft, review, codeReview, report } on success', async () => {
         const data = { costHistory: [], agents: [], alerts: [], existingPlans: [] };
         const result = await optimizeService.runPipeline(data, () => {});
         expect(result).toHaveProperty('draft');
         expect(result).toHaveProperty('review');
+        expect(result).toHaveProperty('codeReview');
         expect(result).toHaveProperty('report');
         expect(result.report).toContain('最終報告');
         expect(result.opusFailed).toBe(false);
     });
 
-    it('falls back gracefully when Opus fails', async () => {
+    it('falls back gracefully when Opus draft review fails', async () => {
         Anthropic.mockImplementation(() => ({
             messages: {
                 create: jest.fn()
                     .mockResolvedValueOnce({ content: [{ text: '## 草案' }] })
                     .mockRejectedValueOnce(new Error('Opus quota'))
+                    .mockResolvedValueOnce({ content: [{ text: '### BUG api.js：問題A' }] })
                     .mockResolvedValueOnce({ content: [{ text: '## 降級報告' }] }),
             }
         }));

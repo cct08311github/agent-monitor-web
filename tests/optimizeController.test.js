@@ -7,13 +7,14 @@ jest.mock('../src/backend/services/optimizeService', () => ({
     collectData: jest.fn(async () => ({ costHistory: [], agents: [], alerts: [], existingPlans: [] })),
     runPipeline: jest.fn(async (data, cb) => {
         cb(2, 'Sonnet 起草中...');
-        cb(3, 'Opus 審查中...');
-        cb(4, 'Sonnet 整合中...');
-        return { draft: 'draft', review: 'review', report: '## Report', opusFailed: false };
+        cb(3, 'Opus 審查草案中...');
+        cb(4, 'Opus Code Review 中...');
+        cb(5, 'Sonnet 整合中...');
+        return { draft: 'draft', review: 'review', codeReview: 'code review', report: '## Report', opusFailed: false };
     }),
     saveAndNotify: jest.fn(async (report, failed, cb) => {
-        cb(5, '儲存報告...');
-        cb(6, 'Telegram 推播...');
+        cb(6, '儲存報告...');
+        cb(7, 'Telegram 推播...');
         return { filename: '2026-03-05-auto-optimize.md' };
     }),
 }));
