@@ -302,3 +302,130 @@ describe('controlAuditMiddleware', () => {
         expect(fs.appendFileSync).toHaveBeenCalled();
     });
 });
+
+// ─── loginRateLimit ────────────────────────────────────────────────────────────
+
+describe('loginRateLimit', () => {
+    // loginRateLimit uses a module-level Map, so we need fresh module per describe
+    let freshAuth;
+    beforeEach(() => {
+        jest.isolateModules(() => {
+            freshAuth = require('../src/backend/middlewares/auth');
+        });
+    });
+
+    it('calls next() on first request', () => {
+        const req = mockReq({ ip: '9.9.9.1' });
+        const res = mockRes();
+        const n = jest.fn();
+        freshAuth.loginRateLimit(req, res, n);
+        expect(n).toHaveBeenCalled();
+    });
+
+    it('returns 429 after 5 failed 401 attempts', () => {
+        const ip = '9.9.9.2';
+        const makeReq = () => mockReq({ ip });
+
+        // Simulate 5 failed login attempts (401 responses)
+        for (let i = 0; i < 5; i++) {
+            const req = makeReq();
+            const res = mockRes();
+            res.statusCode = 401;
+            const n = jest.fn(() => { res.json({}); }); // trigger the patched res.json
+            freshAuth.loginRateLimit(req, res, n);
+        }
+
+        // 6th attempt should be blocked
+        const req = makeReq();
+        const res = mockRes();
+        const n = jest.fn();
+        freshAuth.loginRateLimit(req, res, n);
+        expect(res.status).toHaveBeenCalledWith(429);
+        expect(n).not.toHaveBeenCalled();
+    });
+
+    it('resets counter on successful login', () => {
+        const ip = '9.9.9.3';
+        const makeReq = () => mockReq({ ip });
+
+        // 3 failed attempts
+        for (let i = 0; i < 3; i++) {
+            const req = makeReq();
+            const res = mockRes();
+            res.statusCode = 401;
+            const n = jest.fn(() => { res.json({}); });
+            freshAuth.loginRateLimit(req, res, n);
+        }
+
+        // Success (200)
+        const req2 = makeReq();
+        const res2 = mockRes();
+        res2.statusCode = 200;
+        const n2 = jest.fn(() => { res2.json({ success: true }); });
+        freshAuth.loginRateLimit(req2, res2, n2);
+        expect(n2).toHaveBeenCalled();
+
+        // Should allow further requests (counter reset)
+        const req3 = makeReq();
+        const res3 = mockRes();
+        const n3 = jest.fn();
+        freshAuth.loginRateLimit(req3, res3, n3);
+        expect(n3).toHaveBeenCalled();
+    });
+});
+
+// ─── requireAuth ───────────────────────────────────────────────────────────────
+
+describe('requireAuth', () => {
+    const sessionService = require('../src/backend/services/sessionService');
+
+    beforeEach(() => {
+        sessionService._sessions.clear();
+        process.env.AUTH_SESSION_SECRET = 'test-secret';
+        delete process.env.AUTH_DISABLED;
+    });
+
+    afterEach(() => {
+        process.env.AUTH_DISABLED = 'true';
+    });
+
+    it('calls next() when AUTH_DISABLED=true', () => {
+        process.env.AUTH_DISABLED = 'true';
+        const req = mockReq({ cookies: {} });
+        const res = mockRes();
+        const n = jest.fn();
+        auth.requireAuth(req, res, n);
+        expect(n).toHaveBeenCalled();
+    });
+
+    it('returns 401 when no sid cookie', () => {
+        process.env.AUTH_DISABLED = 'false';
+        const req = mockReq({ cookies: {} });
+        const res = mockRes();
+        const n = jest.fn();
+        auth.requireAuth(req, res, n);
+        expect(res.status).toHaveBeenCalledWith(401);
+        expect(n).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 for invalid/tampered token', () => {
+        process.env.AUTH_DISABLED = 'false';
+        const req = mockReq({ cookies: { sid: 'invalid.token.tampered' } });
+        const res = mockRes();
+        const n = jest.fn();
+        auth.requireAuth(req, res, n);
+        expect(res.status).toHaveBeenCalledWith(401);
+        expect(n).not.toHaveBeenCalled();
+    });
+
+    it('calls next() and sets req._authUser for valid session', () => {
+        process.env.AUTH_DISABLED = 'false';
+        const token = sessionService.createSession('alice');
+        const req = mockReq({ cookies: { sid: token } });
+        const res = mockRes();
+        const n = jest.fn();
+        auth.requireAuth(req, res, n);
+        expect(n).toHaveBeenCalled();
+        expect(req._authUser).toBe('alice');
+    });
+});

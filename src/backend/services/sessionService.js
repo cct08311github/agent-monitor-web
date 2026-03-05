@@ -1,0 +1,76 @@
+// src/backend/services/sessionService.js
+'use strict';
+const crypto = require('crypto');
+
+const sessions = new Map(); // sessionId → { username, expiresAt, lastAccessAt }
+
+function getSecret() {
+    return process.env.AUTH_SESSION_SECRET || 'dev-secret-change-in-production';
+}
+
+function getTtlMs() {
+    const hours = parseFloat(process.env.AUTH_SESSION_TTL_HOURS) || 8;
+    return hours * 60 * 60 * 1000;
+}
+
+function sign(id) {
+    return id + '.' + crypto.createHmac('sha256', getSecret()).update(id).digest('hex');
+}
+
+function unsign(token) {
+    if (!token || !token.includes('.')) return null;
+    const lastDot = token.lastIndexOf('.');
+    const id = token.slice(0, lastDot);
+    const sig = token.slice(lastDot + 1);
+    const expected = crypto.createHmac('sha256', getSecret()).update(id).digest('hex');
+    if (sig.length !== expected.length) return null;
+    if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+    return id;
+}
+
+function createSession(username) {
+    const id = crypto.randomBytes(32).toString('hex');
+    const now = Date.now();
+    sessions.set(id, { username, createdAt: now, lastAccessAt: now, expiresAt: now + getTtlMs() });
+    return sign(id);
+}
+
+function validateSession(token) {
+    const id = unsign(token);
+    if (!id) return null;
+    const session = sessions.get(id);
+    if (!session) return null;
+    if (Date.now() > session.expiresAt) {
+        sessions.delete(id);
+        return null;
+    }
+    return session;
+}
+
+function touchSession(token) {
+    const id = unsign(token);
+    if (!id) return;
+    const session = sessions.get(id);
+    if (!session) return;
+    const now = Date.now();
+    session.lastAccessAt = now;
+    session.expiresAt = now + getTtlMs();
+}
+
+function destroySession(token) {
+    const id = unsign(token);
+    if (id) sessions.delete(id);
+}
+
+// GC: clear expired sessions every 5 minutes
+/* istanbul ignore next */
+if (process.env.NODE_ENV !== 'test') {
+    setInterval(() => {
+        const now = Date.now();
+        for (const [id, s] of sessions) {
+            if (now > s.expiresAt) sessions.delete(id);
+        }
+    }, 5 * 60 * 1000).unref();
+}
+
+module.exports = { createSession, validateSession, touchSession, destroySession, _sessions: sessions };
