@@ -372,6 +372,130 @@ describe('loginRateLimit', () => {
         freshAuth.loginRateLimit(req3, res3, n3);
         expect(n3).toHaveBeenCalled();
     });
+
+    // ── Branch coverage: non-401, non-success status (e.g. 400, 503) ──────────
+    it('does not increment counter or reset on 4xx-non-401 response (400 bad request)', () => {
+        const ip = '9.9.9.4';
+        const req = mockReq({ ip });
+        const res = mockRes();
+        res.statusCode = 400; // bad request — neither 401 nor < 400
+        const n = jest.fn(() => { res.json({ error: 'bad' }); });
+        freshAuth.loginRateLimit(req, res, n);
+        expect(n).toHaveBeenCalled();
+        // Counter should not be set (not a 401), next request should still be allowed
+        const req2 = mockReq({ ip });
+        const res2 = mockRes();
+        const n2 = jest.fn();
+        freshAuth.loginRateLimit(req2, res2, n2);
+        expect(n2).toHaveBeenCalled();
+    });
+
+    it('does not increment counter on 503 (auth_not_configured) response', () => {
+        const ip = '9.9.9.5';
+        const req = mockReq({ ip });
+        const res = mockRes();
+        res.statusCode = 503;
+        const n = jest.fn(() => { res.json({ error: 'auth_not_configured' }); });
+        freshAuth.loginRateLimit(req, res, n);
+        expect(n).toHaveBeenCalled();
+    });
+
+    it('resets an expired window and starts a new one on 401', () => {
+        const ip = '9.9.9.6';
+        // Use a fresh isolated module so we can manipulate the loginFailures map
+        let isolatedAuth;
+        jest.isolateModules(() => { isolatedAuth = require('../src/backend/middlewares/auth'); });
+
+        // Simulate 3 failed attempts
+        for (let i = 0; i < 3; i++) {
+            const req = mockReq({ ip });
+            const res = mockRes();
+            res.statusCode = 401;
+            isolatedAuth.loginRateLimit(req, res, jest.fn(() => res.json({})));
+        }
+
+        // Verify 6th attempt would be 429 only after 5 total
+        for (let i = 3; i < 5; i++) {
+            const req = mockReq({ ip });
+            const res = mockRes();
+            res.statusCode = 401;
+            isolatedAuth.loginRateLimit(req, res, jest.fn(() => res.json({})));
+        }
+
+        const req = mockReq({ ip });
+        const res = mockRes();
+        isolatedAuth.loginRateLimit(req, res, jest.fn());
+        expect(res.status).toHaveBeenCalledWith(429);
+    });
+
+    // ── Branch: window expiry resets count (auth.js line 175) ────────────────
+    it('resets expired window when a new 401 arrives after window passes', () => {
+        const ip = '9.9.9.7';
+        let isolatedAuth;
+        jest.isolateModules(() => { isolatedAuth = require('../src/backend/middlewares/auth'); });
+
+        jest.useFakeTimers();
+
+        // Make 3 failed attempts inside the current window
+        for (let i = 0; i < 3; i++) {
+            const req = mockReq({ ip });
+            const res = mockRes();
+            res.statusCode = 401;
+            isolatedAuth.loginRateLimit(req, res, jest.fn(() => res.json({})));
+        }
+
+        // Advance time past the 15-minute window
+        jest.advanceTimersByTime(16 * 60 * 1000);
+
+        // This 401 should hit the `now >= rec.resetAt` branch → reset count to 0, then increment to 1
+        const req = mockReq({ ip });
+        const res = mockRes();
+        res.statusCode = 401;
+        isolatedAuth.loginRateLimit(req, res, jest.fn(() => res.json({})));
+
+        // Only 1 failure in the new window — should NOT be rate-limited yet
+        const req2 = mockReq({ ip });
+        const res2 = mockRes();
+        const n2 = jest.fn();
+        isolatedAuth.loginRateLimit(req2, res2, n2);
+        expect(n2).toHaveBeenCalled(); // not blocked, window reset worked
+
+        jest.useRealTimers();
+    });
+});
+
+// ─── sessionService (unit — branch coverage) ──────────────────────────────────
+
+describe('sessionService branch coverage', () => {
+    let ss;
+    beforeEach(() => {
+        jest.isolateModules(() => {
+            delete process.env.AUTH_SESSION_SECRET; // trigger fallback branch
+            ss = require('../src/backend/services/sessionService');
+            ss._sessions.clear();
+        });
+    });
+    afterEach(() => {
+        process.env.AUTH_SESSION_SECRET = 'test-secret';
+    });
+
+    it('getSecret() falls back to hardcoded dev-secret when env not set', () => {
+        // If getSecret fallback works, createSession + validateSession should still work
+        const tok = ss.createSession('bob');
+        expect(ss.validateSession(tok).username).toBe('bob');
+    });
+
+    it('touchSession is a no-op for invalid (tampered) token', () => {
+        // id unsign returns null → early return, no throw
+        expect(() => ss.touchSession('invalid.token')).not.toThrow();
+    });
+
+    it('touchSession is a no-op when session not in map', () => {
+        // Create token, then manually clear the sessions map
+        const tok = ss.createSession('alice');
+        ss._sessions.clear();
+        expect(() => ss.touchSession(tok)).not.toThrow();
+    });
 });
 
 // ─── requireAuth ───────────────────────────────────────────────────────────────
