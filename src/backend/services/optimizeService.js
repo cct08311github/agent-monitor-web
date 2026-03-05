@@ -8,6 +8,8 @@ const PROJECT_PATH = path.join(os.homedir(), '.openclaw', 'shared', 'projects', 
 const PLANS_DIR = path.join(PROJECT_PATH, 'docs', 'plans');
 const OPENCLAW_PATH = path.join(os.homedir(), '.openclaw', 'bin', 'openclaw');
 
+const { execFile } = require('child_process');
+
 const tsdbService = require('./tsdbService');
 const alertEngine = require('./alertEngine');
 const openclawService = require('./openclawService');
@@ -126,4 +128,42 @@ async function runPipeline(data, onProgress) {
     return { draft, review, report, opusFailed };
 }
 
-module.exports = { collectData, runPipeline, PROJECT_PATH, OPENCLAW_PATH };
+function execFileAsync(bin, args, opts) {
+    return new Promise((resolve, reject) => {
+        execFile(bin, args, opts, (err, stdout, stderr) => {
+            if (err) reject(err); else resolve({ stdout, stderr });
+        });
+    });
+}
+
+async function saveAndNotify(report, opusFailed, onProgress) {
+    // Step 5: 儲存
+    onProgress(5, '儲存報告...');
+    const date = TODAY();
+    const filename = `${date}-auto-optimize.md`;
+    const filepath = path.join(PLANS_DIR, filename);
+
+    const header = `# Auto-Optimize Report — ${date}\n` +
+        (opusFailed ? '> ⚠️ 本報告未經 Opus 完整審查\n\n' : '') +
+        `> 生成時間：${new Date().toISOString()}\n\n`;
+
+    fs.writeFileSync(filepath, header + report, 'utf8');
+
+    // Step 6: Telegram 推播
+    onProgress(6, 'Telegram 推播...');
+    const summary = report.split('\n').filter(l => l.startsWith('##')).slice(0, 3).join(' | ');
+    const message = `🤖 自主優化報告已生成 (${date})\n${summary}\n📄 ${filename}`;
+
+    try {
+        await execFileAsync(OPENCLAW_PATH, [
+            'message', 'send', '--channel', 'telegram',
+            '--target', '-1003873859338', '--message', message
+        ], { timeout: 30_000 });
+    } catch (_) {
+        // Telegram 失敗不中斷流程
+    }
+
+    return { filename, filepath };
+}
+
+module.exports = { collectData, runPipeline, saveAndNotify, PROJECT_PATH, OPENCLAW_PATH };

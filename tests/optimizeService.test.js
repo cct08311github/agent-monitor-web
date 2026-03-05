@@ -89,3 +89,48 @@ describe('optimizeService.runPipeline', () => {
         await expect(optimizeService.runPipeline(data, () => {})).rejects.toThrow('ANTHROPIC_API_KEY');
     });
 });
+
+describe('optimizeService.saveAndNotify', () => {
+    let writeSpy;
+
+    beforeEach(() => {
+        writeSpy = jest.spyOn(require('fs'), 'writeFileSync').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+        writeSpy.mockRestore();
+    });
+
+    it('saves report to docs/plans/ and returns filename with correct date pattern', async () => {
+        const { execFile } = require('child_process');
+        // execFile is not yet mocked here — it may actually try to run, so mock it
+        jest.spyOn(require('child_process'), 'execFile').mockImplementation(
+            (bin, args, opts, cb) => cb(null, '', '')
+        );
+        const result = await optimizeService.saveAndNotify('## 最終報告\n項目A', false, () => {});
+        expect(result.filename).toMatch(/^\d{4}-\d{2}-\d{2}-auto-optimize\.md$/);
+        expect(writeSpy).toHaveBeenCalled();
+        jest.restoreAllMocks();
+    });
+
+    it('does not throw if Telegram execFile fails', async () => {
+        jest.spyOn(require('child_process'), 'execFile').mockImplementation(
+            (bin, args, opts, cb) => cb(new Error('Telegram fail'), '', '')
+        );
+        await expect(
+            optimizeService.saveAndNotify('## 報告', false, () => {})
+        ).resolves.not.toThrow();
+        jest.restoreAllMocks();
+    });
+
+    it('includes opusFailed warning in header when opusFailed=true', async () => {
+        jest.spyOn(require('child_process'), 'execFile').mockImplementation(
+            (bin, args, opts, cb) => cb(null, '', '')
+        );
+        let written = '';
+        writeSpy.mockImplementation((file, content) => { written = content; });
+        await optimizeService.saveAndNotify('## 報告', true, () => {});
+        expect(written).toContain('未經 Opus 完整審查');
+        jest.restoreAllMocks();
+    });
+});
