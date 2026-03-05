@@ -1,781 +1,95 @@
-# Auto-Optimize Implementation Plan
+# Auto-Optimize Report — 2026-03-05
+> 生成時間：2026-03-05T13:00:37.061Z
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
-**Goal:** 在 agent-monitor-web 新增自主優化功能：UI 按鈕觸發 → 後端收集數據 → Sonnet 起草 → Opus 審查 → Sonnet 整合 → 儲存報告 + Telegram 推播。
-
-**Architecture:** 後端 SSE pipeline：`GET /api/optimize/run` 串流進度給 UI，`optimizeService.js` 依序呼叫 Anthropic SDK 三次（Sonnet→Opus→Sonnet），報告存至 `docs/plans/`，透過 openclaw CLI 推播 Telegram。
-
-**Tech Stack:** Node.js, Express SSE, `@anthropic-ai/sdk`, 現有 tsdbService/alertEngine，openclaw CLI（Telegram）
+這是一份為 `agent-monitor-web` 專案整理的最終實施計畫報告，已將原始草案與 Opus 的審查意見進行深度整合，並梳理了 Code Review 結果。
 
 ---
 
-## Task 1: 安裝 Anthropic SDK
+# agent-monitor-web 技術優化與 QA 實施報告
 
-**Files:**
-- Modify: `package.json`
+## 第一章：優化建議
 
-**Step 1: 安裝套件**
+本章節基於系統運行數據（2026-03-05 11:54:00Z 至 12:57:00Z）進行分析。經 [Opus 修訂] 糾正前端與後端職責邊界後，制定以下 4 項核心優化方案。
 
-```bash
-cd /Users/openclaw/.openclaw/shared/projects/agent-monitor-web
-npm install @anthropic-ai/sdk
-```
+### 1. [Opus 修訂] Agent 監控與未歸屬成本視覺化 (Unattributed Cost Visualization)
+*   **問題**：`total_cost` 持續產生但 `agents` 為空。原草案誤以為是數據遺失並建議傳輸 `idle` 狀態，但這將導致 API Payload 暴增引發瀏覽器 OOM。這實際上是系統基礎設施產生的常駐成本。
+*   **建議**：前端應在 UI 上實作「未歸屬成本（Unattributed Cost）」或「系統基礎成本」的分類。當 `total_cost` > 0 且 `agents` 為空時，圖表應清晰顯示這筆費用屬於基礎設施。
+*   **Opus 補充**：
+    *   **嚴禁**要求後端傳輸大量休眠 Agent 狀態。
+    *   向後端團隊提出 API 變更需求，新增 `cost_breakdown` 欄位（區分 `agent_cost` 與 `system_cost`）以便圖表分層渲染。
+*   **優先級**：**P1**
 
-Expected: `package.json` 的 `dependencies` 新增 `"@anthropic-ai/sdk": "^0.x.x"`
+### 2. [Opus 修訂] 監控數據斷層處理與狀態對齊 (State Reconciliation & Gap Handling)
+*   **問題**：數據出現 4 分鐘盲區。原草案建議在後端採集器加緩存，超出了 Web 前端範疇；且單純的重試機制會在斷線恢復時引發「驚群效應（Thundering Herd）」拖垮後端。
+*   **建議**：前端引入指數退避（Exponential Backoff）重試機制。當 WebSockets 或 Polling 斷線恢復後，自動發起 `[last_received_time, current_time]` 的歷史區間查詢（Historical Fetch）以補齊缺口。
+*   **Opus 補充**：在圖表 UI 呈現上，針對缺失資料的時段（Null values），必須渲染為「斷線」或使用「虛線/灰色陰影」標示，**嚴禁**在視覺上自動平滑連線插值（Interpolation），以免誤導使用者。
+*   **優先級**：**P0**
 
-**Step 2: 確認 .env 有欄位（不填值，只確認格式）**
+### 3. [Opus 修訂] 成本異常視覺警示與配置介面 (Visual Cues for Cost Spikes)
+*   **問題**：成本突增但警報未觸發。原草案建議由前端計算移動平均線並生成 Alert，這是嚴重的架構錯誤（關閉瀏覽器即失效），且低基數百分比計算易導致「告警疲勞」。
+*   **建議**：Alert 的生成與發送必須由後端（如 Prometheus/Worker）全權負責。前端僅負責「強化視覺提示」，例如單分鐘成本觸及 UI 顯示閾值時，將圖表柱狀圖標為紅色或彈出 Toast。
+*   **Opus 補充**：前端應開發一個配置表單介面，讓使用者可以設定「後端告警閾值（建議使用絕對值而非僅百分比）」，並將設定寫回後端。
+*   **優先級**：**P1**
 
-檢查 `.env` 是否已有 `ANTHROPIC_API_KEY=`，若無則新增一行：
-```
-ANTHROPIC_API_KEY=
-```
-（實際 key 由使用者自行填入）
-
-**Step 3: Commit**
-
-```bash
-git add package.json package-lock.json
-git commit -m "chore: add @anthropic-ai/sdk dependency"
-```
-
----
-
-## Task 2: optimizeService.js — 數據收集
-
-**Files:**
-- Create: `src/backend/services/optimizeService.js`
-- Test: `tests/optimizeService.test.js`
-
-**Step 1: 寫失敗測試**
-
-```js
-// tests/optimizeService.test.js
-jest.mock('@anthropic-ai/sdk');
-jest.mock('../src/backend/services/tsdbService', () => ({
-    getCostHistory: jest.fn(() => []),
-    getAgentActivitySummary: jest.fn(() => []),
-}));
-jest.mock('../src/backend/services/alertEngine', () => ({
-    getRecent: jest.fn(() => []),
-}));
-jest.mock('../src/backend/services/openclawService', () => ({
-    listAgents: jest.fn(async () => []),
-}));
-
-const optimizeService = require('../src/backend/services/optimizeService');
-
-describe('optimizeService.collectData', () => {
-    it('returns object with costHistory, alerts, sessions, existingPlans', async () => {
-        const data = await optimizeService.collectData();
-        expect(data).toHaveProperty('costHistory');
-        expect(data).toHaveProperty('alerts');
-        expect(data).toHaveProperty('agents');
-        expect(data).toHaveProperty('existingPlans');
-        expect(Array.isArray(data.existingPlans)).toBe(true);
-    });
-});
-```
-
-**Step 2: 跑測試確認失敗**
-
-```bash
-npm test -- --testPathPattern=optimizeService
-```
-
-Expected: FAIL — "Cannot find module optimizeService"
-
-**Step 3: 建立 optimizeService.js，實作 collectData**
-
-```js
-// src/backend/services/optimizeService.js
-'use strict';
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-
-const PROJECT_PATH = path.join(os.homedir(), '.openclaw', 'shared', 'projects', 'agent-monitor-web');
-const PLANS_DIR = path.join(PROJECT_PATH, 'docs', 'plans');
-const OPENCLAW_PATH = path.join(os.homedir(), '.openclaw', 'bin', 'openclaw');
-
-const tsdbService = require('./tsdbService');
-const alertEngine = require('./alertEngine');
-const openclawService = require('./openclawService');
-
-async function collectData() {
-    const [costHistory, agents, alerts] = await Promise.all([
-        Promise.resolve(tsdbService.getCostHistory ? tsdbService.getCostHistory(60) : []),
-        openclawService.listAgents().catch(() => []),
-        Promise.resolve(alertEngine.getRecent(50)),
-    ]);
-
-    let existingPlans = [];
-    try {
-        existingPlans = fs.readdirSync(PLANS_DIR)
-            .filter(f => f.endsWith('.md'))
-            .sort()
-            .reverse()
-            .slice(0, 20);
-    } catch (_) {}
-
-    return { costHistory, agents, alerts, existingPlans };
-}
-
-module.exports = { collectData, PROJECT_PATH, OPENCLAW_PATH };
-```
-
-**Step 4: 跑測試確認通過**
-
-```bash
-npm test -- --testPathPattern=optimizeService
-```
-
-Expected: PASS
-
-**Step 5: Commit**
-
-```bash
-git add src/backend/services/optimizeService.js tests/optimizeService.test.js
-git commit -m "feat(optimize): collectData — tsdb + alerts + agents + existing plans"
-```
+### 4. [Opus 修訂] 成本數值真實呈現與格式化規範 (Cost Formatting & Data Integrity)
+*   **問題**：單次操作成本微幅增加（如 4.3367 -> 4.3779）。原草案誤判為浮點數精度遺失。這極大機率是真實的累計使用量（如 Token 或運算時間累積）。
+*   **建議**：捨棄精度問題假設，應視為真實成本。在 `agent-monitor-web` 中建立全域的貨幣/成本格式化工具（使用 `Intl.NumberFormat`），固定顯示有效位數（如小數點後 4 位）。
+*   **Opus 補充**：
+    *   **嚴禁**前端私自實作四捨五入（Rounding）或截斷掩蓋漂移，以免監控儀表板與最終計費系統（Billing System）財務數字不符。
+    *   UI 數值旁應增加 Hover Tooltip，顯示成本微增是因為「Compute Time」還是「Token Usage」，以解除使用者疑慮。
+*   **優先級**：**P2**
 
 ---
 
-## Task 3: optimizeService.js — 三步 Claude Pipeline
+### 💡 第一章實施順序建議
+1. **[P0] 優先執行 項目 2**：完成前端斷線重連機制（指數退避）、歷史資料拉取（State Reconciliation）以及圖表斷層（Data Gap）的正確渲染，保障系統穩定性與數據真實性。
+2. **[P1] 執行 項目 1 & 3**：與後端協調 API 規格（`cost_breakdown`），實作前端基礎成本分類視覺化、異常數值的 UI 標紅提示，以及開發後端閾值設定介面。
+3. **[P2] 最後執行 項目 4**：導入全域數字格式化工具，並完善 UI Tooltip 細節，提升整體 UX 與計費透明度。
 
-**Files:**
-- Modify: `src/backend/services/optimizeService.js`
-- Modify: `tests/optimizeService.test.js`
+---
+---
 
-**Step 1: 新增測試（mock Anthropic SDK 三次呼叫）**
+## 第二章：Code Review & QA
 
-在 `tests/optimizeService.test.js` 加入：
+本章節針對 `agent-monitor-web` 的後端/BFF 原始碼進行安全與效能審查，並依嚴重程度降冪排序。
 
-```js
-const Anthropic = require('@anthropic-ai/sdk');
+### P0：極高風險 (Critical) - 立即修復
 
-describe('optimizeService pipeline', () => {
-    beforeEach(() => {
-        process.env.ANTHROPIC_API_KEY = 'test-key';
-        Anthropic.mockImplementation(() => ({
-            messages: {
-                create: jest.fn()
-                    .mockResolvedValueOnce({ content: [{ text: '## 草案\n優化項目A' }] })
-                    .mockResolvedValueOnce({ content: [{ text: '## Opus審查\n問題1' }] })
-                    .mockResolvedValueOnce({ content: [{ text: '## 最終報告\n整合完成' }] }),
-            }
-        }));
-    });
+*   **[SECURITY] Host 校驗存在繞過漏洞（Host Header Injection）**
+    *   **檔案**：`src/backend/middlewares/auth.js`
+    *   **問題**：`isAllowedHost` 使用 `startsWith` 驗證域名（如 `'localhost'` 匹配到 `localhost.evil.com`），可能導致 SSRF 或越權存取內部控制端點。
+    *   **建議**：改用嚴格的字串相等比對（`===`）。對於 IP 網段，使用嚴謹的正規表達式（如 `/^192\.168\.\d+\.\d+$/`）精確匹配。
+*   **[PERFORMANCE] SSE 連線未處理客戶端中斷，導致全域鎖死與資源浪費**
+    *   **檔案**：`src/backend/controllers/optimizeController.js`
+    *   **問題**：`run` 函數的 `isRunning` 互斥鎖在客戶端斷線或發生未捕捉例外時無法釋放，導致 LLM 額度持續消耗且 `/optimize/run` 端點永久鎖死。
+    *   **建議**：監聽客戶端斷線事件 `req.on('close', ...)`，並觸發 `AbortController` 中止背景任務及釋放 `isRunning` 鎖。將資料收集與 LLM 請求改為支援 `AbortSignal`。
 
-    it('runPipeline returns { draft, review, report }', async () => {
-        const data = { costHistory: [], agents: [], alerts: [], existingPlans: [] };
-        const result = await optimizeService.runPipeline(data, () => {});
-        expect(result).toHaveProperty('draft');
-        expect(result).toHaveProperty('review');
-        expect(result).toHaveProperty('report');
-        expect(result.report).toContain('最終報告');
-    });
+### P1：高風險 (High) - 排入本週 Sprint 修復
 
-    it('runPipeline opus failure falls back to draft-only report', async () => {
-        Anthropic.mockImplementation(() => ({
-            messages: {
-                create: jest.fn()
-                    .mockResolvedValueOnce({ content: [{ text: '## 草案' }] })
-                    .mockRejectedValueOnce(new Error('Opus quota'))
-                    .mockResolvedValueOnce({ content: [{ text: '## 降級報告' }] }),
-            }
-        }));
-        const data = { costHistory: [], agents: [], alerts: [], existingPlans: [] };
-        const result = await optimizeService.runPipeline(data, () => {});
-        expect(result.report).toContain('降級');
-        expect(result.opusFailed).toBe(true);
-    });
+*   **[SECURITY] 使用 `exec` 執行指令存在 Command Injection 高風險**
+    *   **檔案**：`src/backend/services/openclawService.js`
+    *   **問題**：`getOpenClawData` 直接拼接字串交由 `child_process.exec` 執行。若未來引入外部變數將導致 RCE (遠端代碼執行) 漏洞。
+    *   **建議**：改用 `child_process.execFile`，並將指令與參數陣列嚴格分離（例：`execFile('openclaw', args)`），杜絕 Shell 注入。
+*   **[PERFORMANCE] 快取機制存在 Cache Stampede（快取雪崩）風險**
+    *   **檔案**：`src/backend/services/openclawService.js`
+    *   **問題**：快取過期且面臨大量併發請求時，所有請求會繞過快取同時觸發 `openclaw` shell 指令，導致 CPU 瞬間飆高。
+    *   **建議**：實作 Promise Lock 機制。若更新快取的 Promise 正在進行，後續請求應等待該 Promise Resolve，而非各自發起新指令。
+*   **[ERROR_HANDLING] 解析錯誤靜默吞掉，導致警告配置被重置清空**
+    *   **檔案**：`src/backend/services/alertEngine.js`
+    *   **問題**：`loadConfig()` 的 JSON 解析錯誤被靜默處理並返回預設值。下次觸發 `saveConfig()` 時會直接覆寫並銷毀原本只是語法寫錯的原始設定檔。
+    *   **建議**：解析失敗應拋出錯誤或紀錄 Error Log 並阻止服務覆蓋檔案；若需容錯，應先將毀損檔案備份（如 `alert-config.json.bak`）。
 
-    it('throws if ANTHROPIC_API_KEY not set', async () => {
-        delete process.env.ANTHROPIC_API_KEY;
-        const data = { costHistory: [], agents: [], alerts: [], existingPlans: [] };
-        await expect(optimizeService.runPipeline(data, () => {})).rejects.toThrow('ANTHROPIC_API_KEY');
-    });
-});
-```
+### P2：中風險 (Medium) - 規劃於後續優化
 
-**Step 2: 跑測試確認失敗**
-
-```bash
-npm test -- --testPathPattern=optimizeService
-```
-
-Expected: FAIL — "runPipeline is not a function"
-
-**Step 3: 實作 runPipeline（在 optimizeService.js 加入）**
-
-```js
-const TODAY = () => new Date().toISOString().slice(0, 10);
-
-const SYSTEM_SONNET_DRAFT = `你是 agent-monitor-web 的系統分析師。
-專案路徑：${PROJECT_PATH}
-今日日期：{DATE}
-
-根據以下運行數據，識別 3-5 個最值得優化的項目，每項包含：
-- 問題描述（基於數據事實）
-- 建議改善方向
-- 預估影響（高/中/低）
-
-不要提出已在以下已完成方案中出現的項目：{EXISTING_PLANS}
-輸出格式：markdown，以 ## 分節。`;
-
-const SYSTEM_OPUS_REVIEW = `你是獨立技術顧問，負責審查 agent-monitor-web 的優化草案。
-專案路徑：${PROJECT_PATH}
-
-對草案中每個優化項目，指出：
-1. 邏輯不足或假設錯誤之處
-2. 遺漏的風險或副作用
-3. 具體改善建議
-
-保持批判立場，不要為草案辯護。每項以 ### 分節。`;
-
-const SYSTEM_SONNET_INTEGRATE = `你是 agent-monitor-web 的技術負責人。
-專案路徑：${PROJECT_PATH}
-
-將下列草案與 Opus 審查意見整合成最終優化方案：
-- 採納 Opus 的合理修改
-- 標註「[Opus 修訂]」的段落
-- 每項優化附上：問題、建議、Opus補充、優先級（P0/P1/P2）
-- 結尾附「實施順序建議」
-
-輸出：完整 markdown，可直接存為實施計畫。`;
-
-async function runPipeline(data, onProgress) {
-    if (!process.env.ANTHROPIC_API_KEY) {
-        throw new Error('ANTHROPIC_API_KEY 未設定');
-    }
-
-    const Anthropic = require('@anthropic-ai/sdk');
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-    const dataStr = JSON.stringify({
-        costHistory: data.costHistory,
-        agents: data.agents,
-        alerts: data.alerts,
-    }, null, 2);
-
-    const existingList = data.existingPlans.join('\n');
-
-    // Step 2: Sonnet 起草
-    onProgress(2, 'Sonnet 起草中...');
-    const draftResp = await client.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 4096,
-        system: SYSTEM_SONNET_DRAFT.replace('{DATE}', TODAY()).replace('{EXISTING_PLANS}', existingList),
-        messages: [{ role: 'user', content: `運行數據：\n${dataStr}` }],
-    });
-    const draft = draftResp.content[0].text;
-
-    // Step 3: Opus 審查（失敗時降級）
-    onProgress(3, 'Opus 審查中...');
-    let review = null;
-    let opusFailed = false;
-    try {
-        const reviewResp = await client.messages.create({
-            model: 'claude-opus-4-6',
-            max_tokens: 4096,
-            system: SYSTEM_OPUS_REVIEW,
-            messages: [{ role: 'user', content: `優化草案：\n${draft}` }],
-        });
-        review = reviewResp.content[0].text;
-    } catch (e) {
-        opusFailed = true;
-        review = `（Opus 審查失敗：${e.message}，以下為降級報告）`;
-    }
-
-    // Step 4: Sonnet 整合
-    onProgress(4, 'Sonnet 整合中...');
-    const integrateResp = await client.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 6000,
-        system: SYSTEM_SONNET_INTEGRATE + (opusFailed ? '\n\n注意：本報告未經 Opus 完整審查，請標註「[未經 Opus 審查]」。' : ''),
-        messages: [{ role: 'user', content: `草案：\n${draft}\n\nOpus審查：\n${review}` }],
-    });
-    const report = integrateResp.content[0].text;
-
-    return { draft, review, report, opusFailed };
-}
-
-module.exports = { collectData, runPipeline, PROJECT_PATH, OPENCLAW_PATH };
-```
-
-**Step 4: 跑測試確認通過**
-
-```bash
-npm test -- --testPathPattern=optimizeService
-```
-
-Expected: PASS
-
-**Step 5: Commit**
-
-```bash
-git add src/backend/services/optimizeService.js tests/optimizeService.test.js
-git commit -m "feat(optimize): runPipeline — Sonnet draft → Opus review → Sonnet integrate"
-```
+*   **[BUG] IP 獲取邏輯在反向代理下失效**
+    *   **檔案**：`src/backend/middlewares/auth.js`
+    *   **問題**：直接讀取 `req.ip`，在 Nginx 等 Reverse Proxy 後方將永遠拿到 `127.0.0.1`，導致封鎖機制或地理分析失效。
+    *   **建議**：優先讀取 `x-forwarded-for` Header，並在 Express 設置 `app.set('trust proxy', true)` 避免 Header 偽造。
+*   *(註：檢測報告末端 `src/backend/services/optimizeService` 項目數據截斷，請開發團隊自行覆查該檔案之近期變更)*
 
 ---
 
-## Task 4: optimizeService.js — 儲存 + Telegram
-
-**Files:**
-- Modify: `src/backend/services/optimizeService.js`
-- Modify: `tests/optimizeService.test.js`
-
-**Step 1: 新增測試**
-
-```js
-const { execFile } = require('child_process');
-jest.mock('child_process');
-
-describe('optimizeService.saveAndNotify', () => {
-    it('saves report to docs/plans/ and returns filename', async () => {
-        const writeSpy = jest.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
-        execFile.mockImplementation((bin, args, opts, cb) => cb(null, '', ''));
-
-        const { filename } = await optimizeService.saveAndNotify(
-            '## 最終報告\n項目A',
-            false,
-            () => {}
-        );
-        expect(filename).toMatch(/^\d{4}-\d{2}-\d{2}-auto-optimize\.md$/);
-        writeSpy.mockRestore();
-    });
-
-    it('does not throw if Telegram fails', async () => {
-        jest.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
-        execFile.mockImplementation((bin, args, opts, cb) => cb(new Error('Telegram fail'), '', ''));
-
-        await expect(
-            optimizeService.saveAndNotify('## 報告', false, () => {})
-        ).resolves.not.toThrow();
-    });
-});
-```
-
-**Step 2: 跑測試確認失敗**
-
-```bash
-npm test -- --testPathPattern=optimizeService
-```
-
-Expected: FAIL — "saveAndNotify is not a function"
-
-**Step 3: 實作 saveAndNotify（在 optimizeService.js 加入）**
-
-```js
-const { execFile } = require('child_process');
-
-function execFileAsync(bin, args, opts) {
-    return new Promise((resolve, reject) => {
-        execFile(bin, args, opts, (err, stdout, stderr) => {
-            if (err) reject(err); else resolve({ stdout, stderr });
-        });
-    });
-}
-
-async function saveAndNotify(report, opusFailed, onProgress) {
-    // Step 5: 儲存
-    onProgress(5, '儲存報告...');
-    const date = TODAY();
-    const filename = `${date}-auto-optimize.md`;
-    const filepath = path.join(PLANS_DIR, filename);
-
-    const header = `# Auto-Optimize Report — ${date}\n` +
-        (opusFailed ? '> ⚠️ 本報告未經 Opus 完整審查\n\n' : '') +
-        `> 生成時間：${new Date().toISOString()}\n\n`;
-
-    fs.writeFileSync(filepath, header + report, 'utf8');
-
-    // Step 6: Telegram 推播
-    onProgress(6, 'Telegram 推播...');
-    const summary = report.split('\n').filter(l => l.startsWith('##')).slice(0, 3).join(' | ');
-    const message = `🤖 自主優化報告已生成 (${date})\n${summary}\n📄 ${filename}`;
-
-    try {
-        await execFileAsync(OPENCLAW_PATH, [
-            'message', 'send', '--channel', 'telegram',
-            '--target', '-1003873859338', '--message', message
-        ], { timeout: 30_000 });
-    } catch (_) {
-        // Telegram 失敗不中斷
-    }
-
-    return { filename, filepath };
-}
-
-module.exports = { collectData, runPipeline, saveAndNotify, PROJECT_PATH, OPENCLAW_PATH };
-```
-
-**Step 4: 跑測試確認通過**
-
-```bash
-npm test -- --testPathPattern=optimizeService
-```
-
-Expected: PASS
-
-**Step 5: Commit**
-
-```bash
-git add src/backend/services/optimizeService.js tests/optimizeService.test.js
-git commit -m "feat(optimize): saveAndNotify — write report to docs/plans, push Telegram"
-```
-
----
-
-## Task 5: optimizeController.js — SSE endpoint
-
-**Files:**
-- Create: `src/backend/controllers/optimizeController.js`
-- Create: `tests/optimizeController.test.js`
-
-**Step 1: 寫失敗測試**
-
-```js
-// tests/optimizeController.test.js
-const request = require('supertest');
-const express = require('express');
-
-jest.mock('../src/backend/services/optimizeService', () => ({
-    collectData: jest.fn(async () => ({ costHistory: [], agents: [], alerts: [], existingPlans: [] })),
-    runPipeline: jest.fn(async (data, cb) => {
-        cb(2, 'Sonnet 起草中...');
-        cb(3, 'Opus 審查中...');
-        cb(4, 'Sonnet 整合中...');
-        return { draft: 'draft', review: 'review', report: '## Report', opusFailed: false };
-    }),
-    saveAndNotify: jest.fn(async (report, failed, cb) => {
-        cb(5, '儲存報告...');
-        cb(6, 'Telegram 推播...');
-        return { filename: '2026-03-05-auto-optimize.md' };
-    }),
-}));
-
-const optimizeController = require('../src/backend/controllers/optimizeController');
-
-function buildApp() {
-    const app = express();
-    app.get('/api/optimize/run', optimizeController.run);
-    return app;
-}
-
-describe('optimizeController.run', () => {
-    it('streams SSE progress events and done event', async () => {
-        const res = await request(buildApp())
-            .get('/api/optimize/run')
-            .buffer(true)
-            .parse((res, cb) => {
-                let data = '';
-                res.on('data', chunk => { data += chunk; });
-                res.on('end', () => cb(null, data));
-            });
-
-        expect(res.status).toBe(200);
-        expect(res.headers['content-type']).toMatch(/text\/event-stream/);
-        expect(res.text).toContain('event: progress');
-        expect(res.text).toContain('event: done');
-        expect(res.text).toContain('2026-03-05-auto-optimize.md');
-    });
-
-    it('returns 409 if already running', async () => {
-        const app = buildApp();
-        // 模擬 running 狀態
-        optimizeController._setRunning(true);
-        const res = await request(app).get('/api/optimize/run');
-        expect(res.status).toBe(409);
-        optimizeController._setRunning(false);
-    });
-
-    it('streams error event on exception', async () => {
-        const optimizeService = require('../src/backend/services/optimizeService');
-        optimizeService.collectData.mockRejectedValueOnce(new Error('DB error'));
-
-        const res = await request(buildApp())
-            .get('/api/optimize/run')
-            .buffer(true)
-            .parse((res, cb) => {
-                let data = '';
-                res.on('data', chunk => { data += chunk; });
-                res.on('end', () => cb(null, data));
-            });
-
-        expect(res.text).toContain('event: error');
-        expect(res.text).toContain('DB error');
-    });
-});
-```
-
-**Step 2: 跑測試確認失敗**
-
-```bash
-npm test -- --testPathPattern=optimizeController
-```
-
-Expected: FAIL — "Cannot find module optimizeController"
-
-**Step 3: 實作 optimizeController.js**
-
-```js
-// src/backend/controllers/optimizeController.js
-'use strict';
-const optimizeService = require('../services/optimizeService');
-
-let isRunning = false;
-
-function _setRunning(val) { isRunning = val; }
-
-async function run(req, res) {
-    if (isRunning) {
-        return res.status(409).json({ success: false, error: '優化正在進行中，請稍後再試' });
-    }
-
-    res.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-    });
-
-    function sendProgress(step, msg) {
-        res.write(`event: progress\ndata: ${JSON.stringify({ step, msg })}\n\n`);
-    }
-
-    isRunning = true;
-    try {
-        sendProgress(1, '收集數據中...');
-        const data = await optimizeService.collectData();
-
-        const { report, opusFailed } = await optimizeService.runPipeline(data, sendProgress);
-
-        const { filename } = await optimizeService.saveAndNotify(report, opusFailed, sendProgress);
-
-        const summary = report.split('\n').filter(l => l.startsWith('##')).slice(0, 3).join(' | ');
-        res.write(`event: done\ndata: ${JSON.stringify({ filename, summary, opusFailed })}\n\n`);
-    } catch (e) {
-        res.write(`event: error\ndata: ${JSON.stringify({ msg: e.message })}\n\n`);
-    } finally {
-        isRunning = false;
-        res.end();
-    }
-}
-
-module.exports = { run, _setRunning };
-```
-
-**Step 4: 跑測試確認通過**
-
-```bash
-npm test -- --testPathPattern=optimizeController
-```
-
-Expected: PASS
-
-**Step 5: Commit**
-
-```bash
-git add src/backend/controllers/optimizeController.js tests/optimizeController.test.js
-git commit -m "feat(optimize): SSE controller — progress stream, 409 guard, error event"
-```
-
----
-
-## Task 6: API Route 掛載
-
-**Files:**
-- Modify: `src/backend/routes/api.js`
-
-**Step 1: 在 api.js 加入 optimizeController**
-
-在 `const alertController = require('../controllers/alertController');` 下方加一行：
-```js
-const optimizeController = require('../controllers/optimizeController');
-```
-
-在 `// Alerts` 路由區塊之後加入：
-```js
-// Optimize
-router.get('/optimize/run', auth.localhostOnlyControl, optimizeController.run);
-```
-
-**Step 2: 全量測試**
-
-```bash
-npm test
-```
-
-Expected: 所有測試通過（數量 ≥ 前一次 + 新增測試數）
-
-**Step 3: Commit**
-
-```bash
-git add src/backend/routes/api.js
-git commit -m "feat(optimize): mount GET /api/optimize/run route"
-```
-
----
-
-## Task 7: 前端 UI — 按鈕 + 進度顯示
-
-**Files:**
-- Modify: `src/frontend/public/index.html`
-- Modify: `src/frontend/public/js/app.js`
-
-**Step 1: 在 index.html System tab 加入按鈕和進度容器**
-
-找到 System tab 的 `<div class="tab-content" id="tab-system">` 區塊頂部（或適當操作按鈕區），加入：
-
-```html
-<div id="optimizeSection" style="margin-bottom:16px;">
-    <button id="optimizeBtn" class="header-btn" onclick="runAutoOptimize()">
-        🔍 執行自主優化
-    </button>
-    <div id="optimizeProgress" style="display:none; margin-top:12px;"></div>
-</div>
-```
-
-**Step 2: 在 app.js 加入 runAutoOptimize 函式**
-
-```js
-function runAutoOptimize() {
-    const btn = document.getElementById('optimizeBtn');
-    const progressEl = document.getElementById('optimizeProgress');
-    if (!btn || !progressEl) return;
-
-    btn.disabled = true;
-    btn.textContent = '⏳ 優化進行中...';
-    progressEl.style.display = 'block';
-    progressEl.innerHTML = '';
-
-    const steps = ['', '', '收集數據', 'Sonnet起草', 'Opus審查', 'Sonnet整合', '儲存報告', 'Telegram推播'];
-    function addStep(step, msg, done) {
-        const id = 'opt-step-' + step;
-        let el = document.getElementById(id);
-        if (!el) {
-            el = document.createElement('div');
-            el.id = id;
-            el.style.cssText = 'padding:4px 0; font-size:13px; color:var(--text-secondary)';
-            progressEl.appendChild(el);
-        }
-        el.textContent = (done ? '✅ ' : '⏳ ') + msg;
-    }
-
-    const es = new EventSource('/api/optimize/run');
-
-    es.addEventListener('progress', (e) => {
-        try {
-            const { step, msg } = JSON.parse(e.data);
-            addStep(step, msg, false);
-            if (step > 1) {
-                const prev = document.getElementById('opt-step-' + (step - 1));
-                if (prev) prev.textContent = '✅ ' + prev.textContent.slice(3);
-            }
-        } catch (_) {}
-    });
-
-    es.addEventListener('done', (e) => {
-        try {
-            const { filename, opusFailed } = JSON.parse(e.data);
-            // 最後一步打勾
-            ['5','6'].forEach(n => {
-                const el = document.getElementById('opt-step-' + n);
-                if (el && el.textContent.startsWith('⏳')) el.textContent = '✅ ' + el.textContent.slice(3);
-            });
-            const result = document.createElement('div');
-            result.style.cssText = 'margin-top:8px; padding:8px; background:var(--bg-muted); border-radius:6px; font-size:13px;';
-            result.innerHTML = `✅ 報告已生成：<strong>${filename}</strong>` +
-                (opusFailed ? ' <span style="color:var(--text-muted)">(未經Opus審查)</span>' : '');
-            progressEl.appendChild(result);
-        } catch (_) {}
-        btn.disabled = false;
-        btn.textContent = '🔍 執行自主優化';
-        es.close();
-    });
-
-    es.addEventListener('error', (e) => {
-        try {
-            const { msg } = JSON.parse(e.data);
-            const errEl = document.createElement('div');
-            errEl.style.cssText = 'color:var(--red); margin-top:8px; font-size:13px;';
-            errEl.textContent = '❌ ' + msg;
-            progressEl.appendChild(errEl);
-        } catch (_) {}
-        btn.disabled = false;
-        btn.textContent = '🔍 執行自主優化';
-        es.close();
-    });
-
-    es.onerror = () => {
-        btn.disabled = false;
-        btn.textContent = '🔍 執行自主優化';
-        es.close();
-    };
-}
-```
-
-**Step 3: 全量測試**
-
-```bash
-npm test
-```
-
-Expected: PASS（前端無 Jest 測試，確認 backend 全過）
-
-**Step 4: Commit**
-
-```bash
-git add src/frontend/public/index.html src/frontend/public/js/app.js
-git commit -m "feat(optimize): UI button + SSE progress display in System tab"
-```
-
----
-
-## Task 8: Push + CI + Issue
-
-**Step 1: 開 GitHub Issue**
-
-```bash
-gh issue create --title "feat: auto-optimize — Sonnet draft → Opus review → integrated report" \
-  --body "UI 按鈕觸發自主優化 pipeline：收集 TSDB/alert 數據 → Sonnet 起草 → Opus 審查 → Sonnet 整合 → 儲存 docs/plans/ + Telegram 推播"
-```
-
-記下 issue 號碼（例如 #66）
-
-**Step 2: Push**
-
-```bash
-git push origin main
-```
-
-**Step 3: 監控 CI**
-
-```bash
-gh run list --limit 5
-gh run watch
-```
-
-Expected: 所有 checks 通過
-
-**Step 4: Close Issue**
-
-```bash
-gh issue close <issue-number> --comment "Implemented in $(git log -1 --format='%H')"
-```
-
----
-
-## Manual Verification Checklist
-
-- [ ] System tab 顯示「🔍 執行自主優化」按鈕
-- [ ] 按下後按鈕禁用，進度列表依序出現
-- [ ] 每步完成後圖示從 ⏳ 變 ✅
-- [ ] 完成後顯示報告檔名
-- [ ] `docs/plans/YYYY-MM-DD-auto-optimize.md` 存在且內容完整
-- [ ] 報告含 `[Opus 修訂]` 標記
-- [ ] Telegram 收到推播摘要
-- [ ] Opus 失敗時：報告標註「未經 Opus 審查」，流程不中斷
-- [ ] 執行中再按：回傳 409，UI 無反應
+### 🚨 必修清單（P0 項目 Check-list）
+在下一次部署上線前，技術團隊**必須**完成以下事項的 PR 審核：
+- [ ] 修復 `auth.js` 中的 `isAllowedHost` 邏輯，消除 Host Header Injection 風險。
+- [ ] 在 `optimizeController.js` 實作 `req.on('close')` 監聽，並掛載 `AbortController` 確保釋放全域鎖 `isRunning`。
