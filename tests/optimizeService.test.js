@@ -65,6 +65,7 @@ describe('optimizeService.runPipeline', () => {
         expect(result).toHaveProperty('review');
         expect(result).toHaveProperty('report');
         expect(result.report).toContain('最終報告');
+        expect(result.opusFailed).toBe(false);
     });
 
     it('falls back gracefully when Opus fails', async () => {
