@@ -8,7 +8,7 @@ jest.mock('../src/backend/services/alertEngine', () => ({
     getRecent: jest.fn(() => []),
 }));
 jest.mock('../src/backend/services/openclawService', () => ({
-    listAgents: jest.fn(async () => []),
+    getOpenClawData: jest.fn(async () => []),
 }));
 
 const optimizeService = require('../src/backend/services/optimizeService');
@@ -30,9 +30,9 @@ describe('optimizeService.collectData', () => {
         });
     });
 
-    it('does not throw if openclawService.listAgents rejects', async () => {
+    it('does not throw if openclawService.getOpenClawData rejects', async () => {
         const openclawService = require('../src/backend/services/openclawService');
-        openclawService.listAgents.mockRejectedValueOnce(new Error('CLI error'));
+        openclawService.getOpenClawData.mockRejectedValueOnce(new Error('CLI error'));
         const data = await optimizeService.collectData();
         expect(Array.isArray(data.agents)).toBe(true);
     });
@@ -86,10 +86,12 @@ describe('optimizeService.runPipeline', () => {
         expect(result.report).toBeTruthy();
     });
 
-    it('throws if GEMINI_API_KEY not set', async () => {
+    it('throws if GEMINI_API_KEY not set anywhere', async () => {
         delete process.env.GEMINI_API_KEY;
+        jest.spyOn(require('fs'), 'readFileSync').mockImplementation(() => { throw new Error('ENOENT'); });
         const data = { costHistory: [], agents: [], alerts: [], existingPlans: [] };
         await expect(optimizeService.runPipeline(data, () => {})).rejects.toThrow('GEMINI_API_KEY');
+        jest.restoreAllMocks();
     });
 });
 
