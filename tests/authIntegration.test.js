@@ -180,3 +180,73 @@ describe('loginRateLimit — HTTP level', () => {
         expect(typeof res.body.retryAfter).toBe('number');
     });
 });
+
+// ── authController branch coverage ───────────────────────────────────────────
+describe('authController — branch coverage', () => {
+    it('login with no body (req.body undefined) returns 400 — exercises req.body || {} fallback', async () => {
+        // When no body is sent and Content-Type is not application/json,
+        // express.json() leaves req.body as undefined → `undefined || {}` branch is taken
+        const res = await request(app)
+            .post('/api/auth/login')
+            .set('Content-Type', 'text/plain')
+            .send('');
+        expect(res.statusCode).toBe(400);
+        expect(res.body.error).toBe('missing_credentials');
+    });
+
+    it('login with req.body=undefined directly (unit) — covers req.body || {} falsy branch', async () => {
+        // Call authController.login directly with undefined req.body
+        jest.resetModules();
+        const authController = require('../src/backend/controllers/authController');
+        const req = { body: undefined, cookies: {} };
+        const res = {
+            statusCode: 200,
+            status: jest.fn(function (c) { this.statusCode = c; return this; }),
+            json: jest.fn(),
+        };
+        await authController.login(req, res);
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({ success: false, error: 'missing_credentials' });
+    });
+
+    it('login falls back to "admin" when AUTH_USERNAME not set', async () => {
+        const saved = process.env.AUTH_USERNAME;
+        delete process.env.AUTH_USERNAME;
+        jest.resetModules();
+        const localApp = require('../src/backend/app');
+        const res = await request(localApp)
+            .post('/api/auth/login')
+            .send({ username: 'admin', password: 'password123' });
+        expect(res.statusCode).toBe(200); // 'admin' default works
+        process.env.AUTH_USERNAME = saved;
+    });
+
+    it('login with AUTH_SESSION_TTL_HOURS unset falls back to 8h default', async () => {
+        const saved = process.env.AUTH_SESSION_TTL_HOURS;
+        delete process.env.AUTH_SESSION_TTL_HOURS;
+        jest.resetModules();
+        const localApp = require('../src/backend/app');
+        const res = await request(localApp)
+            .post('/api/auth/login')
+            .send({ username: 'admin', password: 'password123' });
+        expect(res.statusCode).toBe(200);
+        expect(res.headers['set-cookie']).toBeDefined();
+        process.env.AUTH_SESSION_TTL_HOURS = saved;
+    });
+
+    it('logout without a sid cookie still returns 200', async () => {
+        // Tests the !token branch in logout (token is undefined)
+        const res = await request(app)
+            .post('/api/auth/logout');
+        expect(res.statusCode).toBe(200);
+        expect(res.body.success).toBe(true);
+    });
+
+    it('GET /api/auth/me with expired/invalid cookie returns 401 (!session branch)', async () => {
+        // Create a valid token format but with wrong signature to trigger !session
+        const res = await request(app)
+            .get('/api/auth/me')
+            .set('Cookie', 'sid=aaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb');
+        expect(res.statusCode).toBe(401);
+    });
+});
