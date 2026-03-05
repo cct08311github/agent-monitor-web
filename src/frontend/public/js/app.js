@@ -1030,7 +1030,45 @@ async function manualRepair() {
     fetchWatchdogStatus();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+// ── Auth ─────────────────────────────────────────────────────────────────────
+function redirectToLogin() {
+    if (!location.pathname.endsWith('/login.html')) {
+        location.href = '/login.html';
+    }
+}
+
+async function checkAuth() {
+    try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        if (res.status === 401) { redirectToLogin(); return false; }
+        if (res.ok) {
+            const data = await res.json();
+            const el = document.getElementById('authUsername');
+            if (el && data.username) el.textContent = data.username;
+        }
+    } catch (_) { /* network error — allow app to continue */ }
+    return true;
+}
+
+async function logout() {
+    try {
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch (_) { /* ignore */ }
+    redirectToLogin();
+}
+
+// Wrap fetch to redirect on 401 from API calls
+const _origFetch = window.fetch.bind(window);
+window.fetch = async function (url, opts) {
+    const res = await _origFetch(url, opts);
+    if (res.status === 401 && typeof url === 'string' && url.startsWith('/api/')) {
+        redirectToLogin();
+    }
+    return res;
+};
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await checkAuth();
     const chatInput = document.getElementById('chatInput');
     if (chatInput) {
         chatInput.addEventListener('input', () => {

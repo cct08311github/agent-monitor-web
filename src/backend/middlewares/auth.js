@@ -151,9 +151,60 @@ function controlAuditMiddleware(req, res, next) {
     return next();
 }
 
+// ── Login Rate Limiter ────────────────────────────────────────────────────────
+// Track failed login attempts per IP: max 5 failures in 15 minutes
+const loginFailures = new Map(); // ip → { count, resetAt }
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+
+function loginRateLimit(req, res, next) {
+    const ip = getClientIp(req);
+    const now = Date.now();
+    const record = loginFailures.get(ip);
+
+    if (record && now < record.resetAt && record.count >= LOGIN_MAX_ATTEMPTS) {
+        return res.status(429).json({ success: false, error: 'too_many_attempts',
+            retryAfter: Math.ceil((record.resetAt - now) / 1000) });
+    }
+
+    // Patch res.json to detect failed logins and increment counter
+    const origJson = res.json.bind(res);
+    res.json = function (body) {
+        if (res.statusCode === 401) {
+            const rec = loginFailures.get(ip) || { count: 0, resetAt: now + LOGIN_WINDOW_MS };
+            if (now >= rec.resetAt) { rec.count = 0; rec.resetAt = now + LOGIN_WINDOW_MS; }
+            rec.count += 1;
+            loginFailures.set(ip, rec);
+        } else if (res.statusCode < 400) {
+            loginFailures.delete(ip); // reset on success
+        }
+        return origJson(body);
+    };
+    return next();
+}
+
+// ── requireAuth ───────────────────────────────────────────────────────────────
+const sessionService = require('../services/sessionService');
+
+function requireAuth(req, res, next) {
+    if (process.env.AUTH_DISABLED === 'true') return next();
+
+    const token = req.cookies?.sid;
+    if (!token) return res.status(401).json({ success: false, error: 'unauthenticated' });
+
+    const session = sessionService.validateSession(token);
+    if (!session) return res.status(401).json({ success: false, error: 'unauthenticated' });
+
+    sessionService.touchSession(token);
+    req._authUser = session.username;
+    return next();
+}
+
 module.exports = {
     localhostOnlyControl,
     requireBearerToken,
     rateLimit,
-    controlAuditMiddleware
+    controlAuditMiddleware,
+    loginRateLimit,
+    requireAuth,
 };

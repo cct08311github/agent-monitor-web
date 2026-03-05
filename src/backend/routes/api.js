@@ -17,9 +17,28 @@ const optimizeController = require('../controllers/optimizeController');
 const legacyControlController = require('../controllers/legacyControlController');
 const auth = require('../middlewares/auth');
 const alertController = require('../controllers/alertController');
+const authController = require('../controllers/authController');
 
-// Legacy Read Endpoints
+// ── Public Endpoints (no auth required) ───────────────────────────────────────
 router.get('/read/health', (req, res) => res.json({ success: true, ts: new Date().toISOString() }));
+
+// Auth endpoints — must be public (before requireAuth)
+router.post('/auth/login', auth.loginRateLimit, authController.login);
+router.post('/auth/logout', authController.logout);
+router.get('/auth/me', authController.me);
+
+// Legacy Control Endpoints (have own bearer-token auth, must be before requireAuth)
+const controlRouter = express.Router();
+controlRouter.use(auth.controlAuditMiddleware);
+controlRouter.use(auth.localhostOnlyControl);
+controlRouter.use(auth.rateLimit);
+controlRouter.use(auth.requireBearerToken);
+
+controlRouter.post('/command', legacyControlController.runCommand);
+router.use('/control', controlRouter);
+
+// ── Session Auth (protects all routes below) ──────────────────────────────────
+router.use(auth.requireAuth);
 
 // Alerts
 router.get('/alerts/config', alertController.getConfig);
@@ -51,17 +70,7 @@ router.post('/cron/jobs/:id/toggle', auth.localhostOnlyControl, auth.rateLimit, 
 router.post('/cron/jobs/:id/run', auth.localhostOnlyControl, auth.rateLimit, cronController.runJob);
 router.delete('/cron/jobs/:id', auth.localhostOnlyControl, auth.rateLimit, cronController.deleteJob);
 
-// Legacy Control Endpoints
-const controlRouter = express.Router();
-controlRouter.use(auth.controlAuditMiddleware);
-controlRouter.use(auth.localhostOnlyControl);
-controlRouter.use(auth.rateLimit);
-controlRouter.use(auth.requireBearerToken);
-
-controlRouter.post('/command', legacyControlController.runCommand);
-router.use('/control', controlRouter);
-
-// Dashboard UI command endpoint — no bearer token required (same-origin, localhost-only)
+// Dashboard UI command endpoint — localhost-only, session-auth protected
 router.post('/command', auth.localhostOnlyControl, auth.rateLimit, legacyControlController.runCommand);
 
 // Agents
