@@ -11,7 +11,7 @@ function cookieOptions(ttlHours) {
         secure: true,
         sameSite: 'Strict',
         path: '/',
-        maxAge: ttlHours * 3600,
+        maxAge: ttlHours * 3600 * 1000,
     };
 }
 
