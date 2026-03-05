@@ -36,7 +36,7 @@ router.get('/agents/:agentId/sessions/:sessionId', legacyDashboardController.get
 router.get('/dashboard', legacyDashboardController.getDashboard); // very legacy
 
 // Optimize
-router.get('/optimize/run', auth.localhostOnlyControl, optimizeController.run);
+router.get('/optimize/run', auth.localhostOnlyControl, auth.rateLimit, optimizeController.run);
 
 // TaskHub
 router.get('/taskhub/stats', taskHubController.getStats);
