@@ -4,9 +4,12 @@ const optimizeService = require('../services/optimizeService');
 
 let isRunning = false;
 let lastCompletedAt = 0;
-const COOLDOWN_MS = 10 * 60 * 1000; // 10 分鐘冷卻，防止 EventSource 重連觸發重複執行
+const COOLDOWN_MS = 10 * 60 * 1000; // 10 分鐘冷卻
 
-function _setRunning(val) { isRunning = val; if (!val) lastCompletedAt = 0; }
+// _setRunning 供外部（測試）使用，不應清零 lastCompletedAt
+function _setRunning(val) {
+    isRunning = val;
+}
 
 async function run(req, res) {
     const now = Date.now();
@@ -15,9 +18,19 @@ async function run(req, res) {
         return res.status(409).json({ success: false, error: '優化正在進行中，請稍後再試' });
     }
 
-    // 冷卻中：EventSource 重連時直接回 204，阻止其繼續重連
+    // 冷卻期間：必須用 SSE 格式回應，讓前端透過 cooldown 事件主動 es.close()
+    // 不可用 204 — EventSource 會把非 text/event-stream 視為失敗並自動重連
     if (now - lastCompletedAt < COOLDOWN_MS) {
-        return res.status(204).end();
+        const remaining = Math.ceil((COOLDOWN_MS - (now - lastCompletedAt)) / 1000 / 60);
+        res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no',
+        });
+        res.write(`event: cooldown\ndata: ${JSON.stringify({ remaining })}\n\n`);
+        res.end();
+        return;
     }
 
     res.writeHead(200, {
@@ -27,7 +40,6 @@ async function run(req, res) {
         'X-Accel-Buffering': 'no',
     });
 
-    // 客戶端斷線時不再繼續執行（防止殭屍 pipeline）
     let clientGone = false;
     req.on('close', () => { clientGone = true; });
 
@@ -40,7 +52,12 @@ async function run(req, res) {
         sendProgress(1, '收集數據中...');
         const data = await optimizeService.collectData();
 
+        // 斷線後不繼續執行（避免無人接收的 pipeline 仍送出 Telegram）
+        if (clientGone) return;
+
         const { report, opusFailed } = await optimizeService.runPipeline(data, sendProgress);
+
+        if (clientGone) return;
 
         const { filename } = await optimizeService.saveAndNotify(report, opusFailed, sendProgress);
 
@@ -50,9 +67,11 @@ async function run(req, res) {
         if (!clientGone) res.write(`event: error\ndata: ${JSON.stringify({ msg: e.message })}\n\n`);
     } finally {
         isRunning = false;
-        lastCompletedAt = Date.now();
+        lastCompletedAt = Date.now(); // 只在此處設定，供 cooldown 判斷
         res.end();
     }
 }
 
-module.exports = { run, _setRunning };
+function _resetCooldown() { lastCompletedAt = 0; }
+
+module.exports = { run, _setRunning, _resetCooldown };
