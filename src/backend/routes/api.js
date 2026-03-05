@@ -13,6 +13,7 @@ const systemController = require('../controllers/systemController');
 const cronController = require('../controllers/cronController');
 const taskHubController = require('../controllers/taskHubController');
 const legacyDashboardController = require('../controllers/legacyDashboardController');
+const optimizeController = require('../controllers/optimizeController');
 const legacyControlController = require('../controllers/legacyControlController');
 const auth = require('../middlewares/auth');
 const alertController = require('../controllers/alertController');
@@ -33,6 +34,9 @@ router.get('/read/agents', legacyDashboardController.getAgents);
 router.get('/agents/:agentId/sessions', legacyDashboardController.getSessions);
 router.get('/agents/:agentId/sessions/:sessionId', legacyDashboardController.getSessionContent);
 router.get('/dashboard', legacyDashboardController.getDashboard); // very legacy
+
+// Optimize
+router.get('/optimize/run', auth.localhostOnlyControl, optimizeController.run);
 
 // TaskHub
 router.get('/taskhub/stats', taskHubController.getStats);
