@@ -93,27 +93,79 @@ describe('optimizeService.runPipeline', () => {
     });
 });
 
-describe('optimizeService.saveAndNotify', () => {
-    let writeSpy;
+describe('optimizeService.collectData resilience', () => {
+    it('does not throw if alertEngine.getRecent throws synchronously', async () => {
+        const alertEngine = require('../src/backend/services/alertEngine');
+        alertEngine.getRecent.mockImplementationOnce(() => { throw new Error('alert DB down'); });
+        const data = await optimizeService.collectData();
+        expect(Array.isArray(data.alerts)).toBe(true);
+    });
+});
 
+describe('optimizeService.runPipeline failure paths', () => {
     beforeEach(() => {
-        writeSpy = jest.spyOn(require('fs'), 'writeFileSync').mockImplementation(() => {});
+        process.env.ANTHROPIC_API_KEY = 'test-key';
     });
 
     afterEach(() => {
-        writeSpy.mockRestore();
+        delete process.env.ANTHROPIC_API_KEY;
     });
 
-    it('saves report to docs/plans/ and returns filename with correct date pattern', async () => {
-        const { execFile } = require('child_process');
-        // execFile is not yet mocked here — it may actually try to run, so mock it
+    it('falls back gracefully when Opus Code Review fails', async () => {
+        const Anthropic = require('@anthropic-ai/sdk');
+        Anthropic.mockImplementation(() => ({
+            messages: {
+                create: jest.fn()
+                    .mockResolvedValueOnce({ content: [{ text: '## 草案' }] })
+                    .mockResolvedValueOnce({ content: [{ text: '## Opus審查' }] })
+                    .mockRejectedValueOnce(new Error('Opus CR quota'))
+                    .mockResolvedValueOnce({ content: [{ text: '## 降級報告' }] }),
+            }
+        }));
+        const data = { costHistory: [], agents: [], alerts: [], existingPlans: [] };
+        const result = await optimizeService.runPipeline(data, () => {});
+        expect(result.opusFailed).toBe(true);
+        expect(result.report).toBeTruthy();
+    });
+
+    it('throws if Sonnet integration (final step) fails', async () => {
+        const Anthropic = require('@anthropic-ai/sdk');
+        Anthropic.mockImplementation(() => ({
+            messages: {
+                create: jest.fn()
+                    .mockResolvedValueOnce({ content: [{ text: '## 草案' }] })
+                    .mockResolvedValueOnce({ content: [{ text: '## Opus審查' }] })
+                    .mockResolvedValueOnce({ content: [{ text: '### BUG: 問題A' }] })
+                    .mockRejectedValueOnce(new Error('Sonnet integrate fail')),
+            }
+        }));
+        const data = { costHistory: [], agents: [], alerts: [], existingPlans: [] };
+        await expect(optimizeService.runPipeline(data, () => {})).rejects.toThrow('Sonnet integrate fail');
+    });
+});
+
+describe('optimizeService.saveAndNotify', () => {
+    let writeSpy;
+    let mkdirSpy;
+
+    beforeEach(() => {
+        const fs = require('fs');
+        mkdirSpy = jest.spyOn(fs.promises, 'mkdir').mockResolvedValue(undefined);
+        writeSpy = jest.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined);
         jest.spyOn(require('child_process'), 'execFile').mockImplementation(
             (bin, args, opts, cb) => cb(null, '', '')
         );
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+    });
+
+    it('saves report to docs/plans/ and returns filename with correct date pattern', async () => {
         const result = await optimizeService.saveAndNotify('## 最終報告\n項目A', false, () => {});
         expect(result.filename).toMatch(/^\d{4}-\d{2}-\d{2}-auto-optimize\.md$/);
+        expect(mkdirSpy).toHaveBeenCalledWith(expect.stringContaining('plans'), { recursive: true });
         expect(writeSpy).toHaveBeenCalled();
-        jest.restoreAllMocks();
     });
 
     it('does not throw if Telegram execFile fails', async () => {
@@ -123,17 +175,19 @@ describe('optimizeService.saveAndNotify', () => {
         await expect(
             optimizeService.saveAndNotify('## 報告', false, () => {})
         ).resolves.not.toThrow();
-        jest.restoreAllMocks();
     });
 
     it('includes opusFailed warning in header when opusFailed=true', async () => {
-        jest.spyOn(require('child_process'), 'execFile').mockImplementation(
-            (bin, args, opts, cb) => cb(null, '', '')
-        );
         let written = '';
-        writeSpy.mockImplementation((file, content) => { written = content; });
+        writeSpy.mockImplementation((file, content) => { written = content; return Promise.resolve(); });
         await optimizeService.saveAndNotify('## 報告', true, () => {});
         expect(written).toContain('未經 Opus 完整審查');
-        jest.restoreAllMocks();
+    });
+
+    it('throws if fs.promises.writeFile fails', async () => {
+        writeSpy.mockRejectedValueOnce(new Error('ENOENT: no such file'));
+        await expect(
+            optimizeService.saveAndNotify('## 報告', false, () => {})
+        ).rejects.toThrow('ENOENT');
     });
 });

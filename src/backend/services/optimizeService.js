@@ -18,7 +18,7 @@ async function collectData() {
     const [costHistory, agents, alerts] = await Promise.all([
         Promise.resolve(tsdbService.getCostHistory ? tsdbService.getCostHistory(60) : []).catch(() => []),
         openclawService.listAgents().catch(() => []),
-        Promise.resolve(alertEngine.getRecent(50)),
+        Promise.resolve().then(() => alertEngine.getRecent(50)).catch(() => []),
     ]);
 
     let existingPlans = [];
@@ -221,7 +221,8 @@ async function saveAndNotify(report, opusFailed, onProgress) {
         (opusFailed ? '> ⚠️ 本報告未經 Opus 完整審查\n\n' : '') +
         `> 生成時間：${new Date().toISOString()}\n\n`;
 
-    fs.writeFileSync(filepath, header + report, 'utf8');
+    await fs.promises.mkdir(PLANS_DIR, { recursive: true });
+    await fs.promises.writeFile(filepath, header + report, 'utf8');
 
     // Step 7: Telegram 推播
     onProgress(7, 'Telegram 推播...');
