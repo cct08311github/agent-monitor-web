@@ -72,4 +72,22 @@ describe('optimizeController.run', () => {
         expect(res.body).toContain('event: error');
         expect(res.body).toContain('DB error');
     });
+
+    it('resets isRunning to false after error so subsequent requests succeed', async () => {
+        const optimizeService = require('../src/backend/services/optimizeService');
+        optimizeService.collectData.mockRejectedValueOnce(new Error('transient error'));
+
+        await request(buildApp())
+            .get('/api/optimize/run')
+            .buffer(true)
+            .parse((res, cb) => {
+                let data = '';
+                res.on('data', chunk => { data += chunk; });
+                res.on('end', () => cb(null, data));
+            });
+
+        // After error, isRunning must be false — next request should not get 409
+        const res2 = await request(buildApp()).get('/api/optimize/run');
+        expect(res2.status).not.toBe(409);
+    });
 });
