@@ -7,6 +7,18 @@ const os = require('os');
 const PROJECT_PATH = path.join(os.homedir(), '.openclaw', 'shared', 'projects', 'agent-monitor-web');
 const PLANS_DIR = path.join(PROJECT_PATH, 'docs', 'plans');
 const OPENCLAW_PATH = path.join(os.homedir(), '.openclaw', 'bin', 'openclaw');
+const OPENCLAW_ENV_PATH = path.join(os.homedir(), '.openclaw', '.env');
+
+function getGeminiApiKey() {
+    if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
+    try {
+        const raw = fs.readFileSync(OPENCLAW_ENV_PATH, 'utf8');
+        const match = raw.match(/^GEMINI_API_KEY=(.+)$/m);
+        return match ? match[1].trim() : null;
+    } catch (_) {
+        return null;
+    }
+}
 
 const { execFile } = require('child_process');
 
@@ -17,7 +29,7 @@ const openclawService = require('./openclawService');
 async function collectData() {
     const [costHistory, agents, alerts] = await Promise.all([
         Promise.resolve(tsdbService.getCostHistory ? tsdbService.getCostHistory(60) : []).catch(() => []),
-        openclawService.listAgents().catch(() => []),
+        openclawService.getOpenClawData('openclaw agents list').catch(() => []),
         Promise.resolve().then(() => alertEngine.getRecent(50)).catch(() => []),
     ]);
 
@@ -126,12 +138,12 @@ const SYSTEM_SONNET_INTEGRATE = `你是 agent-monitor-web 的技術負責人。
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 const GEMINI_MODEL = 'gemini-3.1-pro-preview';
 
-async function callGemini(system, userContent, maxTokens = 4096) {
+async function callGemini(apiKey, system, userContent, maxTokens = 4096) {
     const resp = await fetch(GEMINI_API_URL, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.GEMINI_API_KEY}`,
+            'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
             model: GEMINI_MODEL,
@@ -151,7 +163,8 @@ async function callGemini(system, userContent, maxTokens = 4096) {
 }
 
 async function runPipeline(data, onProgress) {
-    if (!process.env.GEMINI_API_KEY) {
+    const apiKey = getGeminiApiKey();
+    if (!apiKey) {
         throw new Error('GEMINI_API_KEY 未設定');
     }
 
@@ -166,6 +179,7 @@ async function runPipeline(data, onProgress) {
     // Step 2: 起草
     onProgress(2, 'Gemini 起草中...');
     const draft = await callGemini(
+        apiKey,
         SYSTEM_SONNET_DRAFT.replace('{DATE}', TODAY()).replace('{EXISTING_PLANS}', existingList),
         `運行數據：\n${dataStr}`
     );
@@ -175,7 +189,7 @@ async function runPipeline(data, onProgress) {
     let review = null;
     let opusFailed = false;
     try {
-        review = await callGemini(SYSTEM_OPUS_REVIEW, `優化草案：\n${draft}`);
+        review = await callGemini(apiKey, SYSTEM_OPUS_REVIEW, `優化草案：\n${draft}`);
     } catch (e) {
         opusFailed = true;
         review = `（草案審查失敗：${e.message}）`;
@@ -187,7 +201,7 @@ async function runPipeline(data, onProgress) {
     let codeReviewFailed = false;
     try {
         const sourceCode = readSourceFiles();
-        codeReview = await callGemini(SYSTEM_OPUS_CODE_REVIEW, `源碼：\n${sourceCode}`);
+        codeReview = await callGemini(apiKey, SYSTEM_OPUS_CODE_REVIEW, `源碼：\n${sourceCode}`);
     } catch (e) {
         codeReviewFailed = true;
         codeReview = `（Code Review 失敗：${e.message}）`;
@@ -199,6 +213,7 @@ async function runPipeline(data, onProgress) {
     if (opusFailed) integrateSystem += '\n\n注意：草案審查未完成，請標註「[未經審查]」。';
     if (codeReviewFailed) integrateSystem += '\n\n注意：Code Review 未完成，請標註「[Code Review 缺失]」。';
     const report = await callGemini(
+        apiKey,
         integrateSystem,
         `草案：\n${draft}\n\n草案審查：\n${review}\n\nCode Review：\n${codeReview}`,
         8000
