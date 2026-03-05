@@ -245,6 +245,13 @@
                         </div>
                     </div>
                 </div>
+                <div id="optimizeSection" class="metric-card" style="margin-top:16px;padding:16px">
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
+                        <span style="font-size:13px;font-weight:600;color:var(--text-primary)">🤖 自主優化</span>
+                        <button id="optimizeBtn" class="header-btn" onclick="runAutoOptimize()">🔍 執行自主優化</button>
+                    </div>
+                    <div id="optimizeProgress" style="display:none;margin-top:10px;font-size:13px"></div>
+                </div>
             </div>
 
             <!-- TAB: Commands & Logs -->
@@ -567,7 +574,7 @@
     <script src="js/modules/cron.js?v=20260304"></script>
     <script src="js/modules/chat.js?v=20260304"></script>
     <script src="js/modules/taskhub.js?v=20260304"></script>
-    <script src="js/app.js?v=20260304"></script>
+    <script src="js/app.js?v=20260305"></script>
 </body>
 
 </html>
