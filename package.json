@@ -9,6 +9,7 @@
     "test": "jest --forceExit --detectOpenHandles"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "better-sqlite3": "^12.6.2",
     "chokidar": "^5.0.0",
     "cors": "^2.8.5",
