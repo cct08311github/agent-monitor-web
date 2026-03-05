@@ -1,6 +1,5 @@
 // tests/optimizeService.test.js
 'use strict';
-jest.mock('@anthropic-ai/sdk');
 jest.mock('../src/backend/services/tsdbService', () => ({
     getCostHistory: jest.fn(() => []),
     getAgentActivitySummary: jest.fn(() => []),
@@ -39,27 +38,32 @@ describe('optimizeService.collectData', () => {
     });
 });
 
-const Anthropic = require('@anthropic-ai/sdk');
+function mockFetchResponses(...texts) {
+    let call = 0;
+    global.fetch = jest.fn(() => {
+        const text = texts[call++] instanceof Error
+            ? Promise.reject(texts[call - 1])
+            : Promise.resolve({
+                ok: true,
+                json: () => Promise.resolve({ choices: [{ message: { content: texts[call - 1] } }] }),
+                text: () => Promise.resolve(''),
+            });
+        return text;
+    });
+}
 
 describe('optimizeService.runPipeline', () => {
     beforeEach(() => {
-        process.env.ANTHROPIC_API_KEY = 'test-key';
-        Anthropic.mockImplementation(() => ({
-            messages: {
-                create: jest.fn()
-                    .mockResolvedValueOnce({ content: [{ text: '## 草案\n優化項目A' }] })
-                    .mockResolvedValueOnce({ content: [{ text: '## Opus審查\n問題1' }] })
-                    .mockResolvedValueOnce({ content: [{ text: '### BUG api.js：問題A' }] })
-                    .mockResolvedValueOnce({ content: [{ text: '## 最終報告\n整合完成' }] }),
-            }
-        }));
+        process.env.GEMINI_API_KEY = 'test-key';
     });
 
     afterEach(() => {
-        delete process.env.ANTHROPIC_API_KEY;
+        delete process.env.GEMINI_API_KEY;
+        jest.restoreAllMocks();
     });
 
     it('returns { draft, review, codeReview, report } on success', async () => {
+        mockFetchResponses('## 草案\n優化項目A', '## 審查\n問題1', '### BUG api.js：問題A', '## 最終報告\n整合完成');
         const data = { costHistory: [], agents: [], alerts: [], existingPlans: [] };
         const result = await optimizeService.runPipeline(data, () => {});
         expect(result).toHaveProperty('draft');
@@ -70,26 +74,22 @@ describe('optimizeService.runPipeline', () => {
         expect(result.opusFailed).toBe(false);
     });
 
-    it('falls back gracefully when Opus draft review fails', async () => {
-        Anthropic.mockImplementation(() => ({
-            messages: {
-                create: jest.fn()
-                    .mockResolvedValueOnce({ content: [{ text: '## 草案' }] })
-                    .mockRejectedValueOnce(new Error('Opus quota'))
-                    .mockResolvedValueOnce({ content: [{ text: '### BUG api.js：問題A' }] })
-                    .mockResolvedValueOnce({ content: [{ text: '## 降級報告' }] }),
-            }
-        }));
+    it('falls back gracefully when draft review fails', async () => {
+        global.fetch = jest.fn()
+            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ choices: [{ message: { content: '## 草案' } }] }) })
+            .mockRejectedValueOnce(new Error('API quota'))
+            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ choices: [{ message: { content: '### BUG api.js' } }] }) })
+            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ choices: [{ message: { content: '## 降級報告' } }] }) });
         const data = { costHistory: [], agents: [], alerts: [], existingPlans: [] };
         const result = await optimizeService.runPipeline(data, () => {});
         expect(result.opusFailed).toBe(true);
         expect(result.report).toBeTruthy();
     });
 
-    it('throws if ANTHROPIC_API_KEY not set', async () => {
-        delete process.env.ANTHROPIC_API_KEY;
+    it('throws if GEMINI_API_KEY not set', async () => {
+        delete process.env.GEMINI_API_KEY;
         const data = { costHistory: [], agents: [], alerts: [], existingPlans: [] };
-        await expect(optimizeService.runPipeline(data, () => {})).rejects.toThrow('ANTHROPIC_API_KEY');
+        await expect(optimizeService.runPipeline(data, () => {})).rejects.toThrow('GEMINI_API_KEY');
     });
 });
 
@@ -104,43 +104,34 @@ describe('optimizeService.collectData resilience', () => {
 
 describe('optimizeService.runPipeline failure paths', () => {
     beforeEach(() => {
-        process.env.ANTHROPIC_API_KEY = 'test-key';
+        process.env.GEMINI_API_KEY = 'test-key';
     });
 
     afterEach(() => {
-        delete process.env.ANTHROPIC_API_KEY;
+        delete process.env.GEMINI_API_KEY;
+        jest.restoreAllMocks();
     });
 
-    it('falls back gracefully when Opus Code Review fails', async () => {
-        const Anthropic = require('@anthropic-ai/sdk');
-        Anthropic.mockImplementation(() => ({
-            messages: {
-                create: jest.fn()
-                    .mockResolvedValueOnce({ content: [{ text: '## 草案' }] })
-                    .mockResolvedValueOnce({ content: [{ text: '## Opus審查' }] })
-                    .mockRejectedValueOnce(new Error('Opus CR quota'))
-                    .mockResolvedValueOnce({ content: [{ text: '## 降級報告' }] }),
-            }
-        }));
+    it('falls back gracefully when Code Review step fails', async () => {
+        global.fetch = jest.fn()
+            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ choices: [{ message: { content: '## 草案' } }] }) })
+            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ choices: [{ message: { content: '## 審查' } }] }) })
+            .mockRejectedValueOnce(new Error('CR quota'))
+            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ choices: [{ message: { content: '## 降級報告' } }] }) });
         const data = { costHistory: [], agents: [], alerts: [], existingPlans: [] };
         const result = await optimizeService.runPipeline(data, () => {});
         expect(result.opusFailed).toBe(true);
         expect(result.report).toBeTruthy();
     });
 
-    it('throws if Sonnet integration (final step) fails', async () => {
-        const Anthropic = require('@anthropic-ai/sdk');
-        Anthropic.mockImplementation(() => ({
-            messages: {
-                create: jest.fn()
-                    .mockResolvedValueOnce({ content: [{ text: '## 草案' }] })
-                    .mockResolvedValueOnce({ content: [{ text: '## Opus審查' }] })
-                    .mockResolvedValueOnce({ content: [{ text: '### BUG: 問題A' }] })
-                    .mockRejectedValueOnce(new Error('Sonnet integrate fail')),
-            }
-        }));
+    it('throws if integration (final step) fails', async () => {
+        global.fetch = jest.fn()
+            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ choices: [{ message: { content: '## 草案' } }] }) })
+            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ choices: [{ message: { content: '## 審查' } }] }) })
+            .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ choices: [{ message: { content: '### BUG' } }] }) })
+            .mockRejectedValueOnce(new Error('integrate fail'));
         const data = { costHistory: [], agents: [], alerts: [], existingPlans: [] };
-        await expect(optimizeService.runPipeline(data, () => {})).rejects.toThrow('Sonnet integrate fail');
+        await expect(optimizeService.runPipeline(data, () => {})).rejects.toThrow('integrate fail');
     });
 });
 

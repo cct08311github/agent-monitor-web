@@ -123,13 +123,37 @@ const SYSTEM_SONNET_INTEGRATE = `你是 agent-monitor-web 的技術負責人。
 
 輸出：完整 markdown，可直接存為實施計畫。`;
 
-async function runPipeline(data, onProgress) {
-    if (!process.env.ANTHROPIC_API_KEY) {
-        throw new Error('ANTHROPIC_API_KEY 未設定');
-    }
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+const GEMINI_MODEL = 'gemini-3.1-pro-preview';
 
-    const Anthropic = require('@anthropic-ai/sdk');
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+async function callGemini(system, userContent, maxTokens = 4096) {
+    const resp = await fetch(GEMINI_API_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.GEMINI_API_KEY}`,
+        },
+        body: JSON.stringify({
+            model: GEMINI_MODEL,
+            max_tokens: maxTokens,
+            messages: [
+                { role: 'system', content: system },
+                { role: 'user', content: userContent },
+            ],
+        }),
+    });
+    if (!resp.ok) {
+        const errText = await resp.text().catch(() => '');
+        throw new Error(`Gemini API error ${resp.status}: ${errText}`);
+    }
+    const json = await resp.json();
+    return json.choices[0].message.content;
+}
+
+async function runPipeline(data, onProgress) {
+    if (!process.env.GEMINI_API_KEY) {
+        throw new Error('GEMINI_API_KEY 未設定');
+    }
 
     const dataStr = JSON.stringify({
         costHistory: data.costHistory,
@@ -139,65 +163,46 @@ async function runPipeline(data, onProgress) {
 
     const existingList = (data.existingPlans || []).join('\n');
 
-    // Step 2: Sonnet 起草
-    onProgress(2, 'Sonnet 起草中...');
-    const draftResp = await client.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 4096,
-        system: SYSTEM_SONNET_DRAFT
-            .replace('{DATE}', TODAY())
-            .replace('{EXISTING_PLANS}', existingList),
-        messages: [{ role: 'user', content: `運行數據：\n${dataStr}` }],
-    });
-    const draft = draftResp.content[0].text;
+    // Step 2: 起草
+    onProgress(2, 'Gemini 起草中...');
+    const draft = await callGemini(
+        SYSTEM_SONNET_DRAFT.replace('{DATE}', TODAY()).replace('{EXISTING_PLANS}', existingList),
+        `運行數據：\n${dataStr}`
+    );
 
-    // Step 3: Opus 審查草案（失敗時降級）
-    onProgress(3, 'Opus 審查草案中...');
+    // Step 3: 審查草案（失敗時降級）
+    onProgress(3, 'Gemini 審查草案中...');
     let review = null;
     let opusFailed = false;
     try {
-        const reviewResp = await client.messages.create({
-            model: 'claude-opus-4-6',
-            max_tokens: 4096,
-            system: SYSTEM_OPUS_REVIEW,
-            messages: [{ role: 'user', content: `優化草案：\n${draft}` }],
-        });
-        review = reviewResp.content[0].text;
+        review = await callGemini(SYSTEM_OPUS_REVIEW, `優化草案：\n${draft}`);
     } catch (e) {
         opusFailed = true;
-        review = `（Opus 草案審查失敗：${e.message}）`;
+        review = `（草案審查失敗：${e.message}）`;
     }
 
-    // Step 4: Opus Code Review（失敗時降級）
-    onProgress(4, 'Opus Code Review 中...');
+    // Step 4: Code Review（失敗時降級）
+    onProgress(4, 'Gemini Code Review 中...');
     let codeReview = null;
     let codeReviewFailed = false;
     try {
         const sourceCode = readSourceFiles();
-        const codeReviewResp = await client.messages.create({
-            model: 'claude-opus-4-6',
-            max_tokens: 4096,
-            system: SYSTEM_OPUS_CODE_REVIEW,
-            messages: [{ role: 'user', content: `源碼：\n${sourceCode}` }],
-        });
-        codeReview = codeReviewResp.content[0].text;
+        codeReview = await callGemini(SYSTEM_OPUS_CODE_REVIEW, `源碼：\n${sourceCode}`);
     } catch (e) {
         codeReviewFailed = true;
-        codeReview = `（Opus Code Review 失敗：${e.message}）`;
+        codeReview = `（Code Review 失敗：${e.message}）`;
     }
 
-    // Step 5: Sonnet 整合
-    onProgress(5, 'Sonnet 整合中...');
+    // Step 5: 整合
+    onProgress(5, 'Gemini 整合中...');
     let integrateSystem = SYSTEM_SONNET_INTEGRATE;
-    if (opusFailed) integrateSystem += '\n\n注意：草案審查未完成，請標註「[未經 Opus 草案審查]」。';
+    if (opusFailed) integrateSystem += '\n\n注意：草案審查未完成，請標註「[未經審查]」。';
     if (codeReviewFailed) integrateSystem += '\n\n注意：Code Review 未完成，請標註「[Code Review 缺失]」。';
-    const integrateResp = await client.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 8000,
-        system: integrateSystem,
-        messages: [{ role: 'user', content: `草案：\n${draft}\n\nOpus草案審查：\n${review}\n\nOpus Code Review：\n${codeReview}` }],
-    });
-    const report = integrateResp.content[0].text;
+    const report = await callGemini(
+        integrateSystem,
+        `草案：\n${draft}\n\n草案審查：\n${review}\n\nCode Review：\n${codeReview}`,
+        8000
+    );
 
     return { draft, review, codeReview, report, opusFailed: opusFailed || codeReviewFailed };
 }
