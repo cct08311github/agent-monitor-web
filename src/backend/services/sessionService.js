@@ -23,8 +23,10 @@ function unsign(token) {
     const id = token.slice(0, lastDot);
     const sig = token.slice(lastDot + 1);
     const expected = crypto.createHmac('sha256', getSecret()).update(id).digest('hex');
-    if (sig.length !== expected.length) return null;
-    if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+    const sigBuf = Buffer.from(sig, 'hex');
+    const expBuf = Buffer.from(expected, 'hex');
+    if (sigBuf.length !== 32 || expBuf.length !== 32) return null;
+    if (!crypto.timingSafeEqual(sigBuf, expBuf)) return null;
     return id;
 }
 

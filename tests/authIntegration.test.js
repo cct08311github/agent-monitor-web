@@ -62,6 +62,24 @@ describe('sessionService', () => {
     it('destroySession is no-op for invalid token', () => {
         expect(() => sessionService.destroySession('bad.token')).not.toThrow();
     });
+
+    it('validateSession returns null for token with non-hex Unicode signature (P0-1 regression)', () => {
+        // A token where sig contains a multibyte Unicode character — previously could crash timingSafeEqual
+        // After fix (Buffer.from(sig,'hex')), this safely returns null without throwing
+        const tok = sessionService.createSession('alice');
+        const lastDot = tok.lastIndexOf('.');
+        const malformed = tok.slice(0, lastDot + 1) + '你好世界' + tok.slice(lastDot + 5);
+        expect(() => sessionService.validateSession(malformed)).not.toThrow();
+        expect(sessionService.validateSession(malformed)).toBeNull();
+    });
+
+    it('validateSession returns null for token with short hex signature (not 32 bytes after hex decode)', () => {
+        const tok = sessionService.createSession('alice');
+        const lastDot = tok.lastIndexOf('.');
+        // Replace signature with a valid hex string but shorter than 64 chars (not 32 bytes)
+        const shortSig = 'deadbeef';
+        expect(sessionService.validateSession(tok.slice(0, lastDot + 1) + shortSig)).toBeNull();
+    });
 });
 
 // ── authController HTTP integration ──────────────────────────────────────────
@@ -91,6 +109,21 @@ describe('POST /api/auth/login', () => {
         expect(res.body.success).toBe(true);
         expect(res.body.username).toBe('admin');
         expect(res.headers['set-cookie']).toBeDefined();
+    });
+
+    it('Set-Cookie sid Max-Age = 28800 seconds (8h × 3600), not milliseconds', async () => {
+        process.env.AUTH_SESSION_TTL_HOURS = '8';
+        const res = await request(app).post('/api/auth/login').send({ username: 'admin', password: 'password123' });
+        const cookie = res.headers['set-cookie']?.[0] || '';
+        // maxAge: 8 * 3600 * 1000 ms → Express converts to Max-Age=28800 in Set-Cookie header
+        expect(cookie).toMatch(/Max-Age=28800/i);
+    });
+
+    it('Set-Cookie sid has HttpOnly and SameSite=Strict', async () => {
+        const res = await request(app).post('/api/auth/login').send({ username: 'admin', password: 'password123' });
+        const cookie = res.headers['set-cookie']?.[0] || '';
+        expect(cookie).toMatch(/HttpOnly/i);
+        expect(cookie).toMatch(/SameSite=Strict/i);
     });
 
     it('returns 401 for wrong password', async () => {
