@@ -167,12 +167,15 @@ function loginRateLimit(req, res, next) {
             retryAfter: Math.ceil((record.resetAt - now) / 1000) });
     }
 
-    // Patch res.json to detect failed logins and increment counter
+    // Patch res.json to detect failed logins and increment counter.
+    // Use fresh Date.now() inside the patch — bcrypt can take 200+ ms,
+    // so `now` captured above would be stale by the time res.json fires.
     const origJson = res.json.bind(res);
     res.json = function (body) {
-        if (res.statusCode === 401) {
-            const rec = loginFailures.get(ip) || { count: 0, resetAt: now + LOGIN_WINDOW_MS };
-            if (now >= rec.resetAt) { rec.count = 0; rec.resetAt = now + LOGIN_WINDOW_MS; }
+        if (res.statusCode === 401 || res.statusCode === 400) {
+            const ts = Date.now();
+            const rec = loginFailures.get(ip) || { count: 0, resetAt: ts + LOGIN_WINDOW_MS };
+            if (ts >= rec.resetAt) { rec.count = 0; rec.resetAt = ts + LOGIN_WINDOW_MS; }
             rec.count += 1;
             loginFailures.set(ip, rec);
         } else if (res.statusCode < 400) {
