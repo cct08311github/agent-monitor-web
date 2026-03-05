@@ -1,5 +1,6 @@
 // src/backend/controllers/authController.js
 'use strict';
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const sessionService = require('../services/sessionService');
 
@@ -28,12 +29,14 @@ async function login(req, res) {
         return res.status(503).json({ success: false, error: 'auth_not_configured' });
     }
 
-    if (username !== expectedUser) {
-        return res.status(401).json({ success: false, error: 'invalid_credentials' });
-    }
+    // Compare username in constant time and always run bcrypt to prevent
+    // timing oracles (wrong username vs wrong password must take equal time).
+    const aBuf = Buffer.from(username);
+    const bBuf = Buffer.from(expectedUser);
+    const usernameOk = aBuf.length === bBuf.length && crypto.timingSafeEqual(aBuf, bBuf);
 
     const valid = await bcrypt.compare(password, expectedHash);
-    if (!valid) {
+    if (!usernameOk || !valid) {
         return res.status(401).json({ success: false, error: 'invalid_credentials' });
     }
 

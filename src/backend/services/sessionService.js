@@ -75,4 +75,6 @@ if (process.env.NODE_ENV !== 'test') {
     }, 5 * 60 * 1000).unref();
 }
 
-module.exports = { createSession, validateSession, touchSession, destroySession, _sessions: sessions };
+function _clearSessions() { sessions.clear(); }
+
+module.exports = { createSession, validateSession, touchSession, destroySession, _sessions: sessions, _clearSessions };

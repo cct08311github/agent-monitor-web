@@ -16,7 +16,7 @@ describe('sessionService', () => {
         process.env.AUTH_SESSION_SECRET = 'test-secret';
         process.env.AUTH_SESSION_TTL_HOURS = '8';
         sessionService = require('../src/backend/services/sessionService');
-        sessionService._sessions.clear();
+        sessionService._clearSessions();
     });
 
     it('createSession returns signed token with dot', () => {

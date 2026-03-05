@@ -472,7 +472,7 @@ describe('sessionService branch coverage', () => {
         jest.isolateModules(() => {
             delete process.env.AUTH_SESSION_SECRET; // trigger fallback branch
             ss = require('../src/backend/services/sessionService');
-            ss._sessions.clear();
+            ss._clearSessions();
         });
     });
     afterEach(() => {
@@ -493,7 +493,7 @@ describe('sessionService branch coverage', () => {
     it('touchSession is a no-op when session not in map', () => {
         // Create token, then manually clear the sessions map
         const tok = ss.createSession('alice');
-        ss._sessions.clear();
+        ss._clearSessions();
         expect(() => ss.touchSession(tok)).not.toThrow();
     });
 });
@@ -504,7 +504,7 @@ describe('requireAuth', () => {
     const sessionService = require('../src/backend/services/sessionService');
 
     beforeEach(() => {
-        sessionService._sessions.clear();
+        sessionService._clearSessions();
         process.env.AUTH_SESSION_SECRET = 'test-secret';
         delete process.env.AUTH_DISABLED;
     });
