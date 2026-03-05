@@ -30,6 +30,7 @@ function buildApp() {
 describe('optimizeController.run', () => {
     beforeEach(() => {
         optimizeController._setRunning(false);
+        optimizeController._resetCooldown();
         jest.clearAllMocks();
     });
 
