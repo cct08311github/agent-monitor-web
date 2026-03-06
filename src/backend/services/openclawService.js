@@ -1,9 +1,7 @@
-const { exec } = require('child_process');
-const util = require('util');
 const fs = require('fs');
 const path = require('path');
-
-const execPromise = util.promisify(exec);
+const { getOpenClawConfig } = require('../config');
+const openclawClient = require('./openclawClient');
 
 // Cache implementation to avoid running exec too often
 const cache = {
@@ -26,10 +24,7 @@ class OpenClawService {
     }
 
     try {
-      const execCommand = /* istanbul ignore next */ command.startsWith('openclaw')
-        ? command.replace('openclaw', '/Users/openclaw/.openclaw/bin/openclaw')
-        : command;
-      const { stdout } = await execPromise(execCommand);
+      const { stdout } = await openclawClient.runCommand(command);
 
       if (command === 'openclaw agents list') {
         cache.agentsText = stdout;
@@ -85,7 +80,8 @@ class OpenClawService {
    */
   detectRealActivity(agentId, workspacePath) {
     try {
-      const fullPath = workspacePath.replace('~/.openclaw', '/Users/openclaw/.openclaw');
+      const { root, agentsRoot } = getOpenClawConfig();
+      const fullPath = workspacePath.replace('~/.openclaw', root);
       let latestModification = 0;
 
       const filesToCheck = [
@@ -102,7 +98,7 @@ class OpenClawService {
       }
 
       // 補查 isolated cron sessions（不寫入 workspace，只寫 sessions/*.jsonl）
-      const sessionsDir = path.join('/Users/openclaw/.openclaw/agents', agentId, 'sessions');
+      const sessionsDir = path.join(agentsRoot, agentId, 'sessions');
       if (fs.existsSync(sessionsDir)) {
         const sessionFiles = fs.readdirSync(sessionsDir)
           .filter(f => f.endsWith('.jsonl'));

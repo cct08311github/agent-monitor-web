@@ -1,12 +1,11 @@
 const fs = require('fs');
-const { spawn } = require('child_process');
 const { getOpenClawConfig } = require('../config');
+const openclawClient = require('../services/openclawClient');
 
 function getPaths() {
     const openclaw = getOpenClawConfig();
     return {
         jobsFile: openclaw.cronJobsPath,
-        openclawBin: openclaw.binPath,
     };
 }
 
@@ -99,7 +98,7 @@ class CronController {
 
         try {
             // 驗證任務存在
-            const { jobsFile, openclawBin } = getPaths();
+            const { jobsFile } = getPaths();
             if (!fs.existsSync(jobsFile)) {
                 throw new Error('任務文件不存在');
             }
@@ -109,9 +108,9 @@ class CronController {
                 return res.status(404).json({ success: false, error: '找不到該任務' });
             }
 
-            console.log(`[CronController] Spawning: ${openclawBin} cron run ${id}`);
+            console.log(`[CronController] Spawning: ${openclawClient.getBinaryPath()} cron run ${id}`);
 
-            const child = spawn(openclawBin, ['cron', 'run', id], {
+            const child = openclawClient.spawnArgs(['cron', 'run', id], {
                 detached: true,
                 stdio: 'ignore'
             });

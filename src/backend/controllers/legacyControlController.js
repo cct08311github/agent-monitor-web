@@ -1,15 +1,12 @@
 const path = require('path');
-const util = require('util');
 const fs = require('fs');
-const { execFile } = require('child_process');
-const execFilePromise = util.promisify(execFile);
 const { getOpenClawConfig } = require('../config');
+const openclawClient = require('../services/openclawClient');
 
 // --- Constants ---
 function getPaths() {
     const openclaw = getOpenClawConfig();
     return {
-        openclawBin: openclaw.binPath,
         notionSyncScript: openclaw.notionSyncScriptPath,
         openclawConfigPath: openclaw.configPath,
     };
@@ -43,8 +40,7 @@ class LegacyControlController {
                     return res.status(400).json({ success: false, error: 'bad_request', message: 'Invalid agent ID format.' });
                 }
 
-                const { openclawBin } = getPaths();
-                const { stdout, stderr } = await execFilePromise(openclawBin, ['agent', '--agent', agentId, '--message', message, '--no-color']);
+                const { stdout, stderr } = await openclawClient.runArgs(['agent', '--agent', agentId, '--message', message, '--no-color']);
                 return res.json({ success: true, output: /* istanbul ignore next */ stdout || stderr });
             }
 
@@ -84,12 +80,11 @@ class LegacyControlController {
 
             // Case 3: System Operations (Restart/Update)
             if (command === 'restart' || command === 'update') {
-                const { openclawBin } = getPaths();
                 const args = command === 'restart' ? ['gateway', 'restart'] : ['update'];
                 res.json({ success: true, output: `COMMAND_ACCEPTED: ${command.toUpperCase()} initiated.` });
 
                 setTimeout(() => {
-                    execFile(openclawBin, args, /* istanbul ignore next */ (error) => {
+                    openclawClient.execArgs(args, /* istanbul ignore next */ (error) => {
                         /* istanbul ignore next */
                         if (error) console.error(`[Control] ${command} failed:`, error.message);
                     });
@@ -101,7 +96,7 @@ class LegacyControlController {
             /* istanbul ignore next */
             if (command === 'notion_sync') {
                 const { notionSyncScript } = getPaths();
-                const { stdout, stderr } = await execFilePromise('python3', [notionSyncScript]);
+                const { stdout, stderr } = await openclawClient.runArgs([notionSyncScript], { binPath: 'python3' });
                 return res.json({ success: true, output: /* istanbul ignore next */ stdout || stderr });
             }
 
@@ -114,8 +109,7 @@ class LegacyControlController {
 
             /* istanbul ignore next */
             if (directMap[command]) {
-                const { openclawBin } = getPaths();
-                const { stdout, stderr } = await execFilePromise(openclawBin, directMap[command]);
+                const { stdout, stderr } = await openclawClient.runArgs(directMap[command]);
                 /* istanbul ignore next */
                 return res.json({ success: true, output: stdout || stderr });
             }
