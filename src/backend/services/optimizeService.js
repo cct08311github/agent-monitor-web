@@ -91,7 +91,7 @@ const TARGET_FILES = [
     'src/backend/services/tsdbService.js',
     'src/backend/services/optimizeService.js',
     'src/backend/controllers/optimizeController.js',
-    'src/backend/controllers/legacyDashboardController.js',
+    'src/backend/controllers/dashboardReadController.js',
 ];
 
 function readSourceFiles() {
