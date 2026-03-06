@@ -7,6 +7,7 @@
  */
 
 const { getTaskHubConfig } = require('../config');
+const { sendOk, sendFail } = require('../utils/apiResponse');
 
 const DOMAIN_TABLES = {
     work: 'work_tasks',
@@ -60,10 +61,10 @@ async function getStats(req, res) {
             result.total_active += active;
         }
 
-        res.json({ success: true, stats: result });
+        return sendOk(res, { stats: result });
     } catch (err) {
         console.error('[TaskHub] getStats error:', err.message);
-        res.status(500).json({ success: false, error: err.message });
+        return sendFail(res, 500, err.message);
     }
 }
 
@@ -78,7 +79,7 @@ async function getTasks(req, res) {
 
         const domains = domain === 'all' ? Object.keys(DOMAIN_TABLES) : [domain];
         if (domain !== 'all' && !DOMAIN_TABLES[domain]) {
-            return res.status(400).json({ success: false, error: `Invalid domain: ${domain}` });
+            return sendFail(res, 400, `Invalid domain: ${domain}`);
         }
 
         let allTasks = [];
@@ -123,10 +124,10 @@ async function getTasks(req, res) {
             return (b.updated_at || '').localeCompare(a.updated_at || '');
         });
 
-        res.json({ success: true, tasks: allTasks.slice(0, parseInt(limit) || 100), total: allTasks.length });
+        return sendOk(res, { tasks: allTasks.slice(0, parseInt(limit) || 100), total: allTasks.length });
     } catch (err) {
         console.error('[TaskHub] getTasks error:', err.message);
-        res.status(500).json({ success: false, error: err.message });
+        return sendFail(res, 500, err.message);
     }
 }
 
@@ -138,7 +139,7 @@ async function getTasks(req, res) {
 async function updateTask(req, res) {
     const { domain, id } = req.params;
     if (!DOMAIN_TABLES[domain]) {
-        return res.status(400).json({ success: false, error: `Invalid domain: ${domain}` });
+        return sendFail(res, 400, `Invalid domain: ${domain}`);
     }
 
     try {
@@ -151,10 +152,10 @@ async function updateTask(req, res) {
 
         // Validate
         if (status && !VALID_STATUSES.includes(status)) {
-            return res.status(400).json({ success: false, error: `Invalid status: ${status}` });
+            return sendFail(res, 400, `Invalid status: ${status}`);
         }
         if (priority && !VALID_PRIORITIES.includes(priority)) {
-            return res.status(400).json({ success: false, error: `Invalid priority: ${priority}` });
+            return sendFail(res, 400, `Invalid priority: ${priority}`);
         }
 
         const updates = [];
@@ -190,7 +191,7 @@ async function updateTask(req, res) {
         }
 
         if (updates.length === 0) {
-            return res.status(400).json({ success: false, error: 'No fields to update' });
+            return sendFail(res, 400, 'No fields to update');
         }
 
         updates.push('updated_at = ?');
@@ -202,14 +203,14 @@ async function updateTask(req, res) {
         const info = stmt.run(...values);
 
         if (info.changes === 0) {
-            return res.status(404).json({ success: false, error: '找不到任務' });
+            return sendFail(res, 404, '找不到任務');
         }
 
         const updated = conn.prepare(`SELECT *, '${domain}' as domain FROM ${table} WHERE id = ?`).get(id);
-        res.json({ success: true, task: { ...updated, tags: tryParseJson(updated.tags, []) } });
+        return sendOk(res, { task: { ...updated, tags: tryParseJson(updated.tags, []) } });
     } catch (err) {
         console.error('[TaskHub] updateTask error:', err.message);
-        res.status(500).json({ success: false, error: err.message });
+        return sendFail(res, 500, err.message);
     }
 }
 
@@ -219,20 +220,20 @@ async function updateTask(req, res) {
 async function deleteTask(req, res) {
     const { domain, id } = req.params;
     if (!DOMAIN_TABLES[domain]) {
-        return res.status(400).json({ success: false, error: `Invalid domain: ${domain}` });
+        return sendFail(res, 400, `Invalid domain: ${domain}`);
     }
     try {
         const conn = getDb();
         const table = DOMAIN_TABLES[domain];
         const existing = conn.prepare(`SELECT id, title FROM ${table} WHERE id = ?`).get(id);
-        if (!existing) return res.status(404).json({ success: false, error: '找不到任務' });
+        if (!existing) return sendFail(res, 404, '找不到任務');
 
         conn.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id);
         console.log(`[TaskHub] Deleted task ${id} (${existing.title}) from ${domain}`);
-        res.json({ success: true, deleted: { id, title: existing.title, domain } });
+        return sendOk(res, { deleted: { id, title: existing.title, domain } });
     } catch (err) {
         console.error('[TaskHub] deleteTask error:', err.message);
-        res.status(500).json({ success: false, error: err.message });
+        return sendFail(res, 500, err.message);
     }
 }
 
@@ -244,10 +245,10 @@ async function createTask(req, res) {
     const { domain, title, status = 'not_started', priority = 'medium', due_date, notes, project, tags } = req.body;
 
     if (!DOMAIN_TABLES[domain]) {
-        return res.status(400).json({ success: false, error: `Invalid domain: ${domain}` });
+        return sendFail(res, 400, `Invalid domain: ${domain}`);
     }
     if (!title || !title.trim()) {
-        return res.status(400).json({ success: false, error: '標題不可空白' });
+        return sendFail(res, 400, '標題不可空白');
     }
 
     try {
@@ -276,10 +277,10 @@ async function createTask(req, res) {
         conn.prepare(`INSERT INTO ${table} (${cols}) VALUES (${placeholders})`).run(...Object.values(fields));
 
         const created = conn.prepare(`SELECT *, '${domain}' as domain FROM ${table} WHERE id = ?`).get(id);
-        res.status(201).json({ success: true, task: { ...created, tags: tryParseJson(created.tags, []) } });
+        return sendOk(res, { task: { ...created, tags: tryParseJson(created.tags, []) } }, 201);
     } catch (err) {
         console.error('[TaskHub] createTask error:', err.message);
-        res.status(500).json({ success: false, error: err.message });
+        return sendFail(res, 500, err.message);
     }
 }
 
