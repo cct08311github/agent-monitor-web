@@ -1,16 +1,16 @@
 // src/backend/services/sessionService.js
 'use strict';
 const crypto = require('crypto');
+const { getAuthConfig } = require('../config');
 
 const sessions = new Map(); // sessionId → { username, expiresAt, lastAccessAt }
 
 function getSecret() {
-    return process.env.AUTH_SESSION_SECRET || 'dev-secret-change-in-production';
+    return getAuthConfig().sessionSecret;
 }
 
 function getTtlMs() {
-    const hours = parseFloat(process.env.AUTH_SESSION_TTL_HOURS) || 8;
-    return hours * 60 * 60 * 1000;
+    return getAuthConfig().sessionTtlHours * 60 * 60 * 1000;
 }
 
 function sign(id) {

@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const sessionService = require('../services/sessionService');
+const { getAuthConfig } = require('../config');
 
 const COOKIE_NAME = 'sid';
 
@@ -22,8 +23,9 @@ async function login(req, res) {
         return res.status(400).json({ success: false, error: 'missing_credentials' });
     }
 
-    const expectedUser = process.env.AUTH_USERNAME || 'admin';
-    const expectedHash = process.env.AUTH_PASSWORD_HASH || '';
+    const authConfig = getAuthConfig();
+    const expectedUser = authConfig.username;
+    const expectedHash = authConfig.passwordHash;
 
     if (!expectedHash) {
         return res.status(503).json({ success: false, error: 'auth_not_configured' });
@@ -41,8 +43,7 @@ async function login(req, res) {
     }
 
     const token = sessionService.createSession(username);
-    const ttl = parseFloat(process.env.AUTH_SESSION_TTL_HOURS) || 8;
-    res.cookie(COOKIE_NAME, token, cookieOptions(ttl));
+    res.cookie(COOKIE_NAME, token, cookieOptions(authConfig.sessionTtlHours));
     return res.json({ success: true, username });
 }
 

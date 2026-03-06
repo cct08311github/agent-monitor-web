@@ -5,13 +5,23 @@ const fs = require('fs');
 const app = require('./src/backend/app');
 const { threatIntel, adaptiveSecurity, complianceSystem } = require('./src/backend/security');
 const gatewayWatchdog = require('./src/backend/services/gatewayWatchdog');
+const { getServerConfig } = require('./src/backend/config');
+const { validateStartup } = require('./src/backend/config/startup');
 
-const PORT = process.env.PORT || 3001;
+const serverConfig = getServerConfig();
+const PORT = serverConfig.port;
+const startup = validateStartup();
+
+if (!startup.ok) {
+  console.error('Startup validation failed:');
+  startup.errors.forEach((error) => console.error(`- ${error}`));
+  process.exit(1);
+}
 
 // 讀取本地生成的 mkcert 憑證
 const sslOptions = {
-  key: fs.readFileSync('./cert/key.pem'),
-  cert: fs.readFileSync('./cert/cert.pem')
+  key: fs.readFileSync(serverConfig.certKeyPath),
+  cert: fs.readFileSync(serverConfig.certCertPath)
 };
 
 // 改用 https.createServer
