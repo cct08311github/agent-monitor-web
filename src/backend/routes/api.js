@@ -20,6 +20,9 @@ const authController = require('../controllers/authController');
 
 // ── Public Endpoints (no auth required) ───────────────────────────────────────
 router.get('/read/health', (req, res) => sendOk(res, { ts: new Date().toISOString() }));
+router.get('/read/liveness', systemController.getLiveness);
+router.get('/read/readiness', systemController.getReadiness);
+router.get('/read/dependencies', systemController.getDependencies);
 
 // Auth endpoints — must be public (before requireAuth)
 router.post('/auth/login', auth.loginRateLimit, authController.login);
