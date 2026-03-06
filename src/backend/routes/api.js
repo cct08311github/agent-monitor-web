@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { spawn } = require('child_process');
 const { getOpenClawConfig } = require('../config');
+const openclawClient = require('../services/openclawClient');
 
 const agentController = require('../controllers/agentController');
 const securityController = require('../controllers/securityController');
@@ -130,7 +130,8 @@ router.get('/logs/stream', auth.localhostOnlyControl, /* istanbul ignore next */
     // NOTE: `openclaw logs` tails the Gateway log file. In some environments that file
     // may contain large structured JSON dumps (e.g. cron jobs listing that *looks like*
     // jobs.json). Those dumps drown out the realtime logs in the UI, so we suppress them.
-    const child = spawn(binPath, ['logs', '--follow', '--plain'], {
+    const child = openclawClient.spawnArgs(['logs', '--follow', '--plain'], {
+        binPath,
         env: { ...process.env, FORCE_COLOR: '0' },
         stdio: ['ignore', 'pipe', 'pipe']
     });

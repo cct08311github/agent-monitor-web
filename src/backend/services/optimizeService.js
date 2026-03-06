@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { getOptimizeConfig } = require('../config');
+const openclawClient = require('./openclawClient');
 
 const {
     projectPath: PROJECT_PATH,
@@ -13,8 +14,6 @@ const {
 function getGeminiApiKey() {
     return getOptimizeConfig().geminiApiKey || null;
 }
-
-const { execFile } = require('child_process');
 
 const tsdbService = require('./tsdbService');
 const alertEngine = require('./alertEngine');
@@ -216,14 +215,6 @@ async function runPipeline(data, onProgress) {
     return { draft, review, codeReview, report, opusFailed: opusFailed || codeReviewFailed };
 }
 
-function execFileAsync(bin, args, opts) {
-    return new Promise((resolve, reject) => {
-        execFile(bin, args, opts, (err, stdout, stderr) => {
-            if (err) reject(err); else resolve({ stdout, stderr });
-        });
-    });
-}
-
 async function saveAndNotify(report, opusFailed, onProgress) {
     // Step 6: 儲存
     onProgress(6, '儲存報告...');
@@ -245,10 +236,10 @@ async function saveAndNotify(report, opusFailed, onProgress) {
     const optimizeConfig = getOptimizeConfig();
 
     try {
-        await execFileAsync(OPENCLAW_PATH, [
+        await openclawClient.runArgs([
             'message', 'send', '--channel', optimizeConfig.telegramChannel,
             '--target', optimizeConfig.telegramTarget, '--message', message
-        ], { timeout: 30_000 });
+        ], { timeout: 30_000, binPath: OPENCLAW_PATH });
     } catch (_) {
         // Telegram 失敗不中斷流程
     }

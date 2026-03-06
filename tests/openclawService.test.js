@@ -78,13 +78,13 @@ describe('getOpenClawData', () => {
     it('replaces openclaw with full binary path', async () => {
         mockExecPromise.mockResolvedValue({ stdout: '"ok"' });
         await service.getOpenClawData('openclaw health');
-        expect(mockExecPromise).toHaveBeenCalledWith(expect.stringContaining('.openclaw/bin/openclaw'));
+        expect(mockExecPromise).toHaveBeenCalledWith(expect.stringContaining('.openclaw/bin/openclaw'), {});
     });
 
     it('passes non-openclaw command as-is (else branch)', async () => {
         mockExecPromise.mockResolvedValue({ stdout: '"ok"' });
         await service.getOpenClawData('echo "hello"', false);
-        expect(mockExecPromise).toHaveBeenCalledWith('echo "hello"');
+        expect(mockExecPromise).toHaveBeenCalledWith('echo "hello"', {});
     });
 });
 
