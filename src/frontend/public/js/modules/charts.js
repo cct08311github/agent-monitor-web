@@ -88,8 +88,7 @@ function updateCharts() {
 
 async function fetchHistory() {
     try {
-        const res = await fetch('/api/read/history');
-        const data = await res.json();
+        const data = await window.apiClient.get('/api/read/history');
         if (data.success && data.history) { sysHistoryData = data.history; if (typeof currentDesktopTab !== 'undefined' && currentDesktopTab === 'system') updateCharts(); }
         if (data.costHistory) { costHistoryData = data.costHistory; if (typeof currentDesktopTab !== 'undefined' && currentDesktopTab === 'system') updateCharts(); }
         if (data.topSpenders && data.topSpenders.length > 0) {
