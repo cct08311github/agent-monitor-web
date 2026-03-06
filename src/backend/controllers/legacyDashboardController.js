@@ -6,6 +6,9 @@ const { exec, execFile } = require('child_process');
 const fetch = require('node-fetch');
 const execPromise = util.promisify(exec);
 const execFilePromise = util.promisify(execFile);
+const { ok, fail } = require('../utils/apiResponse');
+const { getHistoryPayload } = require('../services/historyService');
+const sessionReadService = require('../services/sessionReadService');
 
 // --- Constants & Config ---
 const DASHBOARD_CACHE_TTL_MS = 3000;
@@ -596,19 +599,15 @@ class DashboardController {
             }
             res.json(sharedPayload);
         } catch (error) { /* istanbul ignore next */
-            res.status(500).json({ success: false, error: error.message });
+            res.status(500).json(fail(error.message));
         }
     }
 
     async getHistory(req, res) {
         try {
-            const history = tsdbService.getSystemHistory(60);
-            const topSpenders = tsdbService.getAgentTopTokens(5);
-            const costHistory = tsdbService.getCostHistory(60);
-            const agentActivity = tsdbService.getAgentActivitySummary();
-            res.json({ success: true, history, topSpenders, costHistory, agentActivity });
+            res.json(getHistoryPayload());
         } catch (error) { /* istanbul ignore next */
-            res.status(500).json({ success: false, error: error.message });
+            res.status(500).json(fail(error.message));
         }
     }
 
@@ -636,9 +635,9 @@ class DashboardController {
         try {
             const ocBin = await resolveOpenclawBin();
             const { stdout, stderr } = await execFilePromise(ocBin, ['status']);
-            res.json({ success: true, output: (stdout || '') + (stderr || '') });
+            res.json(ok({ output: (stdout || '') + (stderr || '') }));
         } catch (error) {
-            res.status(500).json({ success: false, error: error.message, output: (error.stdout || '') + (error.stderr || '') });
+            res.status(500).json(fail(error.message, { output: (error.stdout || '') + (error.stderr || '') }));
         }
     }
 
@@ -646,9 +645,9 @@ class DashboardController {
         try {
             const ocBin = await resolveOpenclawBin();
             const { stdout, stderr } = await execFilePromise(ocBin, ['models', 'status']);
-            res.json({ success: true, output: (stdout || '') + (stderr || '') });
+            res.json(ok({ output: (stdout || '') + (stderr || '') }));
         } catch (error) {
-            res.status(500).json({ success: false, error: error.message, output: (error.stdout || '') + (error.stderr || '') });
+            res.status(500).json(fail(error.message, { output: (error.stdout || '') + (error.stderr || '') }));
         }
     }
 
@@ -656,81 +655,27 @@ class DashboardController {
         try {
             const ocBin = await resolveOpenclawBin();
             const { stdout, stderr } = await execFilePromise(ocBin, ['agents', 'list']);
-            res.json({ success: true, output: (stdout || '') + (stderr || '') });
+            res.json(ok({ output: (stdout || '') + (stderr || '') }));
         } catch (error) {
-            res.status(500).json({ success: false, error: error.message, output: (error.stdout || '') + (error.stderr || '') });
+            res.status(500).json(fail(error.message, { output: (error.stdout || '') + (error.stderr || '') }));
         }
     }
 
     async getSessionContent(req, res) {
         try {
-            const agentId = (req.params.agentId || '').replace(/[^a-zA-Z0-9_-]/g, '');
-            const sessionId = (req.params.sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
-            if (!agentId || !sessionId) return res.status(400).json({ success: false, error: 'invalid_params' });
-
-            const filePath = path.join(OPENCLAW_ROOT, 'agents', agentId, 'sessions', `${sessionId}.jsonl`);
-            if (!fs.existsSync(filePath)) return res.status(404).json({ success: false, error: 'not_found' });
-
-            const content = fs.readFileSync(filePath, 'utf8');
-            const messages = [];
-            for (const line of content.split('\n')) {
-                if (!line.trim()) continue;
-                try {
-                    const obj = JSON.parse(line);
-                    if (obj.type !== 'message' || !obj.message) continue;
-                    const { role, content: msgContent, timestamp } = obj.message;
-                    const blocks = Array.isArray(msgContent) ? msgContent : [{ type: 'text', text: String(msgContent || '') }];
-                    const text = blocks.filter(b => b.type === 'text').map(b => b.text || '').join('');
-                    const toolUses = blocks.filter(b => b.type === 'tool_use').map(b => b.name || '').filter(Boolean);
-                    messages.push({ role, text, toolUses, ts: obj.timestamp || null });
-                } catch (_) { /* skip */ }
-            }
-            res.json({ success: true, sessionId, messages });
+            const result = sessionReadService.readSessionContent(req.params.agentId, req.params.sessionId);
+            res.status(result.statusCode).json(result.body);
         } catch (error) {
-            res.status(500).json({ success: false, error: error.message });
+            res.status(500).json(fail(error.message));
         }
     }
 
     async getSessions(req, res) {
         try {
-            const agentId = (req.params.agentId || '').replace(/[^a-zA-Z0-9_-]/g, '');
-            if (!agentId) return res.status(400).json({ success: false, error: 'invalid_agent_id' });
-
-            const sessionsDir = path.join(OPENCLAW_ROOT, 'agents', agentId, 'sessions');
-            if (!fs.existsSync(sessionsDir)) {
-                return res.json({ success: true, sessions: [] });
-            }
-
-            const files = fs.readdirSync(sessionsDir)
-                .filter(f => f.endsWith('.jsonl'))
-                .sort()
-                .reverse()
-                .slice(0, 20);
-
-            const sessions = files.map(f => {
-                const filePath = path.join(sessionsDir, f);
-                let messageCount = 0;
-                let lastTs = null;
-                try {
-                    const content = fs.readFileSync(filePath, 'utf8');
-                    const lines = content.split('\n').filter(l => l.trim());
-                    messageCount = lines.length;
-                    for (let i = lines.length - 1; i >= 0; i--) {
-                        try {
-                            const obj = JSON.parse(lines[i]);
-                            if (obj.ts || obj.timestamp || obj.created_at) {
-                                lastTs = obj.ts || obj.timestamp || obj.created_at;
-                                break;
-                            }
-                        } catch (_) { /* skip */ }
-                    }
-                } catch (_) { /* skip unreadable */ }
-                return { id: f.replace('.jsonl', ''), messageCount, lastTs };
-            });
-
-            res.json({ success: true, sessions });
+            const result = sessionReadService.readSessions(req.params.agentId);
+            res.status(result.statusCode).json(result.body);
         } catch (error) {
-            res.status(500).json({ success: false, error: error.message });
+            res.status(500).json(fail(error.message));
         }
     }
 }
