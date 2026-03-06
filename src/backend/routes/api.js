@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { getOpenClawConfig } = require('../config');
 const openclawClient = require('../services/openclawClient');
+const AppError = require('../utils/appError');
+const { sendOk } = require('../utils/apiResponse');
 
 const agentController = require('../controllers/agentController');
 const securityController = require('../controllers/securityController');
@@ -17,7 +19,7 @@ const alertController = require('../controllers/alertController');
 const authController = require('../controllers/authController');
 
 // ── Public Endpoints (no auth required) ───────────────────────────────────────
-router.get('/read/health', (req, res) => res.json({ success: true, ts: new Date().toISOString() }));
+router.get('/read/health', (req, res) => sendOk(res, { ts: new Date().toISOString() }));
 
 // Auth endpoints — must be public (before requireAuth)
 router.post('/auth/login', auth.loginRateLimit, authController.login);
@@ -90,15 +92,15 @@ router.get('/health', systemController.getHealth);
 const gatewayWatchdog = require('../services/gatewayWatchdog');
 
 router.get('/watchdog/status', (req, res) => {
-    res.json({ success: true, watchdog: gatewayWatchdog.getStatus() });
+    return sendOk(res, { watchdog: gatewayWatchdog.getStatus() });
 });
 
-router.post('/watchdog/repair', auth.localhostOnlyControl, auth.rateLimit, async (req, res) => {
+router.post('/watchdog/repair', auth.localhostOnlyControl, auth.rateLimit, async (req, res, next) => {
     try {
         const result = await gatewayWatchdog.triggerRepair();
-        res.json({ success: true, repaired: result });
+        return sendOk(res, { repaired: result });
     } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
+        return next(new AppError(500, 'repair_failed', e.message));
     }
 });
 
@@ -109,7 +111,7 @@ router.post('/watchdog/toggle', auth.localhostOnlyControl, auth.rateLimit, (req,
     } else {
         gatewayWatchdog.stop();
     }
-    res.json({ success: true, watchdog: gatewayWatchdog.getStatus() });
+    return sendOk(res, { watchdog: gatewayWatchdog.getStatus() });
 });
 
 // OpenClaw Logs Streaming (SSE)
