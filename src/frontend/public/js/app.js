@@ -1180,6 +1180,20 @@ function runAutoOptimize() {
         es.close();
     });
 
+    es.addEventListener('cooldown', (e) => {
+        try {
+            const { remaining } = JSON.parse(e.data);
+            const infoEl = document.createElement('div');
+            infoEl.style.cssText = 'color:var(--text-muted);margin-top:8px';
+            infoEl.textContent = `⏸ 優化冷卻中，還需等待約 ${remaining} 分鐘`;
+            progressEl.appendChild(infoEl);
+        } catch (_) {}
+        btn.disabled = false;
+        btn.textContent = '🔍 執行自主優化';
+        progressEl.style.display = 'none';
+        es.close();
+    });
+
     es.addEventListener('error', (e) => {
         try {
             const { msg } = JSON.parse(e.data);
