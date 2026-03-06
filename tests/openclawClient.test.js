@@ -36,14 +36,14 @@ describe('openclawClient', () => {
         const client = require('../src/backend/services/openclawClient');
         mockExecPromise.mockResolvedValue({ stdout: 'ok', stderr: '' });
         await client.runCommand('openclaw agents list');
-        expect(mockExecPromise).toHaveBeenCalledWith('/tmp/custom-openclaw agents list', {});
+        expect(mockExecPromise).toHaveBeenCalledWith('/tmp/custom-openclaw agents list');
     });
 
     it('passes non-openclaw shell commands as-is', async () => {
         const client = require('../src/backend/services/openclawClient');
         mockExecPromise.mockResolvedValue({ stdout: 'ok', stderr: '' });
         await client.runCommand('echo hello');
-        expect(mockExecPromise).toHaveBeenCalledWith('echo hello', {});
+        expect(mockExecPromise).toHaveBeenCalledWith('echo hello');
     });
 
     it('runs execFile against configured binary by default', async () => {

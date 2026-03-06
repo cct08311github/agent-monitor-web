@@ -81,10 +81,20 @@ function getOptimizeConfig() {
     };
 }
 
+function getTaskHubConfig() {
+    const homeDir = os.homedir();
+    const dbPath = readTrimmedEnv(
+        'TASKHUB_DB_PATH',
+        path.join(homeDir, '.openclaw', 'shared', 'projects', 'task-hub', 'data', 'taskhub.db')
+    );
+    return { dbPath };
+}
+
 module.exports = {
     getProjectRoot,
     getServerConfig,
     getOpenClawConfig,
     getAuthConfig,
     getOptimizeConfig,
+    getTaskHubConfig,
 };

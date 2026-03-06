@@ -1,6 +1,4 @@
-const { exec } = require('child_process');
-const util = require('util');
-const execPromise = util.promisify(exec);
+const openclawClient = require('../services/openclawClient');
 
 const MODEL_COOLDOWN_CACHE_TTL = 3000;
 let modelCache = { ts: 0, cooldowns: {} };
@@ -14,7 +12,7 @@ async function fetchModelCooldowns() {
     }
 
     try {
-        const { stdout } = await execPromise('/Users/openclaw/.openclaw/bin/openclaw models status');
+        const { stdout } = await openclawClient.runCommand('openclaw models status');
         const lines = stdout.split('\n');
         const cooldowns = {};
 
