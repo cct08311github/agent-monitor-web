@@ -1,21 +1,22 @@
 const alertEngine = require('../services/alertEngine');
+const { sendOk, sendFail } = require('../utils/apiResponse');
 
 function getConfig(req, res) {
-    res.json({ success: true, config: alertEngine.getConfig() });
+    return sendOk(res, { config: alertEngine.getConfig() });
 }
 
 function updateConfig(req, res) {
     try {
         const updated = alertEngine.updateConfig(/* istanbul ignore next */ req.body || {});
-        res.json({ success: true, config: updated });
+        return sendOk(res, { config: updated });
     } catch (e) {
-        res.status(400).json({ success: false, error: e.message });
+        return sendFail(res, 400, e.message);
     }
 }
 
 function getRecent(req, res) {
     const limit = Math.min(parseInt(req.query.limit) || 50, 100);
-    res.json({ success: true, alerts: alertEngine.getRecent(limit) });
+    return sendOk(res, { alerts: alertEngine.getRecent(limit) });
 }
 
 module.exports = { getConfig, updateConfig, getRecent };

@@ -1,4 +1,5 @@
 const { threatIntel, adaptiveSecurity } = require('../security');
+const { sendOk, sendFail } = require('../utils/apiResponse');
 
 class SecurityController {
     analyzeThreats(req, res) {
@@ -6,13 +7,13 @@ class SecurityController {
             const { content, context } = req.body;
 
             if (!content) {
-                return res.status(400).json({ success: false, error: '缺少內容參數' });
+                return sendFail(res, 400, '缺少內容參數');
             }
 
             const analysis = threatIntel.analyze(content);
-            res.json({ success: true, ...analysis });
+            return sendOk(res, analysis);
         } catch (error) { /* istanbul ignore next */
-            res.status(500).json({ success: false, error: error.message });
+            return sendFail(res, 500, error.message);
         }
     }
 
@@ -21,27 +22,26 @@ class SecurityController {
             const { content, context } = req.body;
 
             if (!content) {
-                return res.status(400).json({ success: false, error: '缺少內容參數' });
+                return sendFail(res, 400, '缺少內容參數');
             }
 
             const result = adaptiveSecurity.analyze(content, context || {});
-            res.json({ success: true, ...result });
+            return sendOk(res, result);
         } catch (error) { /* istanbul ignore next */
-            res.status(500).json({ success: false, error: error.message });
+            return sendFail(res, 500, error.message);
         }
     }
 
     searchAndLearn(req, res) {
         const query = req.query.q;
         if (!query) {
-            return res.status(400).json({ success: false, error: '缺少查詢參數' });
+            return sendFail(res, 400, '缺少查詢參數');
         }
 
         const securityAnalysis = adaptiveSecurity.analyze(query, { source: 'learning_query' });
 
         if (securityAnalysis.riskScore > 0.7) {
-            return res.json({
-                success: true,
+            return sendOk(res, {
                 query: query,
                 securityWarning: true,
                 securityAnalysis: securityAnalysis,
@@ -64,7 +64,7 @@ class SecurityController {
             }]
         };
 
-        res.json({ success: true, ...results });
+        return sendOk(res, results);
     }
 }
 

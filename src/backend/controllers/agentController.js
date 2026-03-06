@@ -1,4 +1,5 @@
 const openclawService = require('../services/openclawService');
+const { sendOk, sendFail } = require('../utils/apiResponse');
 
 class AgentController {
     async getAgents(req, res) {
@@ -33,18 +34,14 @@ class AgentController {
                 error: agents.filter(a => a.status === 'error').length
             };
 
-            res.json({
-                success: true,
+            return sendOk(res, {
                 timestamp: new Date().toISOString(),
                 stats: stats,
                 agents: agents
             });
 
         } catch (error) { /* istanbul ignore next */
-            res.status(500).json({
-                success: false,
-                error: error.message
-            });
+            return sendFail(res, 500, error.message);
         }
     }
 }
