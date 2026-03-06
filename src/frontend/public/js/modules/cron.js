@@ -6,8 +6,7 @@ async function fetchCronJobs() {
     if (isCronLoading) return;
     isCronLoading = true;
     try {
-        const res = await fetch('/api/cron/jobs');
-        const data = await res.json();
+        const data = await window.apiClient.get('/api/cron/jobs');
         if (data.success) {
             cronJobs = data.jobs;
             renderCronJobs();
@@ -156,12 +155,7 @@ function _buildCronCard(job) {
 async function toggleCronJob(id, enabled) {
     showToast(enabled ? '正在啟用任務...' : '正在停用任務...', 'info');
     try {
-        const res = await fetch(`/api/cron/jobs/${id}/toggle`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ enabled })
-        });
-        const data = await res.json();
+        const data = await window.apiClient.post(`/api/cron/jobs/${id}/toggle`, { enabled });
         if (data.success) {
             showToast(enabled ? '✅ 任務已啟用' : '⏸ 任務已停用', 'success');
             // Update local state
@@ -182,8 +176,7 @@ async function deleteCronJob(id, name) {
     if (!confirm(`確認刪除 Cron 任務「${name}」？\n此操作無法復原。`)) return;
     showToast('刪除中...', 'info');
     try {
-        const res = await fetch(`/api/cron/jobs/${id}`, { method: 'DELETE' });
-        const data = await res.json();
+        const data = await window.apiClient.delete(`/api/cron/jobs/${id}`);
         if (!data.success) throw new Error(data.error || '刪除失敗');
         showToast('✅ 任務已刪除', 'success');
         cronJobs = cronJobs.filter(j => j.id !== id);
@@ -200,11 +193,7 @@ async function deleteCronJob(id, name) {
 async function runCronJob(id) {
     showToast('正在執行任務...', 'info');
     try {
-        const res = await fetch(`/api/cron/jobs/${id}/run`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        const data = await res.json();
+        const data = await window.apiClient.post(`/api/cron/jobs/${id}/run`);
         if (data.success) {
             showToast(`✅ ${data.message || '任務已觸發（在背景執行中）'}`, 'success');
             // 刷新任務列表以更新最後執行時間
@@ -218,4 +207,3 @@ async function runCronJob(id) {
         fetchCronJobs();
     }
 }
-
