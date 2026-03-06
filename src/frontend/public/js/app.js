@@ -217,6 +217,14 @@ function scrollToErrors() {
     switchDesktopTab('logs');
 }
 
+function getApiErrorMessage(error) {
+    const payload = error && error.payload ? error.payload : null;
+    let message = error && error.message ? error.message : 'Failed';
+    if (payload && payload._debug_host) message += `\nHost: ${payload._debug_host}`;
+    if (payload && payload._debug_origin) message += `\nOrigin: ${payload._debug_origin}`;
+    return message;
+}
+
 // (#4) Send error to SRE with response panel
 async function sendErrorToSRE() {
     const rawMsg = document.getElementById('errorBannerMsg').dataset.rawMsg || document.getElementById('errorBannerMsg').textContent;
@@ -235,13 +243,7 @@ async function sendErrorToSRE() {
     ].filter(Boolean).join('\n');
 
     try {
-        const res = await fetch('/api/command', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ command: 'talk', agentId: 'sre', message: fullReport })
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error || data.output || 'Failed');
+        const data = await window.apiClient.post('/api/command', { command: 'talk', agentId: 'sre', message: fullReport });
         showToast('✅ 已通知 SRE，opening response...', 'success');
         pushLog('✅ SRE 已收到錯誤報告', 'info');
 
@@ -279,13 +281,7 @@ async function sendSREFollowUp() {
     log.scrollTop = log.scrollHeight;
 
     try {
-        const res = await fetch('/api/command', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ command: 'talk', agentId: 'sre', message: msg })
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error || data.output || 'Failed');
+        const data = await window.apiClient.post('/api/command', { command: 'talk', agentId: 'sre', message: msg });
         log.innerHTML += `<div class="sre-response-entry"><div class="sre-label">🛡️ SRE — ${fmtTime()}</div><div class="sre-content">${esc(data.output)}</div></div>`;
     } catch (e) {
         log.innerHTML += `<div class="sre-response-entry error"><div class="sre-content">❌ ${esc(e.message)}</div></div>`;
@@ -424,20 +420,12 @@ async function runCmd(cmd) {
         let url, opts;
         if (['status', 'models', 'agents'].includes(cmd)) {
             url = `/api/read/${cmd}`;
-            opts = { method: 'GET' };
+            opts = window.apiClient.get(url);
         } else {
             url = '/api/command';
-            opts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: cmd }) };
+            opts = window.apiClient.post(url, { command: cmd });
         }
-        const res = await fetch(url, opts);
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-            // Show debug info if forbidden_host
-            let errMsg = data.error || data.message || 'Failed';
-            if (data._debug_host) errMsg += `\nHost: ${data._debug_host}`;
-            if (data._debug_origin) errMsg += `\nOrigin: ${data._debug_origin}`;
-            throw new Error(errMsg);
-        }
+        const data = await opts;
         pushLog(`✅ [${cmd.toUpperCase()}] 完成`, 'info');
         if (['status', 'models', 'agents'].includes(cmd)) {
             showCmdOutput(`📋 ${cmd.toUpperCase()}`, data.output || JSON.stringify(data, null, 2));
@@ -445,8 +433,9 @@ async function runCmd(cmd) {
             showToast(`✅ ${cmd} 完成`, 'success');
         }
     } catch (e) {
-        pushLog(`❌ ${cmd} 失敗: ${e.message}`, 'err');
-        showToast(`❌ ${e.message}`, 'error');
+        const message = getApiErrorMessage(e);
+        pushLog(`❌ ${cmd} 失敗: ${message}`, 'err');
+        showToast(`❌ ${message}`, 'error');
     } finally {
         commandRunning = false;
         document.querySelectorAll('.cmd-btn').forEach(b => b.disabled = false);
