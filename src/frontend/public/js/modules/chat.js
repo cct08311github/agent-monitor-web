@@ -91,14 +91,12 @@ async function sendChatPage() {
     log.scrollTop = log.scrollHeight;
 
     try {
-        const res = await fetch('/api/command', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ command: 'talk', agentId: chatPageAgent, message: msg })
+        const data = await window.apiClient.post('/api/command', {
+            command: 'talk',
+            agentId: chatPageAgent,
+            message: msg
         });
-        const data = await res.json();
         document.getElementById(typingId)?.remove();
-        if (!data.success) throw new Error(data.error || 'Failed');
         appendChatPageMsg(log, data.output, 'agent');
     } catch (e) {
         document.getElementById(typingId)?.remove();
@@ -148,19 +146,11 @@ function openChat(agentId) {
 async function autoSendHi(agentId) {
     const log = document.getElementById('chatLog');
     try {
-        const res = await fetch('/api/command', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ command: 'talk', agentId: agentId, message: 'hi' })
+        const data = await window.apiClient.post('/api/command', {
+            command: 'talk',
+            agentId: agentId,
+            message: 'hi'
         });
-        const data = await res.json();
-        if (!data.success) {
-            // Include debug info if available (#1 fix)
-            let errDetail = data.error || 'Failed';
-            if (data._debug_host) errDetail += ` (host: ${data._debug_host})`;
-            if (data._debug_origin) errDetail += ` (origin: ${data._debug_origin})`;
-            throw new Error(errDetail);
-        }
         const sysMsg = log.querySelector('.chat-msg.system');
         if (sysMsg) sysMsg.remove();
         log.innerHTML += `<div class="chat-msg user">hi</div>`;
@@ -168,8 +158,12 @@ async function autoSendHi(agentId) {
     } catch (e) {
         const sysMsg = log.querySelector('.chat-msg.system');
         if (sysMsg) sysMsg.remove();
-        log.innerHTML += `<div class="chat-msg error">❌ 連接失敗: ${esc(e.message)}</div>`;
-        pushLog(`Chat error (${agentId}): ${e.message}`, 'err');
+        const payload = e && e.payload ? e.payload : null;
+        let message = e.message;
+        if (payload && payload._debug_host) message += ` (host: ${payload._debug_host})`;
+        if (payload && payload._debug_origin) message += ` (origin: ${payload._debug_origin})`;
+        log.innerHTML += `<div class="chat-msg error">❌ 連接失敗: ${esc(message)}</div>`;
+        pushLog(`Chat error (${agentId}): ${message}`, 'err');
     }
     log.scrollTop = log.scrollHeight;
 }
@@ -204,21 +198,18 @@ async function sendChat() {
     log.scrollTop = log.scrollHeight;
 
     try {
-        const res = await fetch('/api/command', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ command: 'talk', agentId: currentTargetAgent, message: msg })
+        const data = await window.apiClient.post('/api/command', {
+            command: 'talk',
+            agentId: currentTargetAgent,
+            message: msg
         });
-        const data = await res.json();
-        if (!data.success) {
-            let errDetail = data.error || 'Failed';
-            if (data._debug_host) errDetail += ` (host: ${data._debug_host})`;
-            throw new Error(errDetail);
-        }
         log.innerHTML += `<div class="chat-msg agent">${esc(data.output)}</div>`;
     } catch (e) {
-        log.innerHTML += `<div class="chat-msg error">❌ ${esc(e.message)}</div>`;
-        pushLog(`Chat error (${currentTargetAgent}): ${e.message}`, 'err');
+        const payload = e && e.payload ? e.payload : null;
+        let message = e.message;
+        if (payload && payload._debug_host) message += ` (host: ${payload._debug_host})`;
+        log.innerHTML += `<div class="chat-msg error">❌ ${esc(message)}</div>`;
+        pushLog(`Chat error (${currentTargetAgent}): ${message}`, 'err');
     }
     chatModalSending = false;
     log.scrollTop = log.scrollHeight;
@@ -241,13 +232,11 @@ async function confirmModelSwitch() {
     closeModelModal();
     showToast(`正在切換 ${modelSwitchTarget} → ${model}...`, 'info');
     try {
-        const res = await fetch('/api/command', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ command: 'switch-model', agentId: modelSwitchTarget, model })
+        const data = await window.apiClient.post('/api/command', {
+            command: 'switch-model',
+            agentId: modelSwitchTarget,
+            model
         });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error || data.output || 'Failed');
         showToast(`✅ ${modelSwitchTarget} 已切換至 ${model}`, 'success');
         pushLog(`Model switched: ${modelSwitchTarget} → ${model}`, 'info');
         await update(true);
@@ -259,4 +248,3 @@ async function confirmModelSwitch() {
         pushLog(`Model switch failed: ${e.message}`, 'err');
     }
 }
-

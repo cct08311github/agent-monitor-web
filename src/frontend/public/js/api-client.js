@@ -10,7 +10,10 @@
         }
 
         if (!response.ok) {
-            throw new Error(data && (data.message || data.error) ? (data.message || data.error) : 'Request failed');
+            const error = new Error(data && (data.message || data.error) ? (data.message || data.error) : 'Request failed');
+            error.payload = data;
+            error.status = response.status;
+            throw error;
         }
 
         return data;
