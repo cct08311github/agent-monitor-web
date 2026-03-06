@@ -11,9 +11,9 @@ const complianceController = require('../controllers/complianceController');
 const systemController = require('../controllers/systemController');
 const cronController = require('../controllers/cronController');
 const taskHubController = require('../controllers/taskHubController');
-const legacyDashboardController = require('../controllers/legacyDashboardController');
+const dashboardReadController = require('../controllers/dashboardReadController');
 const optimizeController = require('../controllers/optimizeController');
-const legacyControlController = require('../controllers/legacyControlController');
+const controlController = require('../controllers/controlController');
 const auth = require('../middlewares/auth');
 const alertController = require('../controllers/alertController');
 const authController = require('../controllers/authController');
@@ -36,7 +36,7 @@ controlRouter.use(auth.localhostOnlyControl);
 controlRouter.use(auth.rateLimit);
 controlRouter.use(auth.requireBearerToken);
 
-controlRouter.post('/command', legacyControlController.runCommand);
+controlRouter.post('/command', controlController.runCommand);
 router.use('/control', controlRouter);
 
 // ── Session Auth (protects all routes below) ──────────────────────────────────
@@ -46,15 +46,15 @@ router.use(auth.requireAuth);
 router.get('/alerts/config', alertController.getConfig);
 router.patch('/alerts/config', auth.localhostOnlyControl, auth.rateLimit, alertController.updateConfig);
 router.get('/alerts/recent', alertController.getRecent);
-router.get('/read/dashboard', legacyDashboardController.getDashboard);
-router.get('/read/stream', legacyDashboardController.streamDashboard);
-router.get('/read/history', legacyDashboardController.getHistory);
-router.get('/read/status', legacyDashboardController.getStatus);
-router.get('/read/models', legacyDashboardController.getModels);
-router.get('/read/agents', legacyDashboardController.getAgents);
-router.get('/agents/:agentId/sessions', legacyDashboardController.getSessions);
-router.get('/agents/:agentId/sessions/:sessionId', legacyDashboardController.getSessionContent);
-router.get('/dashboard', legacyDashboardController.getDashboard); // very legacy
+router.get('/read/dashboard', dashboardReadController.getDashboard);
+router.get('/read/stream', dashboardReadController.streamDashboard);
+router.get('/read/history', dashboardReadController.getHistory);
+router.get('/read/status', dashboardReadController.getStatus);
+router.get('/read/models', dashboardReadController.getModels);
+router.get('/read/agents', dashboardReadController.getAgents);
+router.get('/agents/:agentId/sessions', dashboardReadController.getSessions);
+router.get('/agents/:agentId/sessions/:sessionId', dashboardReadController.getSessionContent);
+router.get('/dashboard', dashboardReadController.getDashboard); // very legacy
 
 // Optimize
 router.get('/optimize/run', auth.localhostOnlyControl, auth.rateLimit, optimizeController.run);
@@ -73,7 +73,7 @@ router.post('/cron/jobs/:id/run', auth.localhostOnlyControl, auth.rateLimit, cro
 router.delete('/cron/jobs/:id', auth.localhostOnlyControl, auth.rateLimit, cronController.deleteJob);
 
 // Dashboard UI command endpoint — localhost-only, session-auth protected
-router.post('/command', auth.localhostOnlyControl, auth.rateLimit, legacyControlController.runCommand);
+router.post('/command', auth.localhostOnlyControl, auth.rateLimit, controlController.runCommand);
 
 // Agents
 router.get('/agents', agentController.getAgents);
