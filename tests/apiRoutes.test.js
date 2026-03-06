@@ -126,7 +126,7 @@ describe('API Routes', () => {
                 .post('/api/control/command')
                 .set('host', 'localhost:3000')
                 .send({ command: 'status' });
-            expect(res.statusCode).toBe(401);
+            expect([401, 503]).toContain(res.statusCode);
         });
     });
 

@@ -129,11 +129,47 @@ describe('localhostOnlyControl', () => {
 
 // ─── requireBearerToken ────────────────────────────────
 
-describe('requireBearerToken', () => {
+describe('requireBearerToken without CONTROL_TOKEN', () => {
+    let authWithoutToken;
+
+    beforeEach(() => {
+        jest.isolateModules(() => {
+            delete process.env.HUD_CONTROL_TOKEN;
+            delete process.env.OPENCLAW_HUD_CONTROL_TOKEN;
+            authWithoutToken = require('../src/backend/middlewares/auth');
+        });
+    });
+
+    it('returns 503 when control token is not configured', () => {
+        const req = mockReq({ headers: { host: 'localhost' } });
+        const res = mockRes();
+        authWithoutToken.requireBearerToken(req, res, next);
+        expect(res.status).toHaveBeenCalledWith(503);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: 'control_not_configured' }));
+        expect(next).not.toHaveBeenCalled();
+    });
+});
+
+describe('requireBearerToken with CONTROL_TOKEN configured', () => {
+    let authWithToken;
+    const originalToken = process.env.HUD_CONTROL_TOKEN;
+
+    beforeAll(() => {
+        jest.isolateModules(() => {
+            process.env.HUD_CONTROL_TOKEN = 'my-secret-token';
+            authWithToken = require('../src/backend/middlewares/auth');
+        });
+    });
+
+    afterAll(() => {
+        if (originalToken === undefined) delete process.env.HUD_CONTROL_TOKEN;
+        else process.env.HUD_CONTROL_TOKEN = originalToken;
+    });
+
     it('rejects missing Authorization header', () => {
         const req = mockReq({ headers: { host: 'localhost' } });
         const res = mockRes();
-        auth.requireBearerToken(req, res, next);
+        authWithToken.requireBearerToken(req, res, next);
         expect(res.status).toHaveBeenCalledWith(401);
         expect(next).not.toHaveBeenCalled();
     });
@@ -141,28 +177,28 @@ describe('requireBearerToken', () => {
     it('rejects non-Bearer auth scheme', () => {
         const req = mockReq({ headers: { host: 'localhost', authorization: 'Basic abc123' } });
         const res = mockRes();
-        auth.requireBearerToken(req, res, next);
+        authWithToken.requireBearerToken(req, res, next);
         expect(res.status).toHaveBeenCalledWith(401);
     });
 
-    it('accepts correct password hash (810778)', () => {
-        // CONTROL_TOKEN env not set → uses password hash check
-        const req = mockReq({ headers: { host: 'localhost', authorization: 'Bearer 810778' } });
-        auth.requireBearerToken(req, mockRes(), next);
+    it('accepts correct CONTROL_TOKEN', () => {
+        const req = mockReq({ headers: { host: 'localhost', authorization: 'Bearer my-secret-token' } });
+        const res = mockRes();
+        authWithToken.requireBearerToken(req, res, next);
         expect(next).toHaveBeenCalled();
     });
 
-    it('rejects wrong password', () => {
+    it('rejects wrong token', () => {
         const req = mockReq({ headers: { host: 'localhost', authorization: 'Bearer wrongpass' } });
         const res = mockRes();
-        auth.requireBearerToken(req, res, next);
+        authWithToken.requireBearerToken(req, res, next);
         expect(res.status).toHaveBeenCalledWith(401);
     });
 
     it('sets req._actorToken on success', () => {
-        const req = mockReq({ headers: { host: 'localhost', authorization: 'Bearer 810778' } });
-        auth.requireBearerToken(req, mockRes(), next);
-        expect(req._actorToken).toBe('810778');
+        const req = mockReq({ headers: { host: 'localhost', authorization: 'Bearer my-secret-token' } });
+        authWithToken.requireBearerToken(req, mockRes(), next);
+        expect(req._actorToken).toBe('my-secret-token');
     });
 });
 
@@ -197,41 +233,6 @@ describe('rateLimit', () => {
         req.connection = {};
         auth.rateLimit(req, mockRes(), next);
         expect(next).toHaveBeenCalled();
-    });
-});
-
-// ─── requireBearerToken CONTROL_TOKEN env path ─────────
-
-describe('requireBearerToken with CONTROL_TOKEN set', () => {
-    let authWithToken;
-    const originalToken = process.env.HUD_CONTROL_TOKEN;
-
-    beforeAll(() => {
-        jest.isolateModules(() => {
-            process.env.HUD_CONTROL_TOKEN = 'my-secret-token';
-            authWithToken = require('../src/backend/middlewares/auth');
-        });
-    });
-
-    afterAll(() => {
-        if (originalToken === undefined) delete process.env.HUD_CONTROL_TOKEN;
-        else process.env.HUD_CONTROL_TOKEN = originalToken;
-    });
-
-    it('accepts correct CONTROL_TOKEN', () => {
-        const req = mockReq({ headers: { host: 'localhost', authorization: 'Bearer my-secret-token' } });
-        const res = mockRes();
-        const n = jest.fn();
-        authWithToken.requireBearerToken(req, res, n);
-        expect(n).toHaveBeenCalled();
-    });
-
-    it('rejects wrong token when CONTROL_TOKEN is set', () => {
-        const req = mockReq({ headers: { host: 'localhost', authorization: 'Bearer wrong-token' } });
-        const res = mockRes();
-        const n = jest.fn();
-        authWithToken.requireBearerToken(req, res, n);
-        expect(res.status).toHaveBeenCalledWith(401);
     });
 });
 
