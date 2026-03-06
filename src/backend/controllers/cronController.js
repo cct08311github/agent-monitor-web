@@ -1,6 +1,7 @@
 const fs = require('fs');
 const { getOpenClawConfig } = require('../config');
 const openclawClient = require('../services/openclawClient');
+const { sendOk, sendFail } = require('../utils/apiResponse');
 
 function getPaths() {
     const openclaw = getOpenClawConfig();
@@ -19,14 +20,14 @@ class CronController {
             const { jobsFile } = getPaths();
             if (!fs.existsSync(jobsFile)) {
                 console.warn('[CronController] Jobs file not found at:', jobsFile);
-                return res.json({ success: true, jobs: [] });
+                return sendOk(res, { jobs: [] });
             }
             const data = JSON.parse(fs.readFileSync(jobsFile, 'utf8'));
             console.log(`[CronController] Found ${data.jobs?.length || 0} jobs.`);
-            res.json({ success: true, jobs: data.jobs || [] });
+            return sendOk(res, { jobs: data.jobs || [] });
         } catch (error) {
             console.error('獲取 Cron 任務失敗:', error);
-            res.status(500).json({ success: false, error: error.message });
+            return sendFail(res, 500, error.message);
         }
     }
 
@@ -47,7 +48,7 @@ class CronController {
             const jobIndex = data.jobs.findIndex(j => j.id === id);
 
             if (jobIndex === -1) {
-                return res.status(404).json({ success: false, error: '找不到該任務' });
+                return sendFail(res, 404, '找不到該任務');
             }
 
             // 更新狀態
@@ -57,10 +58,10 @@ class CronController {
             // 寫回文件
             fs.writeFileSync(jobsFile, JSON.stringify(data, null, 2), 'utf8');
 
-            res.json({ success: true, job: data.jobs[jobIndex] });
+            return sendOk(res, { job: data.jobs[jobIndex] });
         } catch (error) {
             console.error('更新 Cron 任務失敗:', error);
-            res.status(500).json({ success: false, error: error.message });
+            return sendFail(res, 500, error.message);
         }
     }
 
@@ -78,14 +79,14 @@ class CronController {
             const before = data.jobs.length;
             data.jobs = data.jobs.filter(j => j.id !== id);
             if (data.jobs.length === before) {
-                return res.status(404).json({ success: false, error: '找不到該任務' });
+                return sendFail(res, 404, '找不到該任務');
             }
             fs.writeFileSync(jobsFile, JSON.stringify(data, null, 2), 'utf8');
             console.log(`[CronController] Deleted job ${id}`);
-            res.json({ success: true });
+            return sendOk(res);
         } catch (error) {
             console.error('[CronController] Delete failed:', error);
-            res.status(500).json({ success: false, error: error.message });
+            return sendFail(res, 500, error.message);
         }
     }
 
@@ -105,7 +106,7 @@ class CronController {
             const data = JSON.parse(fs.readFileSync(jobsFile, 'utf8'));
             const job = data.jobs.find(j => j.id === id);
             if (!job) {
-                return res.status(404).json({ success: false, error: '找不到該任務' });
+                return sendFail(res, 404, '找不到該任務');
             }
 
             console.log(`[CronController] Spawning: ${openclawClient.getBinaryPath()} cron run ${id}`);
@@ -116,14 +117,13 @@ class CronController {
             });
             child.unref();
 
-            res.json({
-                success: true,
+            return sendOk(res, {
                 message: '任務已觸發（在背景執行中）',
                 jobId: id
             });
         } catch (error) {
             console.error('[CronController] Unexpected error:', error);
-            res.status(500).json({ success: false, error: error.message });
+            return sendFail(res, 500, error.message);
         }
     }
 }
