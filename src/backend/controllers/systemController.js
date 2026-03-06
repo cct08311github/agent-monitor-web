@@ -1,5 +1,6 @@
 const { threatIntel, adaptiveSecurity, complianceSystem } = require('../security');
 const openclawService = require('../services/openclawService');
+const healthService = require('../services/healthService');
 const { sendOk, sendFail } = require('../utils/apiResponse');
 
 class SystemController {
@@ -96,6 +97,23 @@ class SystemController {
                 lastScore: complianceStatus.lastScore
             }
         });
+    }
+
+    getLiveness(req, res) {
+        return sendOk(res, healthService.getLivenessPayload());
+    }
+
+    getReadiness(req, res) {
+        const payload = healthService.getReadinessPayload();
+        return sendOk(res, payload, payload.ready ? 200 : 503);
+    }
+
+    getDependencies(req, res) {
+        const dependencies = healthService.getDependencyHealth();
+        const hasMissing = Object.values(dependencies).some((dependency) =>
+            dependency.status === 'missing' || dependency.status === 'unreadable'
+        );
+        return sendOk(res, { dependencies }, hasMissing ? 503 : 200);
     }
 }
 

@@ -10,6 +10,28 @@ describe('API Routes', () => {
             expect(res.body.success).toBe(true);
             expect(res.body.ts).toBeDefined();
         });
+
+        it('GET /api/read/liveness returns alive status', async () => {
+            const res = await request(app).get('/api/read/liveness');
+            expect(res.statusCode).toBe(200);
+            expect(res.body.success).toBe(true);
+            expect(res.body.status).toBe('alive');
+        });
+
+        it('GET /api/read/readiness returns readiness payload', async () => {
+            const res = await request(app).get('/api/read/readiness');
+            expect([200, 503]).toContain(res.statusCode);
+            expect(res.body.success).toBe(true);
+            expect(res.body).toHaveProperty('ready');
+            expect(res.body).toHaveProperty('dependencies');
+        });
+
+        it('GET /api/read/dependencies returns dependency map', async () => {
+            const res = await request(app).get('/api/read/dependencies');
+            expect([200, 503]).toContain(res.statusCode);
+            expect(res.body.success).toBe(true);
+            expect(res.body).toHaveProperty('dependencies');
+        });
     });
 
     describe('Cron Jobs', () => {
