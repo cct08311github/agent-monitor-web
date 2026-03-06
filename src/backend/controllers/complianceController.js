@@ -1,4 +1,5 @@
 const { adaptiveSecurity, complianceSystem } = require('../security');
+const { sendOk, sendFail } = require('../utils/apiResponse');
 
 class ComplianceController {
     analyzeCompliance(req, res) {
@@ -7,7 +8,7 @@ class ComplianceController {
 
             /* istanbul ignore next */
             if (!systemData) {
-                return res.status(400).json({ success: false, error: '缺少系統數據' });
+                return sendFail(res, 400, '缺少系統數據');
             }
 
             const enhancedData = {
@@ -25,17 +26,17 @@ class ComplianceController {
             const analysis = complianceSystem.analyze(enhancedData);
             const report = complianceSystem.generateReport(analysis);
 
-            res.json({ success: true, ...report });
+            return sendOk(res, report);
         } catch (error) { /* istanbul ignore next */
-            res.status(500).json({ success: false, error: error.message });
+            return sendFail(res, 500, error.message);
         }
     }
 
     getComplianceStatus(req, res) {
         try {
-            res.json({ success: true, ...complianceSystem.getStatus() });
+            return sendOk(res, complianceSystem.getStatus());
         } catch (error) { /* istanbul ignore next */
-            res.status(500).json({ success: false, error: error.message });
+            return sendFail(res, 500, error.message);
         }
     }
 }

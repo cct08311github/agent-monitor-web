@@ -1,5 +1,6 @@
 const { threatIntel, adaptiveSecurity, complianceSystem } = require('../security');
 const openclawService = require('../services/openclawService');
+const { sendOk, sendFail } = require('../utils/apiResponse');
 
 class SystemController {
     async getComprehensiveStatus(req, res) {
@@ -23,8 +24,7 @@ class SystemController {
 
             const complianceAnalysis = complianceSystem.analyze(systemData);
 
-            res.json({
-                success: true,
+            return sendOk(res, {
                 timestamp: new Date().toISOString(),
                 system: {
                     name: 'Agent 監控與安全系統',
@@ -64,7 +64,7 @@ class SystemController {
             });
 
         } catch (error) { /* istanbul ignore next */
-            res.status(500).json({ success: false, error: error.message });
+            return sendFail(res, 500, error.message);
         }
     }
 
@@ -73,8 +73,7 @@ class SystemController {
         const securityStatus = adaptiveSecurity.getStatus();
         const complianceStatus = complianceSystem.getStatus();
 
-        res.json({
-            success: true,
+        return sendOk(res, {
             status: 'healthy',
             timestamp: new Date().toISOString(),
             version: '2.5.1',
