@@ -1,10 +1,14 @@
 const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const { execFile, spawn } = require('child_process');
+const { spawn } = require('child_process');
+const { getOpenClawConfig } = require('../config');
 
-const JOBS_FILE = '/Users/openclaw/.openclaw/cron/jobs.json';
-const OPENCLAW_BIN = path.join(os.homedir(), '.openclaw', 'bin', 'openclaw');
+function getPaths() {
+    const openclaw = getOpenClawConfig();
+    return {
+        jobsFile: openclaw.cronJobsPath,
+        openclawBin: openclaw.binPath,
+    };
+}
 
 class CronController {
     /**
@@ -13,11 +17,12 @@ class CronController {
     async getJobs(req, res) {
         console.log('[CronController] Fetching jobs...');
         try {
-            if (!fs.existsSync(JOBS_FILE)) {
-                console.warn('[CronController] Jobs file not found at:', JOBS_FILE);
+            const { jobsFile } = getPaths();
+            if (!fs.existsSync(jobsFile)) {
+                console.warn('[CronController] Jobs file not found at:', jobsFile);
                 return res.json({ success: true, jobs: [] });
             }
-            const data = JSON.parse(fs.readFileSync(JOBS_FILE, 'utf8'));
+            const data = JSON.parse(fs.readFileSync(jobsFile, 'utf8'));
             console.log(`[CronController] Found ${data.jobs?.length || 0} jobs.`);
             res.json({ success: true, jobs: data.jobs || [] });
         } catch (error) {
@@ -34,11 +39,12 @@ class CronController {
         const { enabled } = req.body;
 
         try {
-            if (!fs.existsSync(JOBS_FILE)) {
+            const { jobsFile } = getPaths();
+            if (!fs.existsSync(jobsFile)) {
                 throw new Error('任務文件不存在');
             }
 
-            const data = JSON.parse(fs.readFileSync(JOBS_FILE, 'utf8'));
+            const data = JSON.parse(fs.readFileSync(jobsFile, 'utf8'));
             const jobIndex = data.jobs.findIndex(j => j.id === id);
 
             if (jobIndex === -1) {
@@ -50,7 +56,7 @@ class CronController {
             data.jobs[jobIndex].updatedAtMs = Date.now();
 
             // 寫回文件
-            fs.writeFileSync(JOBS_FILE, JSON.stringify(data, null, 2), 'utf8');
+            fs.writeFileSync(jobsFile, JSON.stringify(data, null, 2), 'utf8');
 
             res.json({ success: true, job: data.jobs[jobIndex] });
         } catch (error) {
@@ -65,16 +71,17 @@ class CronController {
     async deleteJob(req, res) {
         const { id } = req.params;
         try {
-            if (!fs.existsSync(JOBS_FILE)) {
+            const { jobsFile } = getPaths();
+            if (!fs.existsSync(jobsFile)) {
                 throw new Error('任務文件不存在');
             }
-            const data = JSON.parse(fs.readFileSync(JOBS_FILE, 'utf8'));
+            const data = JSON.parse(fs.readFileSync(jobsFile, 'utf8'));
             const before = data.jobs.length;
             data.jobs = data.jobs.filter(j => j.id !== id);
             if (data.jobs.length === before) {
                 return res.status(404).json({ success: false, error: '找不到該任務' });
             }
-            fs.writeFileSync(JOBS_FILE, JSON.stringify(data, null, 2), 'utf8');
+            fs.writeFileSync(jobsFile, JSON.stringify(data, null, 2), 'utf8');
             console.log(`[CronController] Deleted job ${id}`);
             res.json({ success: true });
         } catch (error) {
@@ -92,18 +99,19 @@ class CronController {
 
         try {
             // 驗證任務存在
-            if (!fs.existsSync(JOBS_FILE)) {
+            const { jobsFile, openclawBin } = getPaths();
+            if (!fs.existsSync(jobsFile)) {
                 throw new Error('任務文件不存在');
             }
-            const data = JSON.parse(fs.readFileSync(JOBS_FILE, 'utf8'));
+            const data = JSON.parse(fs.readFileSync(jobsFile, 'utf8'));
             const job = data.jobs.find(j => j.id === id);
             if (!job) {
                 return res.status(404).json({ success: false, error: '找不到該任務' });
             }
 
-            console.log(`[CronController] Spawning: ${OPENCLAW_BIN} cron run ${id}`);
+            console.log(`[CronController] Spawning: ${openclawBin} cron run ${id}`);
 
-            const child = spawn(OPENCLAW_BIN, ['cron', 'run', id], {
+            const child = spawn(openclawBin, ['cron', 'run', id], {
                 detached: true,
                 stdio: 'ignore'
             });

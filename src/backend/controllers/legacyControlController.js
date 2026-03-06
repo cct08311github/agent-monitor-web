@@ -1,14 +1,19 @@
-const os = require('os');
 const path = require('path');
 const util = require('util');
+const fs = require('fs');
 const { execFile } = require('child_process');
 const execFilePromise = util.promisify(execFile);
+const { getOpenClawConfig } = require('../config');
 
 // --- Constants ---
-const HOME_DIR = os.homedir();
-const OPENCLAW_ROOT = path.join(HOME_DIR, '.openclaw');
-const OPENCLAW_BIN = path.join(OPENCLAW_ROOT, 'bin', 'openclaw');
-const NOTION_SYNC_SCRIPT = path.join(OPENCLAW_ROOT, 'workspace-main', 'tools', 'smart_notion_sync.py');
+function getPaths() {
+    const openclaw = getOpenClawConfig();
+    return {
+        openclawBin: openclaw.binPath,
+        notionSyncScript: openclaw.notionSyncScriptPath,
+        openclawConfigPath: openclaw.configPath,
+    };
+}
 
 const LOW_RISK_ALLOWLIST = new Set(['status', 'talk', 'notion_sync', 'switch-model', 'models', 'agents']);
 const HIGH_RISK_ALLOWLIST = new Set(['restart', 'update']);
@@ -38,7 +43,8 @@ class LegacyControlController {
                     return res.status(400).json({ success: false, error: 'bad_request', message: 'Invalid agent ID format.' });
                 }
 
-                const { stdout, stderr } = await execFilePromise(OPENCLAW_BIN, ['agent', '--agent', agentId, '--message', message, '--no-color']);
+                const { openclawBin } = getPaths();
+                const { stdout, stderr } = await execFilePromise(openclawBin, ['agent', '--agent', agentId, '--message', message, '--no-color']);
                 return res.json({ success: true, output: /* istanbul ignore next */ stdout || stderr });
             }
 
@@ -54,8 +60,8 @@ class LegacyControlController {
                 }
 
                 try {
-                    const configPath = path.join(OPENCLAW_ROOT, 'openclaw.json');
-                    const configData = require('fs').readFileSync(configPath, 'utf8');
+                    const { openclawConfigPath } = getPaths();
+                    const configData = fs.readFileSync(openclawConfigPath, 'utf8');
                     const config = JSON.parse(configData);
                     let found = false;
                     for (const a of config.agents.list) {
@@ -66,7 +72,7 @@ class LegacyControlController {
                         }
                     }
                     if (found) {
-                        require('fs').writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+                        fs.writeFileSync(openclawConfigPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
                         return res.json({ success: true, output: `Model switched for ${agentId} to ${model}` });
                     } else {
                         return res.status(404).json({ success: false, error: 'not_found', message: `Agent ${agentId} not found in config` });
@@ -78,11 +84,12 @@ class LegacyControlController {
 
             // Case 3: System Operations (Restart/Update)
             if (command === 'restart' || command === 'update') {
+                const { openclawBin } = getPaths();
                 const args = command === 'restart' ? ['gateway', 'restart'] : ['update'];
                 res.json({ success: true, output: `COMMAND_ACCEPTED: ${command.toUpperCase()} initiated.` });
 
                 setTimeout(() => {
-                    execFile(OPENCLAW_BIN, args, /* istanbul ignore next */ (error) => {
+                    execFile(openclawBin, args, /* istanbul ignore next */ (error) => {
                         /* istanbul ignore next */
                         if (error) console.error(`[Control] ${command} failed:`, error.message);
                     });
@@ -93,7 +100,8 @@ class LegacyControlController {
             // Case 4: Notion Sync
             /* istanbul ignore next */
             if (command === 'notion_sync') {
-                const { stdout, stderr } = await execFilePromise('python3', [NOTION_SYNC_SCRIPT]);
+                const { notionSyncScript } = getPaths();
+                const { stdout, stderr } = await execFilePromise('python3', [notionSyncScript]);
                 return res.json({ success: true, output: /* istanbul ignore next */ stdout || stderr });
             }
 
@@ -106,7 +114,8 @@ class LegacyControlController {
 
             /* istanbul ignore next */
             if (directMap[command]) {
-                const { stdout, stderr } = await execFilePromise(OPENCLAW_BIN, directMap[command]);
+                const { openclawBin } = getPaths();
+                const { stdout, stderr } = await execFilePromise(openclawBin, directMap[command]);
                 /* istanbul ignore next */
                 return res.json({ success: true, output: stdout || stderr });
             }

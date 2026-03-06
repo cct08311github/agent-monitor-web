@@ -2,22 +2,16 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
+const { getOptimizeConfig } = require('../config');
 
-const PROJECT_PATH = path.join(os.homedir(), '.openclaw', 'shared', 'projects', 'agent-monitor-web');
-const PLANS_DIR = path.join(PROJECT_PATH, 'docs', 'plans');
-const OPENCLAW_PATH = path.join(os.homedir(), '.openclaw', 'bin', 'openclaw');
-const OPENCLAW_ENV_PATH = path.join(os.homedir(), '.openclaw', '.env');
+const {
+    projectPath: PROJECT_PATH,
+    plansDir: PLANS_DIR,
+    openclawBinPath: OPENCLAW_PATH,
+} = getOptimizeConfig();
 
 function getGeminiApiKey() {
-    if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
-    try {
-        const raw = fs.readFileSync(OPENCLAW_ENV_PATH, 'utf8');
-        const match = raw.match(/^GEMINI_API_KEY=(.+)$/m);
-        return match ? match[1].trim() : null;
-    } catch (_) {
-        return null;
-    }
+    return getOptimizeConfig().geminiApiKey || null;
 }
 
 const { execFile } = require('child_process');
@@ -248,11 +242,12 @@ async function saveAndNotify(report, opusFailed, onProgress) {
     onProgress(7, 'Telegram 推播...');
     const summary = report.split('\n').filter(l => l.startsWith('##')).slice(0, 3).join(' | ');
     const message = `🤖 自主優化報告已生成 (${date})\n${summary}\n📄 ${filename}`;
+    const optimizeConfig = getOptimizeConfig();
 
     try {
         await execFileAsync(OPENCLAW_PATH, [
-            'message', 'send', '--channel', 'telegram',
-            '--target', '-1003873859338', '--message', message
+            'message', 'send', '--channel', optimizeConfig.telegramChannel,
+            '--target', optimizeConfig.telegramTarget, '--message', message
         ], { timeout: 30_000 });
     } catch (_) {
         // Telegram 失敗不中斷流程

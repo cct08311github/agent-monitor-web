@@ -204,13 +204,18 @@ describe('rateLimit', () => {
 
 describe('requireBearerToken with CONTROL_TOKEN set', () => {
     let authWithToken;
+    const originalToken = process.env.HUD_CONTROL_TOKEN;
 
     beforeAll(() => {
         jest.isolateModules(() => {
             process.env.HUD_CONTROL_TOKEN = 'my-secret-token';
             authWithToken = require('../src/backend/middlewares/auth');
-            delete process.env.HUD_CONTROL_TOKEN;
         });
+    });
+
+    afterAll(() => {
+        if (originalToken === undefined) delete process.env.HUD_CONTROL_TOKEN;
+        else process.env.HUD_CONTROL_TOKEN = originalToken;
     });
 
     it('accepts correct CONTROL_TOKEN', () => {

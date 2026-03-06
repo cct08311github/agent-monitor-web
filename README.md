@@ -51,6 +51,19 @@ npm test
 # 340 tests, 24 suites — jest --forceExit --detectOpenHandles
 ```
 
+## Configuration
+
+- `PORT` — HTTPS 服務埠，預設 `3001`
+- `HTTPS_KEY_PATH` / `HTTPS_CERT_PATH` — TLS 憑證路徑，預設為 `cert/key.pem` 與 `cert/cert.pem`
+- `OPENCLAW_ROOT` / `OPENCLAW_BIN` / `OPENCLAW_ENV_PATH` — OpenClaw 根目錄、執行檔與 `.env` 路徑
+- `PROJECT_PATH` / `PLANS_DIR` — 專案根目錄與自主優化報告輸出路徑
+- `AUTH_DISABLED` / `AUTH_USERNAME` / `AUTH_PASSWORD_HASH` / `AUTH_SESSION_SECRET` / `AUTH_SESSION_TTL_HOURS` — 後台登入與 session 設定
+- `HUD_CONTROL_TOKEN` 或 `OPENCLAW_HUD_CONTROL_TOKEN` — 控制端點 bearer token
+- `GEMINI_API_KEY` — 自主優化 pipeline 使用；未設定時會 fallback 讀取 OpenClaw `.env`
+- `OPENCLAW_NOTIFY_CHANNEL` / `OPENCLAW_NOTIFY_TARGET` — 自主優化通知目標，預設為 Telegram
+
+啟動時會先檢查 TLS 憑證、OpenClaw binary 與必要 auth 設定；若缺少必要檔案或設定，server 會直接拒絕啟動並輸出明確錯誤。
+
 ## 架構
 
 ```

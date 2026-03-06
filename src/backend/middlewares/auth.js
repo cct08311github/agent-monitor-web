@@ -1,10 +1,9 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { getAuthConfig } = require('../config');
 
 const CONTROL_RATE_LIMIT_PER_MINUTE = 30;
-const CONTROL_TOKEN_ENV = process.env.HUD_CONTROL_TOKEN || process.env.OPENCLAW_HUD_CONTROL_TOKEN || '';
-const CONTROL_TOKEN = String(CONTROL_TOKEN_ENV || '').trim();
 const CONTROL_PASSWORD_HASH = '6b277d013fa68756e3c4cd0fe34f13c8deee437e939487e5c1f5ac5774db91b8';
 
 function tokenHashPrefix(token) {
@@ -62,6 +61,7 @@ function localhostOnlyControl(req, res, next) {
 }
 
 function requireBearerToken(req, res, next) {
+    const { controlToken } = getAuthConfig();
     const auth = (req.headers.authorization || '').toString();
     const m = auth.match(/^Bearer\s+(.+)$/i);
     if (!m) {
@@ -72,8 +72,8 @@ function requireBearerToken(req, res, next) {
     if (!token) return res.status(401).json({ success: false, error: 'unauthorized' });
 
     let ok = false;
-    if (CONTROL_TOKEN) {
-        ok = (token === CONTROL_TOKEN);
+    if (controlToken) {
+        ok = (token === controlToken);
     } else {
         const tokenHash = crypto.createHash('sha256').update(token, 'utf8').digest('hex');
         ok = (tokenHash === CONTROL_PASSWORD_HASH);
@@ -190,7 +190,8 @@ function loginRateLimit(req, res, next) {
 const sessionService = require('../services/sessionService');
 
 function requireAuth(req, res, next) {
-    if (process.env.AUTH_DISABLED === 'true') return next();
+    const { authDisabled } = getAuthConfig();
+    if (authDisabled) return next();
 
     const token = req.cookies?.sid;
     if (!token) return res.status(401).json({ success: false, error: 'unauthenticated' });
