@@ -314,8 +314,7 @@ function clearAlertBadge() {
 async function openAlertConfig() {
     clearAlertBadge();
     try {
-        const res = await fetch('/api/alerts/config');
-        const { config } = await res.json();
+        const { config } = await window.apiClient.get('/api/alerts/config');
         _alertConfigCache = config;
         const modal = document.getElementById('alertConfigModal');
         const tbody = document.getElementById('alertConfigBody');
@@ -373,12 +372,7 @@ async function saveAlertConfig() {
                 enabled: document.getElementById(`en_${rule}`)?.checked ?? _alertConfigCache.rules[rule].enabled,
             };
         }
-        const saveRes = await fetch('/api/alerts/config', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(patch)
-        });
-        if (!saveRes.ok) { showToast('儲存失敗', 'error'); return; }
+        await window.apiClient.patch('/api/alerts/config', patch);
         showToast('✅ 警報設定已儲存', 'success');
         closeAlertConfig();
     } catch (e) { showToast('儲存失敗', 'error'); }
@@ -539,8 +533,7 @@ function showAgentDetail(agentId) {
 }
 
 function _loadSessionList(agentId) {
-    fetch(`/api/agents/${encodeURIComponent(agentId)}/sessions`)
-        .then(r => r.json())
+    window.apiClient.get(`/api/agents/${encodeURIComponent(agentId)}/sessions`)
         .then(d => {
             const body = document.getElementById('sessionListBody');
             if (!body) return;
@@ -594,8 +587,7 @@ function openSessionView(agentId, sessionId) {
     body.textContent = '載入中…';
     modal.style.display = 'flex';
 
-    fetch(`/api/agents/${encodeURIComponent(agentId)}/sessions/${encodeURIComponent(sessionId)}`)
-        .then(r => r.json())
+    window.apiClient.get(`/api/agents/${encodeURIComponent(agentId)}/sessions/${encodeURIComponent(sessionId)}`)
         .then(d => {
             while (body.firstChild) body.removeChild(body.firstChild);
             if (!d.success || !d.messages || d.messages.length === 0) {
@@ -884,8 +876,8 @@ function renderDashboard(data) {
 // --- Data ---
 async function update(force = false) {
     try {
-        const res = await fetch(force ? `/api/read/dashboard?force=1&t=${Date.now()}` : '/api/read/dashboard');
-        renderDashboard(await res.json());
+        const data = await window.apiClient.get(force ? `/api/read/dashboard?force=1&t=${Date.now()}` : '/api/read/dashboard');
+        renderDashboard(data);
     } catch (e) {
         pushLog('連線中斷...', 'err');
     }
@@ -944,8 +936,7 @@ function startConnectionTimer() {
 // --- Watchdog ---
 async function fetchWatchdogStatus() {
     try {
-        const res = await fetch('/api/watchdog/status');
-        const data = await res.json();
+        const data = await window.apiClient.get('/api/watchdog/status');
         if (data.success && data.watchdog) renderWatchdogStatus(data.watchdog);
     } catch (e) { /* silent */ }
 }
@@ -991,12 +982,7 @@ function renderWatchdogStatus(wd) {
 async function toggleWatchdog(enabled) {
     showToast(enabled ? '🐕 啟動 Watchdog...' : '⏸ 暫停 Watchdog...', 'info');
     try {
-        const res = await fetch('/api/watchdog/toggle', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ enabled })
-        });
-        const data = await res.json();
+        const data = await window.apiClient.post('/api/watchdog/toggle', { enabled });
         if (data.success) {
             renderWatchdogStatus(data.watchdog);
             showToast(enabled ? '✅ Watchdog 已啟動' : '⏸ Watchdog 已暫停', 'success');
@@ -1012,11 +998,7 @@ async function manualRepair() {
     showToast('🔧 正在手動修復 Gateway...', 'info');
     pushLog('🔧 手動觸發 Gateway 修復', 'warn');
     try {
-        const res = await fetch('/api/watchdog/repair', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-        });
-        const data = await res.json();
+        const data = await window.apiClient.post('/api/watchdog/repair');
         if (data.success) {
             showToast(data.repaired ? '✅ Gateway 修復成功！' : '❌ 修復失敗，需人工介入', data.repaired ? 'success' : 'error');
             pushLog(data.repaired ? '✅ 手動修復成功' : '❌ 手動修復失敗', data.repaired ? 'info' : 'err');
@@ -1039,20 +1021,22 @@ function redirectToLogin() {
 
 async function checkAuth() {
     try {
-        const res = await fetch('/api/auth/me', { credentials: 'include' });
-        if (res.status === 401) { redirectToLogin(); return false; }
-        if (res.ok) {
-            const data = await res.json();
-            const el = document.getElementById('authUsername');
-            if (el && data.username) el.textContent = data.username;
+        const data = await window.apiClient.get('/api/auth/me', { credentials: 'include' });
+        const el = document.getElementById('authUsername');
+        if (el && data.username) el.textContent = data.username;
+    } catch (error) {
+        if (String(error.message) === 'unauthenticated') {
+            redirectToLogin();
+            return false;
         }
-    } catch (_) { /* network error — allow app to continue */ }
+        /* network error — allow app to continue */
+    }
     return true;
 }
 
 async function logout() {
     try {
-        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+        await window.apiClient.post('/api/auth/logout', undefined, { credentials: 'include' });
     } catch (_) { /* ignore */ }
     redirectToLogin();
 }

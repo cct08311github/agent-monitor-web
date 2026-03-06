@@ -16,28 +16,30 @@
         return data;
     }
 
-    function get(url) {
-        return request(url);
+    function get(url, options) {
+        return request(url, options);
     }
 
-    function post(url, body) {
+    function withJsonBody(method, url, body, options) {
+        const headers = { 'Content-Type': 'application/json', ...(options && options.headers ? options.headers : {}) };
         return request(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: body === undefined ? undefined : JSON.stringify(body)
+            ...options,
+            method,
+            headers,
+            body: body === undefined ? undefined : JSON.stringify(body),
         });
     }
 
-    function patch(url, body) {
-        return request(url, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: body === undefined ? undefined : JSON.stringify(body)
-        });
+    function post(url, body, options) {
+        return withJsonBody('POST', url, body, options);
     }
 
-    function del(url) {
-        return request(url, { method: 'DELETE' });
+    function patch(url, body, options) {
+        return withJsonBody('PATCH', url, body, options);
+    }
+
+    function del(url, options) {
+        return request(url, { ...options, method: 'DELETE' });
     }
 
     window.apiClient = { request, get, post, patch, delete: del };
