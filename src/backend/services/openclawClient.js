@@ -27,6 +27,9 @@ function normalizeCommand(command) {
 
 async function runCommand(command, options = {}) {
     const execOptions = options.execOptions || {};
+    if (Object.keys(execOptions).length === 0) {
+        return getExecPromise()(normalizeCommand(command));
+    }
     return getExecPromise()(normalizeCommand(command), execOptions);
 }
 

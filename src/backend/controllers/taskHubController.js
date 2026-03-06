@@ -2,14 +2,11 @@
  * TaskHub Controller
  * 整合 task-hub SQLite 資料庫，提供任務查詢與維護 API
  *
- * DB: /Users/openclaw/.openclaw/shared/projects/task-hub/data/taskhub.db
+ * DB: configurable via TASKHUB_DB_PATH
  * 三個 Domain: work_tasks / personal_tasks / sideproject_tasks
  */
 
-const path = require('path');
-const os = require('os');
-
-const TASKHUB_DB = path.join(os.homedir(), '.openclaw', 'shared', 'projects', 'task-hub', 'data', 'taskhub.db');
+const { getTaskHubConfig } = require('../config');
 
 const DOMAIN_TABLES = {
     work: 'work_tasks',
@@ -26,10 +23,11 @@ function getDb() {
     if (db) return db;
     try {
         const Database = require('better-sqlite3');
-        db = new Database(TASKHUB_DB, { readonly: false, fileMustExist: true });
+        const { dbPath } = getTaskHubConfig();
+        db = new Database(dbPath, { readonly: false, fileMustExist: true });
         db.pragma('journal_mode = WAL');
         db.pragma('foreign_keys = ON');
-        console.log('[TaskHub] DB connected:', TASKHUB_DB);
+        console.log('[TaskHub] DB connected:', dbPath);
         return db;
     } catch (err) {
         console.error('[TaskHub] DB connect failed:', err.message);

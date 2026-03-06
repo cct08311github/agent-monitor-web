@@ -1,11 +1,12 @@
 const chokidar = require('chokidar');
 const path = require('path');
 const { EventEmitter } = require('events');
+const { getOpenClawConfig } = require('../config');
 
 class AgentWatcherService extends EventEmitter {
     constructor() {
         super();
-        this.agentsDir = '/Users/openclaw/.openclaw/agents';
+        this.agentsDir = getOpenClawConfig().agentsRoot;
         this.watcher = null;
     }
 
