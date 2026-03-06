@@ -43,8 +43,7 @@ function debounceThSearch() {
 
 async function fetchTaskhubStats() {
     try {
-        const res = await fetch('/api/taskhub/stats');
-        const data = await res.json();
+        const data = await window.apiClient.get('/api/taskhub/stats');
         if (!data.success) return;
         renderTaskhubStats(data.stats);
     } catch (e) {
@@ -91,8 +90,7 @@ async function fetchTasks() {
     if (grid) grid.innerHTML = '<div class="th-loading">載入中...</div>';
 
     try {
-        const res = await fetch('/api/taskhub/tasks?' + params);
-        const data = await res.json();
+        const data = await window.apiClient.get('/api/taskhub/tasks?' + params);
         if (!data.success) throw new Error(data.error);
         thTasks = data.tasks;
         renderTasks(thTasks);
@@ -321,12 +319,7 @@ function isDueUrgent(dateStr) {
 async function quickUpdateStatus(domain, id, status) {
     showToast(`更新狀態 → ${TH_STATUS_MAP[status]?.label || status}...`, 'info');
     try {
-        const res = await fetch(`/api/taskhub/tasks/${domain}/${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status }),
-        });
-        const data = await res.json();
+        const data = await window.apiClient.patch(`/api/taskhub/tasks/${domain}/${id}`, { status });
         if (!data.success) throw new Error(data.error);
         showToast(`✅ 已更新為「${TH_STATUS_MAP[status]?.label || status}」`, 'success');
         // Update local state & re-render
@@ -462,12 +455,7 @@ async function saveTaskEdit(domain, id) {
 
     showToast('儲存中...', 'info');
     try {
-        const res = await fetch(`/api/taskhub/tasks/${domain}/${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        });
-        const data = await res.json();
+        const data = await window.apiClient.patch(`/api/taskhub/tasks/${domain}/${id}`, body);
         if (!data.success) throw new Error(data.error);
         showToast('✅ 已儲存', 'success');
         const idx = thTasks.findIndex(t => t.id === id);
@@ -484,8 +472,7 @@ async function confirmDeleteTask(domain, id, title) {
     if (!confirm(`確認刪除任務「${title}」？\n此操作無法復原。`)) return;
     showToast('刪除中...', 'info');
     try {
-        const res = await fetch(`/api/taskhub/tasks/${domain}/${id}`, { method: 'DELETE' });
-        const data = await res.json();
+        const data = await window.apiClient.delete(`/api/taskhub/tasks/${domain}/${id}`);
         if (!data.success) throw new Error(data.error);
         showToast(`✅ 任務已刪除`, 'success');
         thTasks = thTasks.filter(t => !(t.id === id && t.domain === domain));
@@ -525,12 +512,14 @@ async function submitAddTask() {
 
     showToast('建立任務中...', 'info');
     try {
-        const res = await fetch('/api/taskhub/tasks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ domain, title, priority, due_date: due_date || undefined, notes: notes || undefined, project: project || undefined }),
+        const data = await window.apiClient.post('/api/taskhub/tasks', {
+            domain,
+            title,
+            priority,
+            due_date: due_date || undefined,
+            notes: notes || undefined,
+            project: project || undefined
         });
-        const data = await res.json();
         if (!data.success) throw new Error(data.error);
         showToast(`✅ 任務已建立`, 'success');
         closeAddTaskModal();
