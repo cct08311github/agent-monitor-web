@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-03-07 Asia/Taipei
+Last updated: 2026-03-07T12:00 Asia/Taipei
 
 ## Collaboration Rules
 
@@ -8,8 +8,15 @@ Last updated: 2026-03-07 Asia/Taipei
 - Frontend worktree: `/Users/openclaw/.openclaw/shared/projects/agent-monitor-web-frontend`
 - Commit format: `feat(s1): ...`
 - When changing frontend JS, update `index.html` query strings and note cache-busting impact.
-- Current main worktree status at handoff: clean.
-- Current frontend worktree status at handoff: clean.
+- Historical handoff status: both worktrees were clean when Sprint 1 was closed.
+- Current observed main worktree status during this handoff:
+  - `M progress.md`
+  - `M src/frontend/public/index.html`
+  - `M src/frontend/public/js/app.js`
+  - `M src/frontend/public/js/state.js`
+  - `M tests/apiRoutes.test.js`
+- Current observed frontend worktree status during this handoff: not revalidated in this pass.
+- Rule: do not stage the four non-`progress.md` files above unless their owner explicitly assigns them.
 
 ## Current Worktree Split
 
@@ -104,12 +111,46 @@ Last updated: 2026-03-07 Asia/Taipei
 
 ## QA Results — 2026-03-07
 
-### Full Suite QA
+### Full Suite QA (Pass 1 — test + syntax)
 
 - **Backend tests:** 32/32 suites, 421/421 tests passed ✅
-- **Frontend syntax:** all 16 JS files pass `node -c` ✅
-- **Fixes applied during QA:**
+- **Frontend syntax:** all 21 JS files pass `node -c` ✅
+- **Fixes applied:**
   - `tests/optimizeService.test.js`: `saveAndNotify` tests timed out because Telegram mock still targeted the old code path instead of `openclawClient.runArgs` (current path). Added `jest.mock` for `openclawClient` at module level and updated the Telegram-failure test accordingly.
+
+### Deep QA (Pass 2 — integration)
+
+- **Frontend module completeness:** 21 files on disk = 21 script tags in index.html ✅
+- **Script load order:** state → stream → api → UI → app → runtime → bootstrap ✅
+- **Cross-module globals:** apiClient/appState/streamManager correctly defined and referenced ✅
+- **Legacy cleanup:** no legacy controller files or references in src/ or tests/ ✅
+- **Backend route integrity:** api.js imports 11 controllers, all files exist ✅
+- **Server startup:** starts normally, liveness/readiness endpoints respond correctly ✅
+- **Startup validation:** correctly rejects launch when AUTH_PASSWORD_HASH missing ✅
+- **Minor finding:** `theme-manager.js` missing cache-busting `?v=` → fixed
+
+### Slice A — Frontend Cleanup (completed)
+
+- Removed 12 redundant global declarations from `app.js` (duplicated by `state.js`)
+- Moved `loadErrorKeys`/`saveErrorKeys` + initialization into `state.js`
+- `isMobile` now initialized in `state.js` with `matchMedia` result
+- Added `?v=20260307` to `theme-manager.js` in `index.html`
+- Fixed `apiRoutes.test.js` flaky dashboard test (mocked `dashboardPayloadService` instead of hitting real CLI)
+
+### Slice B — Backend Logger Normalization (completed)
+
+- `dashboardPayloadService.js`: 4 console.error → structured logger (exchange_rate, poller)
+- `openclawService.js`: 1 console.error → `logger.error('openclaw_command_failed')`
+- `tsdbService.js`: 2 console.error → structured logger (snapshot, cleanup)
+- `modelMonitor.js`: 1 console.error → `logger.error('model_monitor_fetch_failed')`
+- `adaptive_security_simple.js`: constructor + adjustLevel → structured logger
+- `compliance_simple.js`: constructor + analyze → structured logger
+- `threat_intelligence_fixed.js`: constructor + loadRules + evaluate + updateRules + saveRules → structured logger
+- `threat_intelligence_simple.js`: same pattern as above
+- All `if (require.main === module)` self-test blocks left untouched
+- **Remaining console.* (low priority):** controlOriginPolicy.js, controlAudit.js, agentWatcherService.js
+
+### Final verification — 32/32 suites, 421/421 tests ✅
 
 ## Verified Test/Validation Coverage
 
@@ -174,6 +215,7 @@ Last updated: 2026-03-07 Asia/Taipei
 - Reduce direct global alias usage in modules and move to explicit imports/globals via `window.appState`.
 - Consider a dedicated `dashboard-stream.js` wrapper over `stream-manager.js`.
 - Decide whether remaining globals should stay as compatibility shims or move under a shared UI namespace.
+- Add cache-busting `?v=` to `theme-manager.js` in `index.html` for consistency.
 
 ### Backend
 
@@ -186,6 +228,349 @@ Last updated: 2026-03-07 Asia/Taipei
 - Historical `docs/plans/` files still reference removed `legacyDashboardController.js`.
   Those are archival design notes, not runtime dependencies.
   Only update them if the team wants historical docs normalized.
+
+## Future Task Backlog
+
+### Priority 1 — Low-Risk Final Cleanup
+
+1. ~~Frontend cache-busting consistency~~ ✅ done
+
+2. Frontend global namespace inventory
+- Files:
+  - `src/frontend/public/js/app.js`
+  - `src/frontend/public/js/state.js`
+  - `src/frontend/public/js/modules/*.js`
+- Task: enumerate all remaining global symbols on `window`, classify as required public API vs accidental leakage.
+- Output expectation: add a short table to `progress.md` or a dedicated note under `docs/architecture/`.
+
+3. Frontend compatibility shim decision
+- Files:
+  - `src/frontend/public/js/state.js`
+  - `src/frontend/public/js/app.js`
+  - `src/frontend/public/index.html`
+- Task: decide whether to keep current globals as-is or move to a single namespace such as `window.ocHud`.
+- Validation: if namespacing is introduced, all inline HTML handlers still work or are migrated.
+
+4. Frontend stream wrapper consolidation
+- Files:
+  - `src/frontend/public/js/stream-manager.js`
+  - `src/frontend/public/js/dashboard-runtime.js`
+  - `src/frontend/public/js/modules/logs.js`
+  - `src/frontend/public/js/optimize-runner.js`
+- Task: optionally create `dashboard-stream.js` or equivalent thin wrapper for dashboard-specific SSE semantics.
+- Validation: `node -c` on touched files and manual browser smoke check of dashboard updates + log stream + optimize stream.
+
+### Priority 2 — Backend Logging Normalization
+
+5. ~~dashboardPayloadService logger migration~~ ✅ done
+6. ~~openclawService logger migration~~ ✅ done
+7. ~~tsdbService logger migration~~ ✅ done
+8. ~~modelMonitor logger migration~~ ✅ done
+9. ~~security module logger migration~~ ✅ done (runtime only; self-test blocks preserved)
+
+### Priority 3 — Health/Operability Enhancements
+
+10. Readiness dependency depth review
+- Files:
+  - `src/backend/services/healthService.js`
+  - `src/backend/routes/api.js`
+- Task: decide whether readiness should include richer checks for watchdog/logging/taskhub/openclaw CLI availability beyond current level.
+- Validation: run `tests/healthService.test.js` and `tests/apiRoutes.test.js` selectively for health endpoints.
+
+11. Watchdog API smoke review
+- Files:
+  - `src/backend/services/gatewayWatchdog.js`
+  - `src/backend/routes/api.js`
+- Task: confirm current watchdog behavior is acceptable after config-driven cleanup; only change further if there is a concrete bug or operability gap.
+- Validation: run `tests/gatewayWatchdog.test.js`, `tests/gatewayWatchdogExtended.test.js`, and `tests/apiRoutes.test.js --testNamePattern="Watchdog Routes"`.
+
+### Priority 4 — Documentation / Historical Cleanup
+
+12. Historical docs normalization decision
+- Files:
+  - `docs/plans/2026-03-02-system-optimization-design.md`
+  - `docs/plans/2026-03-02-system-optimization.md`
+- Task: decide whether to preserve historical references to `legacyDashboardController.js` as-is or annotate them as historical.
+- Recommendation: preserve unless the team explicitly wants historical docs normalized.
+
+13. Architecture snapshot refresh
+- Files:
+  - `README.md`
+  - `CLAUDE.md`
+  - optional new `docs/architecture/current-state.md`
+- Task: if more cleanup happens, refresh docs once after the code settles instead of piecemeal.
+- Validation: `git diff --check` on docs only.
+
+## Complete Task Breakdown
+
+This section expands all remaining work into directly assignable tasks so multiple AI workers can pick up independent slices without re-discovering scope.
+
+### Track A — Frontend Polish / Compatibility
+
+#### A1. Fix cache-busting gap for theme manager
+
+- Goal: make `theme-manager.js` consistent with the rest of the JS asset loading strategy.
+- Files:
+  - `src/frontend/public/index.html`
+- Work:
+  - add `?v=YYYYMMDD` to the `theme-manager.js` script tag
+  - verify no duplicate or stale script tags exist
+- Validation:
+  - `node -c src/frontend/public/js/theme-manager.js`
+  - manual browser hard refresh
+
+#### A2. Inventory remaining frontend globals
+
+- Goal: understand what still leaks onto `window` and whether it is intentional.
+- Files:
+  - `src/frontend/public/js/*.js`
+  - `src/frontend/public/js/modules/*.js`
+- Work:
+  - enumerate all `window.*` assignments
+  - classify each symbol as one of:
+    - required by inline HTML handler
+    - shared runtime API used by another module
+    - legacy compatibility shim
+    - accidental global that can be removed
+  - record result in this file or `docs/architecture/current-state.md`
+- Validation:
+  - `rg -n "window\\." src/frontend/public/js`
+  - no code changes required if this is inventory-only
+
+#### A3. Decide compatibility strategy for frontend globals
+
+- Goal: stop drifting between intentional public globals and accidental compatibility residue.
+- Files:
+  - `src/frontend/public/js/state.js`
+  - `src/frontend/public/js/app.js`
+  - `src/frontend/public/index.html`
+  - any touched UI modules
+- Options:
+  - keep current globals and document them
+  - move stable public APIs under a namespace such as `window.ocHud`
+  - leave inline handlers as wrappers and keep the real implementation private
+- Work:
+  - choose one approach
+  - apply only if the compatibility risk is low
+- Validation:
+  - `node -c` on all touched frontend files
+  - manual smoke check for dashboard render, session modal, command modal, logout, optimize
+
+#### A4. Optional dashboard-specific stream wrapper
+
+- Goal: keep `stream-manager.js` generic and put dashboard-specific SSE semantics in a thin adapter if the codebase still needs it.
+- Files:
+  - `src/frontend/public/js/stream-manager.js`
+  - `src/frontend/public/js/dashboard-runtime.js`
+  - `src/frontend/public/js/modules/logs.js`
+  - `src/frontend/public/js/optimize-runner.js`
+- Work:
+  - decide whether `dashboard-stream.js` adds clarity
+  - if yes, move only dashboard-specific event glue there
+- Validation:
+  - `node -c` on touched files
+  - manual SSE smoke check
+
+### Track B — Backend Logging Normalization
+
+#### B1. dashboardPayloadService logger migration
+
+- Goal: remove remaining `console.error` usage from shared dashboard polling/broadcast flow.
+- Files:
+  - `src/backend/services/dashboardPayloadService.js`
+- Work:
+  - replace exchange-rate, poller update, and broadcast failure logs with shared logger
+  - preserve current behavior and throttling expectations
+- Validation:
+  - `npx jest tests/dashboardReadController.test.js tests/dashboardReadControllerCoverage.test.js --runInBand`
+
+#### B2. openclawService logger migration
+
+- Goal: normalize command failure logs with structured fields.
+- Files:
+  - `src/backend/services/openclawService.js`
+- Work:
+  - replace raw command failure `console.error`
+  - include command or args context without leaking secrets
+- Validation:
+  - `npx jest tests/openclawService.test.js --runInBand`
+
+#### B3. tsdbService logger migration
+
+- Goal: normalize snapshot and cleanup errors.
+- Files:
+  - `src/backend/services/tsdbService.js`
+- Work:
+  - replace remaining `console.error`
+  - preserve quiet behavior on non-critical paths
+- Validation:
+  - run any direct TSDB test if added
+  - otherwise `npx jest tests/dashboardReadControllerCoverage.test.js --runInBand`
+
+#### B4. modelMonitor logger migration
+
+- Goal: align model status failure logging with the shared logger.
+- Files:
+  - `src/backend/utils/modelMonitor.js`
+- Work:
+  - replace remaining `console.error`
+  - include enough context to debug model-status command failures
+- Validation:
+  - `npx jest tests/modelMonitor.test.js --runInBand`
+
+#### B5. security module logger migration
+
+- Goal: reduce ad hoc boot/runtime logs in the simplified security/compliance modules.
+- Files:
+  - `src/backend/security/threat_intelligence_fixed.js`
+  - `src/backend/security/threat_intelligence_simple.js`
+  - `src/backend/security/adaptive_security_simple.js`
+  - `src/backend/security/compliance_simple.js`
+- Work:
+  - inventory runtime/test boot logging
+  - move production-path logging to shared logger
+  - leave intentional demo noise documented if kept
+- Validation:
+  - `npx jest tests/securityController.test.js tests/securityAPI.test.js tests/complianceSimple.test.js --runInBand`
+
+### Track C — Health / Operability
+
+#### C1. Deepen readiness dependency semantics
+
+- Goal: decide whether current readiness is sufficient for deployment expectations.
+- Files:
+  - `src/backend/services/healthService.js`
+  - `src/backend/routes/api.js`
+- Work:
+  - review whether readiness should include:
+    - OpenClaw CLI binary resolution
+    - TaskHub DB path existence
+    - watchdog enabled/configured state
+    - cert presence only at startup vs also in health
+  - keep this scoped; avoid expensive runtime checks
+- Validation:
+  - `npx jest tests/healthService.test.js tests/apiRoutes.test.js --runInBand --testNamePattern="health|readiness|dependencies"`
+
+#### C2. Watchdog smoke review
+
+- Goal: confirm no regression after config/logger cleanup.
+- Files:
+  - `src/backend/services/gatewayWatchdog.js`
+  - `src/backend/routes/api.js`
+- Work:
+  - re-check watchdog status payload and repair path expectations
+  - only change if there is a concrete defect
+- Validation:
+  - `npx jest tests/gatewayWatchdog.test.js tests/gatewayWatchdogExtended.test.js --runInBand`
+  - `npx jest tests/apiRoutes.test.js --runInBand --testNamePattern="Watchdog Routes"`
+
+### Track D — Documentation / Handoff
+
+#### D1. Historical docs decision
+
+- Goal: explicitly decide whether old design docs should reflect the new controller names.
+- Files:
+  - `docs/plans/2026-03-02-system-optimization-design.md`
+  - `docs/plans/2026-03-02-system-optimization.md`
+- Work:
+  - either preserve as historical snapshots
+  - or add a short note that `legacyDashboardController.js` was later removed
+- Validation:
+  - docs-only diff review
+
+#### D2. Architecture snapshot refresh
+
+- Goal: maintain one accurate current-state document after all cleanup ends.
+- Files:
+  - `README.md`
+  - `CLAUDE.md`
+  - optional `docs/architecture/current-state.md`
+- Work:
+  - refresh only once after code settles
+  - avoid repeated churn during cleanup-only batches
+- Validation:
+  - `git diff --check`
+
+## Suggested Parallelization Plan
+
+Use separate worktrees when tasks are independent.
+
+### Worker 1 — Frontend worktree
+
+- Recommended path: `/Users/openclaw/.openclaw/shared/projects/agent-monitor-web-frontend`
+- Pick from:
+  - A1
+  - A2
+  - A3
+  - A4
+- Commit style:
+  - `feat(s1): ...`
+- Merge strategy:
+  - commit in frontend worktree first
+  - cherry-pick to `main`
+
+### Worker 2 — Main worktree backend logging
+
+- Recommended tasks:
+  - B1
+  - B2
+  - B3
+  - B4
+  - B5
+- Constraint:
+  - check `git status --short` before each commit and do not include unrelated frontend edits
+
+### Worker 3 — Main worktree docs/operability
+
+- Recommended tasks:
+  - C1
+  - C2
+  - D1
+  - D2
+- Constraint:
+  - keep these as narrow docs/health-only batches to avoid mixing with logging refactors
+
+## Batch Templates
+
+### Small Batch Template
+
+1. Confirm ownership of the target files via `git status --short`.
+2. Make one focused change.
+3. Run the narrowest validating test subset.
+4. Update `progress.md`:
+   - mark task done
+   - record commit hash
+   - record exact validation command
+5. Commit only the touched files.
+
+### Done Criteria Per Task
+
+- behavior unchanged unless explicitly intended
+- tests or syntax checks run and recorded
+- `progress.md` updated
+- no unrelated files staged
+- frontend batches include cache-busting review if script tags changed
+
+## Tasks Explicitly Not Worth Doing Unless Requested
+
+- rewrite archival `docs/plans/*` content for style only
+- large frontend namespace rewrite with no concrete bug
+- replacing every `console.*` in test-only or intentionally noisy demo paths
+- adding new framework/tooling just to finish cleanup
+
+## Execution Order Recommendation
+
+1. Do Priority 1 tasks first only if the team still wants polish work.
+2. Do Priority 2 tasks next if the goal is log consistency and quieter tests.
+3. Do Priority 3 only when there is a concrete operability requirement.
+4. Treat Priority 4 as optional documentation debt, not runtime debt.
+
+## Handoff Notes For Claude Opus
+
+- The primary architectural refactor is done.
+- Remaining tasks are cleanup/polish, not core re-architecture.
+- The biggest risk now is unnecessary churn: prefer small isolated batches with narrow tests.
+- Do not stage unrelated dirty files currently in the worktree; check `git status --short` before each commit.
 
 ## Recommended Next Batch Slices
 

@@ -13,11 +13,12 @@ const CONFIG = {
   updateInterval: 24 * 60 * 60 * 1000 // 24小時
 };
 
+const logger = require('../utils/logger');
+
 class ThreatIntelligence {
   constructor() {
     this.rules = this.loadRules();
-    console.log('🔒 威脅情報系統初始化');
-    console.log(`📊 已加載規則: ${this.rules.length} 條`);
+    logger.info('security_threat_intel_init', { rulesCount: this.rules.length });
   }
   
   loadRules() {
@@ -28,7 +29,7 @@ class ThreatIntelligence {
       }
       return this.getDefaultRules();
     } catch (error) {
-      console.error('加載規則失敗:', error.message);
+      logger.error('security_threat_rules_load_failed', { msg: error.message });
       return this.getDefaultRules();
     }
   }
@@ -105,7 +106,7 @@ class ThreatIntelligence {
   }
   
   async updateRules() {
-    console.log('🔄 更新威脅規則...');
+    logger.info('security_threat_rules_update_start');
     
     // 模擬從外部獲取新規則
     const newRules = [
@@ -123,14 +124,14 @@ class ThreatIntelligence {
     for (const rule of newRules) {
       if (!existingIds.has(rule.id)) {
         this.rules.push(rule);
-        console.log(`✅ 添加新規則: ${rule.name}`);
+        logger.info('security_threat_rule_added', { name: rule.name });
       }
     }
     
     // 保存規則
     this.saveRules();
     
-    console.log(`📊 規則更新完成: ${this.rules.length} 條規則`);
+    logger.info('security_threat_rules_update_done', { rulesCount: this.rules.length });
     return true;
   }
   
@@ -138,7 +139,7 @@ class ThreatIntelligence {
     try {
       fs.writeFileSync(CONFIG.threatRulesFile, JSON.stringify(this.rules, null, 2), 'utf8');
     } catch (error) {
-      console.error('保存規則失敗:', error.message);
+      logger.error('security_threat_rules_save_failed', { msg: error.message });
     }
   }
   

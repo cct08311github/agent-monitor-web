@@ -4,14 +4,15 @@
  * 自適應安全系統 - 簡化版本
  */
 
+const logger = require('../utils/logger');
+
 class AdaptiveSecurity {
   constructor(threatIntel) {
     this.threatIntel = threatIntel;
     this.currentLevel = 'medium'; // low, medium, high, critical
     this.history = [];
     
-    console.log('🛡️ 自適應安全系統初始化');
-    console.log(`🔒 當前安全級別: ${this.getLevelInfo().label} ${this.getLevelInfo().emoji}`);
+    logger.info('security_adaptive_init', { level: this.currentLevel });
   }
   
   getLevelInfo(level = null) {
@@ -62,9 +63,7 @@ class AdaptiveSecurity {
     
     this.currentLevel = newLevel;
     
-    console.log(`🔄 安全級別調整: ${oldInfo.emoji} ${oldInfo.label} → ${newInfo.emoji} ${newInfo.label}`);
-    console.log(`  原因: ${reason}`);
-    console.log(`  動作: ${newInfo.actions.join(', ')}`);
+    logger.info('security_level_change', { from: this.history[this.history.length-1].from, to: newLevel, reason, actions: newInfo.actions });
     
     return true;
   }

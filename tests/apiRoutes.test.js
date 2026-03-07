@@ -154,10 +154,14 @@ describe('API Routes', () => {
 
     describe('Dashboard Routes', () => {
         it('GET /api/dashboard alias works', async () => {
+            const dps = require('../src/backend/services/dashboardPayloadService');
+            jest.spyOn(dps, 'shouldRefreshSharedPayload').mockReturnValue(false);
+            jest.spyOn(dps, 'getSharedPayload').mockReturnValue({ success: true, agents: [] });
             const res = await request(app).get('/api/dashboard');
-            // Will likely 200 or 500 depending on openclaw availability
-            expect([200, 500]).toContain(res.statusCode);
-        }, 10000);
+            expect(res.statusCode).toBe(200);
+            expect(res.body.success).toBe(true);
+            jest.restoreAllMocks();
+        });
     });
 
     describe('Compliance', () => {

@@ -1,6 +1,7 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
+const logger = require('../utils/logger');
 
 const dbPath = path.join(__dirname, '../../../data');
 /* istanbul ignore next */
@@ -64,7 +65,7 @@ function saveSnapshot(systemData, agents) {
         });
         insertTx();
     } catch (e) {
-        console.error('[TSDB] Snapshot error:', e);
+        logger.error('tsdb_snapshot_error', { msg: e.message });
     }
 }
 
@@ -74,7 +75,7 @@ function runCleanup() {
         cleanupStmt.run();
         cleanupAgentsStmt.run();
     } catch (e) {
-        console.error('[TSDB] Cleanup error:', e);
+        logger.error('tsdb_cleanup_error', { msg: e.message });
     }
 }
 

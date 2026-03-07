@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { getOpenClawConfig } = require('../config');
 const openclawClient = require('./openclawClient');
+const logger = require('../utils/logger');
 
 // Cache implementation to avoid running exec too often
 const cache = {
@@ -33,7 +34,7 @@ class OpenClawService {
 
       return parseJson ? JSON.parse(stdout) : stdout;
     } catch (error) {
-      console.error(`執行命令失敗: ${command}`, error.message);
+      logger.error('openclaw_command_failed', { command, msg: error.message });
       return parseJson ? {} : '';
     }
   }
