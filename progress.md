@@ -51,6 +51,7 @@ Last updated: 2026-03-07 Asia/Taipei
 - `40aa47c` `feat(s1): replace legacy controller entrypoints`
 - `2b6b157` `feat(s1): add request context logging`
 - `a31fab7` `feat(s1): align controller test naming`
+- `8db5918` `feat(s1): add structured controller logging`
 
 ### Frontend
 
@@ -63,6 +64,7 @@ Last updated: 2026-03-07 Asia/Taipei
 - `9e36c20` `feat(s1): split app navigation and detail modules`
 - `87045b4` `feat(s1): split app runtime modules`
 - `4d2bc79` `feat(s1): split app bootstrap runtime`
+- `d5c3889` `feat(s1): split dashboard render modules`
 
 ## Current Architecture Improvements Already Landed
 
@@ -76,6 +78,7 @@ Last updated: 2026-03-07 Asia/Taipei
 - API response helper and express error handling exist.
 - Readiness/liveness/dependency endpoints exist.
 - Request context middleware exists with `x-request-id` propagation and structured API request/error logs.
+- Cron/control/taskhub controllers now emit structured logger events instead of raw `console.*`.
 - New controller names exist:
   - `dashboardReadController.js`
   - `controlController.js`
@@ -93,9 +96,10 @@ Last updated: 2026-03-07 Asia/Taipei
 - Shared `error-center.js` exists for dashboard error banners, SRE flows, and error helpers.
 - Shared `watchdog-ui.js`, `auth-ui.js`, and `optimize-runner.js` own runtime control flows previously in `app.js`.
 - Shared `dashboard-runtime.js` and `bootstrap.js` own SSE/bootstrap lifecycle setup.
+- Shared `alert-config.js` and `dashboard-render.js` own alert config, alert detection, and dashboard card/grid rendering.
 - `charts.js`, `cron.js`, `taskhub.js`, `chat.js`, and large parts of `app.js` already use `window.apiClient`.
 - Dashboard stream, log stream, and optimize stream now go through `stream-manager.js`.
-- `app.js` is down to 505 lines and no longer owns the full command/error/navigation/detail/runtime/bootstrap workflow blocks.
+- `app.js` is now down to roughly 120 lines of shared utilities/data update glue.
 
 ## Verified Test/Validation Coverage
 
@@ -146,6 +150,8 @@ Last updated: 2026-03-07 Asia/Taipei
 - `node -c src/frontend/public/js/optimize-runner.js`
 - `node -c src/frontend/public/js/dashboard-runtime.js`
 - `node -c src/frontend/public/js/bootstrap.js`
+- `node -c src/frontend/public/js/alert-config.js`
+- `node -c src/frontend/public/js/dashboard-render.js`
 
 ## Remaining High-Value Work
 
@@ -169,6 +175,7 @@ Last updated: 2026-03-07 Asia/Taipei
   - `state.js`
   - `stream-manager.js`
   - controller renames and compatibility wrappers
+  - latest frontend split modules and `app.js` shrink
 
 ## Recommended Next Batch Slices
 
