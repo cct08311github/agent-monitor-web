@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-03-07T15:15 Asia/Taipei
+Last updated: 2026-03-08T00:20 Asia/Taipei
 
 ## Collaboration Rules
 
@@ -8,7 +8,8 @@ Last updated: 2026-03-07T15:15 Asia/Taipei
 - Frontend worktree: `/Users/openclaw/.openclaw/shared/projects/agent-monitor-web-frontend`
 - Commit format: `feat(s2): ...`
 - When changing frontend JS, update `index.html` query strings (`?v=YYYYMMDD`).
-- Both worktrees clean at latest handoff.
+- Main worktree is currently **not clean**: `package.json`, `package-lock.json`, `server.js` have uncommitted changes.
+- Treat those three files as user-owned in-progress work unless explicitly confirmed otherwise.
 
 ## Sprint 1 — Completed
 
@@ -96,10 +97,16 @@ All Sprint 1 items are done. Collapsed for reference.
 ## Sprint 2 Checklist
 
 Current status: 35/35 suites, 440/440 tests. Sprint 2 watchdog hardening batch is complete. Coverage snapshot still pending refresh after the latest test additions.
+Reality check: the checklist below was audited against code/tests on 2026-03-08. Several old "missing test" notes were too strict about filenames and did not reflect broader existing coverage.
 
-### S2-A: Test Coverage — Untested Modules
+### S2-A: Controller-Level Coverage Gaps
 
-5 source modules still have no dedicated test file. Prioritized by risk.
+Dedicated controller-named suites are still missing for 4 controllers, but this is **not** the same as "no coverage". Existing suites already cover part of the behavior:
+
+- `authController` is partially covered by `tests/authIntegration.test.js`
+- `systemController` is partially covered by `tests/systemAPI.test.js`
+- `taskHubController` is partially covered by `tests/taskHub.test.js` and `tests/taskHubErrors.test.js`
+- `complianceController` currently has no controller/API-focused suite; only the underlying compliance module is covered by `tests/complianceSimple.test.js`
 
 - [x] **S2-A1.** Add `dashboardPayloadService` tests (coverage: 85% stmts, 74% branches — lowest)
   - File: `src/backend/services/dashboardPayloadService.js`
@@ -129,18 +136,24 @@ Current status: 35/35 suites, 440/440 tests. Sprint 2 watchdog hardening batch i
     - [x] S2-A3.3 Write tests for error/empty paths
     - [x] S2-A3.4 Validate: `npx jest tests/historyService.test.js --runInBand`
 
-- [ ] **S2-A5.** Add missing controller tests
-  - Untested controllers: `authController`, `complianceController`, `systemController`, `taskHubController`
+- [ ] **S2-A5.** Add direct controller/API-focused tests where coverage is still indirect
+  - Controllers: `authController`, `complianceController`, `systemController`, `taskHubController`
   - Steps:
-    - [ ] S2-A5.1 Add `tests/authController.test.js` (login/logout/session flows)
-    - [ ] S2-A5.2 Add `tests/complianceController.test.js` (analyze endpoint)
-    - [ ] S2-A5.3 Add `tests/systemController.test.js` (system info endpoint)
-    - [ ] S2-A5.4 Add `tests/taskHubController.test.js` (CRUD operations)
-    - [ ] S2-A5.5 Validate: `npx jest tests/*Controller.test.js`
+    - [ ] S2-A5.1 Decide whether to add dedicated `authController` unit tests beyond existing HTTP integration coverage
+    - [ ] S2-A5.2 Add `complianceController` endpoint coverage (highest real gap)
+    - [ ] S2-A5.3 Decide whether `systemAPI.test.js` is sufficient or should be split/renamed for controller clarity
+    - [ ] S2-A5.4 Decide whether `taskHub.test.js` + `taskHubErrors.test.js` are sufficient or should be complemented by a controller-named suite
+    - [ ] S2-A5.5 Validate targeted suites plus full `npm test -- --runInBand`
 
 ### S2-B: Silent Error Swallowing
 
-14 empty `catch {}` blocks across 5 files. These hide failures silently.
+After the 2026-03-08 audit, 7 empty `catch {}` blocks remain in Sprint 2 target code:
+
+- `src/backend/services/sessionReadService.js`: 3
+- `src/backend/services/optimizeService.js`: 1
+- `src/backend/services/gatewayWatchdog.js`: 1
+- `src/backend/middlewares/controlAudit.js`: 1
+- `src/backend/routes/api.js`: 1
 
 - [x] **S2-B1.** Audit and fix silent catches in `dashboardPayloadService.js` (7 occurrences)
   - Lines: 87, 200, 206, 217, 356, 409, 442
@@ -151,10 +164,11 @@ Current status: 35/35 suites, 440/440 tests. Sprint 2 watchdog hardening batch i
     - [x] S2-B1.4 Validate: `npx jest tests/dashboardPayloadService.test.js tests/dashboardReadController*.test.js --runInBand`
 
 - [ ] **S2-B2.** Audit silent catches in remaining files
-  - `sessionReadService.js` (lines 44, 82, 84) — JSONL parse fallbacks
-  - `optimizeService.js` (line 36) — env file read fallback
-  - `gatewayWatchdog.js` (line 221) — kill process fallback
-  - `controlAudit.js` (line 60) — audit write fallback
+  - `sessionReadService.js` (lines 44, 82, 84) — likely intentional JSONL parse/read fallbacks, but document intent
+  - `optimizeService.js` (line 36) — existing plans directory read fallback
+  - `gatewayWatchdog.js` (line 256) — Gemini CLI lookup fallback
+  - `controlAudit.js` (line 60) — audit hook failure should not break response, but should likely be logged
+  - `api.js` (line 207) — log-stream child process kill fallback
   - Steps:
     - [ ] S2-B2.1 Classify each: intentional fallback vs. error hiding
     - [ ] S2-B2.2 Add logger or comment as appropriate
@@ -233,8 +247,8 @@ Lowest-coverage files:
 
 ### Untested Modules
 
-5 source modules without dedicated test files:
-`authController`, `complianceController`, `sessionService`, `systemController`, `taskHubController`
+Controller-level test naming still inconsistent. Real coverage state:
+`authController` (partial), `complianceController` (gap), `sessionService` (covered inside `auth.test.js` and `authIntegration.test.js`), `systemController` (partial), `taskHubController` (partial)
 
 ### Frontend Globals Inventory
 
@@ -263,6 +277,27 @@ Lowest-coverage files:
   - Result:
     - [x] `35/35` suites passed
     - [x] `440/440` tests passed
+- [x] 2026-03-08 progress + branch audit
+  - Verified against:
+    - [x] current `main` code
+    - [x] `npm test -- --runInBand`
+    - [x] local branch ancestry / diff
+  - Findings:
+    - [x] `progress.md` previously overstated "clean worktrees"
+    - [x] controller coverage gaps were overstated by filename-based checklisting
+    - [x] 7 empty catch blocks still remain in Sprint 2 target files
+    - [x] no branch with unique, still-needed functional changes was found outside `main`
+
+## Branch Reconciliation
+
+- `main` is ahead of `origin/main` by 6 commits and contains the Sprint 2 progress/test/hardening work.
+- Non-merged branch heads were audited on 2026-03-08:
+  - `codex/frontend-split`: frontend modularization is already present on `main` via different commit hashes
+  - `codex/watchdog-hardening`: watchdog hardening is already present on `main` via commit `83bb755`
+  - `backup/local-main-e3b80c6`: backup branch only carries an old mobile-chat-button removal already represented on `main`
+  - `feat/issue-39-bug--openclaw`: its single extra commit removes a duplicate mobile chat button, but that behavior is already present on `main` via earlier equivalent changes
+- Conclusion: there is currently **no pending branch that must be merged for code completeness**.
+- Blocking note: because `package.json`, `package-lock.json`, and `server.js` are dirty on `main`, do not perform branch merges until those user changes are either committed or stashed intentionally.
 
 ## Next Checklist
 
@@ -273,16 +308,15 @@ Use the batches below as independent ownership units. One AI should own one batc
 - [ ] Owner:
 - [ ] Suggested worktree: `codex/s2-controller-tests`
 - [ ] Scope:
-  - [ ] **S2-A5.1** Add [tests/authController.test.js](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/tests/authController.test.js) for login/logout/session flows
-  - [ ] **S2-A5.2** Add [tests/complianceController.test.js](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/tests/complianceController.test.js) for analyze endpoint
-  - [ ] **S2-A5.3** Add [tests/systemController.test.js](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/tests/systemController.test.js) for system info endpoint
-  - [ ] **S2-A5.4** Add [tests/taskHubController.test.js](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/tests/taskHubController.test.js) for CRUD surface
+  - [ ] **S2-A5.1** Add missing direct coverage for `complianceController` first
+  - [ ] **S2-A5.2** Decide whether auth/system/taskHub need new controller-named suites or only checklist normalization
+  - [ ] **S2-A5.3** If new suites are added, keep them additive rather than duplicating existing route/integration assertions
 - [ ] Validate:
-  - [ ] `npx jest tests/authController.test.js tests/complianceController.test.js tests/systemController.test.js tests/taskHubController.test.js --runInBand`
+  - [ ] targeted Jest for any newly added suites
   - [ ] `npm test -- --runInBand` after cherry-pick to main
 - [ ] Done when:
-  - [ ] all 4 controller suites exist
-  - [ ] no behavior regressions in API route tests
+  - [ ] actual coverage gaps are closed or explicitly documented as intentionally covered elsewhere
+  - [ ] no behavior regressions in API route / integration tests
   - [ ] `progress.md` counts are updated
 
 ### Batch B — Silent Catch Audit
@@ -294,6 +328,7 @@ Use the batches below as independent ownership units. One AI should own one batc
   - [ ] **S2-B2.2** Audit remaining silent catches in [optimizeService.js](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/src/backend/services/optimizeService.js)
   - [ ] **S2-B2.3** Audit remaining silent catches in [gatewayWatchdog.js](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/src/backend/services/gatewayWatchdog.js)
   - [ ] **S2-B2.4** Audit remaining silent catches in [controlAudit.js](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/src/backend/middlewares/controlAudit.js)
+  - [ ] **S2-B2.5** Audit remaining silent catch in [api.js](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/src/backend/routes/api.js)
 - [ ] Steps:
   - [ ] classify each catch as intentional fallback vs hidden failure
   - [ ] add comment for intentional fallback
@@ -339,7 +374,9 @@ Use the batches below as independent ownership units. One AI should own one batc
 
 ### Merge Order
 
-- [ ] Merge Batch A or Batch B first; they are independent
+- [ ] Resolve or explicitly shelve the dirty `main` changes in `package.json`, `package-lock.json`, `server.js`
+- [ ] Merge Batch B before Batch D so docs do not fossilize stale silent-catch counts
+- [ ] Merge Batch A anytime after Batch B planning is clarified
 - [ ] Merge Batch C anytime; low coupling
 - [ ] Merge Batch D last unless it only adds archival note
 
@@ -351,6 +388,7 @@ Use the batches below as independent ownership units. One AI should own one batc
   - [ ] `Last updated`
   - [ ] `Current status`
   - [ ] `Recent QA`
+  - [ ] `Branch Reconciliation` if branch state changed
   - [ ] `Sprint 2 Work Log`
 
 ## Notes For Other AI Workers
