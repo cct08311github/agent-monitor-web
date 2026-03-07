@@ -1,4 +1,4 @@
-// legacyControlController tests
+// controlController tests
 // All external process calls are mocked
 
 const mockExecFilePromise = jest.fn();
@@ -36,7 +36,7 @@ beforeEach(() => {
         readFileSync: mockReadFileSync,
         writeFileSync: mockWriteFileSync,
     }));
-    ctrl = require('../src/backend/controllers/legacyControlController');
+    ctrl = require('../src/backend/controllers/controlController');
     mockExecFilePromise.mockReset();
     mockExecFile.mockReset();
     mockReadFileSync.mockReset();

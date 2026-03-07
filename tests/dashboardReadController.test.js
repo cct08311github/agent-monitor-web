@@ -1,4 +1,4 @@
-// legacyDashboardController tests
+// dashboardReadController tests
 // Tests focus on pure helper functions that can be extracted via mocking
 
 const mockFs = {
@@ -70,7 +70,7 @@ beforeEach(() => {
     jest.mock('../src/backend/services/alertEngine', () => ({ evaluate: jest.fn().mockReturnValue([]) }));
     jest.mock('../src/backend/utils/modelMonitor', () => ({ fetchModelCooldowns: jest.fn().mockResolvedValue({}) }));
 
-    ctrl = require('../src/backend/controllers/legacyDashboardController');
+    ctrl = require('../src/backend/controllers/dashboardReadController');
 });
 
 function mockRes() {

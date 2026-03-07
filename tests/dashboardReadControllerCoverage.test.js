@@ -1,4 +1,4 @@
-// legacyDashboardController — branch coverage extension
+// dashboardReadController — branch coverage extension
 // Targets: detectDetailedActivity, buildSubagentStatus, getSystemResources, cron parse error
 
 const path = require('path');
@@ -59,7 +59,7 @@ beforeEach(() => {
     jest.mock('../src/backend/services/alertEngine', () => ({ evaluate: jest.fn().mockReturnValue([]) }));
     jest.mock('../src/backend/utils/modelMonitor', () => ({ fetchModelCooldowns: jest.fn().mockResolvedValue({}) }));
 
-    ctrl = require('../src/backend/controllers/legacyDashboardController');
+    ctrl = require('../src/backend/controllers/dashboardReadController');
 });
 
 function mockRes() {
