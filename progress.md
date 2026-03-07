@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-03-07T16:09 Asia/Taipei
+Last updated: 2026-03-07T15:15 Asia/Taipei
 
 ## Collaboration Rules
 
@@ -8,7 +8,7 @@ Last updated: 2026-03-07T16:09 Asia/Taipei
 - Frontend worktree: `/Users/openclaw/.openclaw/shared/projects/agent-monitor-web-frontend`
 - Commit format: `feat(s2): ...`
 - When changing frontend JS, update `index.html` query strings (`?v=YYYYMMDD`).
-- Both worktrees clean at last handoff.
+- Both worktrees clean at latest handoff.
 
 ## Sprint 1 — Completed
 
@@ -95,11 +95,11 @@ All Sprint 1 items are done. Collapsed for reference.
 
 ## Sprint 2 Checklist
 
-Current status: 35/35 suites, 437/437 tests, coverage snapshot still pending refresh after the latest test additions.
+Current status: 35/35 suites, 440/440 tests. Sprint 2 watchdog hardening batch is complete. Coverage snapshot still pending refresh after the latest test additions.
 
 ### S2-A: Test Coverage — Untested Modules
 
-9 source modules have no dedicated test file. Prioritized by risk.
+5 source modules still have no dedicated test file. Prioritized by risk.
 
 - [x] **S2-A1.** Add `dashboardPayloadService` tests (coverage: 85% stmts, 74% branches — lowest)
   - File: `src/backend/services/dashboardPayloadService.js`
@@ -128,14 +128,6 @@ Current status: 35/35 suites, 437/437 tests, coverage snapshot still pending ref
     - [x] S2-A3.2 Write tests for normal history retrieval
     - [x] S2-A3.3 Write tests for error/empty paths
     - [x] S2-A3.4 Validate: `npx jest tests/historyService.test.js --runInBand`
-
-- [ ] **S2-A4.** Add `agentWatcherService` tests
-  - File: `src/backend/services/agentWatcherService.js`
-  - Create: `tests/agentWatcherService.test.js`
-  - Steps:
-    - [ ] S2-A4.1 Read service, identify subscribe/unsubscribe lifecycle
-    - [ ] S2-A4.2 Write tests for watcher event forwarding
-    - [ ] S2-A4.3 Validate: `npx jest tests/agentWatcherService.test.js`
 
 - [ ] **S2-A5.** Add missing controller tests
   - Untested controllers: `authController`, `complianceController`, `systemController`, `taskHubController`
@@ -172,25 +164,29 @@ Current status: 35/35 suites, 437/437 tests, coverage snapshot still pending ref
 
 From Sprint 1 smoke findings. Low risk, small scope.
 
-- [ ] **S2-C1.** Add `enabled` type validation to toggle endpoint
-  - File: `src/backend/controllers/watchdogController.js`
+- [x] **S2-C1.** Add `enabled` type validation to toggle endpoint
+  - File: `src/backend/routes/api.js`
+  - Commit: `83bb755` (`2026-03-07`)
   - Steps:
-    - [ ] S2-C1.1 Add `typeof enabled !== 'boolean'` -> 400 response
-    - [ ] S2-C1.2 Add test for non-boolean `enabled` value
-    - [ ] S2-C1.3 Validate: `npx jest tests/watchdog*.test.js`
+    - [x] S2-C1.1 Add `typeof enabled !== 'boolean'` -> 400 response
+    - [x] S2-C1.2 Add test for non-boolean `enabled` value
+    - [x] S2-C1.3 Validate: `npx jest tests/apiRoutes.test.js --runInBand --testNamePattern="Watchdog Routes"`
 
-- [ ] **S2-C2.** Add escalation path test coverage
+- [x] **S2-C2.** Add escalation path test coverage
   - File: `src/backend/services/gatewayWatchdog.js`
+  - Commit: `83bb755` (`2026-03-07`)
   - Steps:
-    - [ ] S2-C2.1 Read escalation logic (3 consecutive failures)
-    - [ ] S2-C2.2 Write test: 3 consecutive repair failures trigger escalation
-    - [ ] S2-C2.3 Validate: `npx jest tests/watchdog*.test.js`
+    - [x] S2-C2.1 Read escalation logic and identify the real accumulation path (`healthCheckLoop`, not `triggerRepair`)
+    - [x] S2-C2.2 Add test: failed auto-repair escalates and sends alert
+    - [x] S2-C2.3 Validate: `npx jest tests/gatewayWatchdog*.test.js --runInBand`
 
-- [ ] **S2-C3.** Wrap module-level `getOpenClawConfig()` in try/catch
+- [x] **S2-C3.** Wrap module-level `getOpenClawConfig()` in try/catch
   - File: `src/backend/services/gatewayWatchdog.js`
+  - Commit: `83bb755` (`2026-03-07`)
   - Steps:
-    - [ ] S2-C3.1 Wrap top-level config read in try/catch with logger.error fallback
-    - [ ] S2-C3.2 Validate: `npx jest tests/watchdog*.test.js`
+    - [x] S2-C3.1 Wrap top-level config read in try/catch with logger.error fallback
+    - [x] S2-C3.2 Add config-fallback regression test
+    - [x] S2-C3.3 Validate: `npx jest tests/gatewayWatchdogExtended.test.js --runInBand --testNamePattern="module config fallback"`
 
 ### S2-D: Frontend Polish
 
@@ -237,8 +233,8 @@ Lowest-coverage files:
 
 ### Untested Modules
 
-6 source modules without dedicated test files:
-`agentWatcherService`, `authController`, `complianceController`, `sessionService`, `systemController`, `taskHubController`
+5 source modules without dedicated test files:
+`authController`, `complianceController`, `sessionService`, `systemController`, `taskHubController`
 
 ### Frontend Globals Inventory
 
@@ -251,11 +247,37 @@ Lowest-coverage files:
 
 ### Watchdog Smoke Findings
 
-- 36/36 tests pass, no blocking issues
-- Addressed by S2-C:
-  1. `/watchdog/toggle` does not validate `req.body.enabled` type
-  2. Escalation path (3 consecutive failures) has no test coverage
-  3. Module-level `getOpenClawConfig()` call could crash if config broken
+- Resolved in `83bb755`
+- Addressed items:
+  1. `/watchdog/toggle` now rejects non-boolean `enabled` with `400 invalid_enabled`
+  2. Escalation path now has regression coverage through `healthCheckLoop`
+  3. Module-level config read now has logger-backed fallback path instead of crashing
+
+## Recent QA
+
+- [x] 2026-03-07 watchdog hardening batch
+  - Commit: `83bb755`
+  - QA:
+    - [x] `NODE_PATH=/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/node_modules /Users/openclaw/.openclaw/shared/projects/agent-monitor-web/node_modules/.bin/jest tests/gatewayWatchdog.test.js tests/gatewayWatchdogExtended.test.js tests/apiRoutes.test.js --runInBand`
+    - [x] `npm test -- --runInBand`
+  - Result:
+    - [x] `35/35` suites passed
+    - [x] `440/440` tests passed
+
+## Next Checklist
+
+- [ ] **S2-A5.1** Add `tests/authController.test.js` for login/logout/session flows
+- [ ] **S2-A5.2** Add `tests/complianceController.test.js` for analyze endpoint
+- [ ] **S2-A5.3** Add `tests/systemController.test.js` for system info endpoint
+- [ ] **S2-A5.4** Add `tests/taskHubController.test.js` for CRUD surface
+- [ ] **S2-B2.1** Audit remaining silent catches in `sessionReadService.js`
+- [ ] **S2-B2.2** Audit remaining silent catches in `optimizeService.js`
+- [ ] **S2-B2.3** Audit remaining silent catches in `gatewayWatchdog.js`
+- [ ] **S2-B2.4** Audit remaining silent catches in `controlAudit.js`
+- [ ] **S2-D1.1** Audit SSE usage across `stream-manager.js`, `dashboard-runtime.js`, `modules/logs.js`, `optimize-runner.js`
+- [ ] **S2-D1.2** Decide and document whether a dashboard-specific stream wrapper is worth extracting
+- [ ] **S2-E1.1** Review `docs/plans/` for stale references and archival note
+- [ ] **S2-E2.1** Refresh README/CLAUDE architecture snapshot after Sprint 2 closes
 
 ## Notes For Other AI Workers
 
@@ -322,73 +344,16 @@ Lowest-coverage files:
   - [x] `npx jest tests/dashboardReadController.test.js tests/dashboardReadControllerCoverage.test.js --runInBand`
   - [x] `npm test -- --runInBand`
 
-## Latest QA Result
+### 2026-03-07 — Watchdog hardening batch
 
-- Date: `2026-03-07`
-- Result: `PASS`
-- Full suite:
-  - [x] 35/35 suites
-  - [x] 437/437 tests
-- New in this pass:
-  - [x] historyService dedicated unit coverage
-  - [x] sessionReadService dedicated unit coverage
-  - [x] dashboardPayloadService dedicated unit coverage
-  - [x] dashboardPayloadService silent-catch warning coverage
-- Non-blocking observations:
-  - Structured logger output still appears in Jest console for expected error-path tests.
-  - Current `progress.md` is ahead of coverage snapshot text; refresh exact percentage only after the next formal coverage run.
-
-## Next-Step Checklist For Multi-AI Handoff
-
-Use these as pick-up tasks. Each checkbox item is intended to be independently owned.
-
-### Highest Priority
-
-- [ ] **S2-C1** Add `enabled` boolean validation to watchdog toggle endpoint
-  - [ ] implement 400 response for non-boolean values
-  - [ ] add regression test
-  - [ ] run watchdog test subset
-
-### Medium Priority
-
-- [ ] **S2-A4** Add `agentWatcherService` dedicated tests
-  - [ ] watcher subscribe/unsubscribe lifecycle
-  - [ ] forwarded event emission
-  - [ ] run `npx jest tests/agentWatcherService.test.js --runInBand`
-
-- [ ] **S2-A5** Add dedicated controller unit tests
-  - [ ] `tests/authController.test.js`
-  - [ ] `tests/complianceController.test.js`
-  - [ ] `tests/systemController.test.js`
-  - [ ] `tests/taskHubController.test.js`
-  - [ ] run only touched controller suites
-
-- [ ] **S2-B2** Audit remaining silent catches outside dashboard payload
-  - [ ] `sessionReadService.js`
-  - [ ] `optimizeService.js`
-  - [ ] `gatewayWatchdog.js`
-  - [ ] `controlAudit.js`
-
-- [ ] **S2-C2** Add escalation-path watchdog test
-  - [ ] simulate 3 consecutive repair failures
-  - [ ] assert escalation path / state transition
-
-- [ ] **S2-C3** Harden top-level watchdog config read
-  - [ ] wrap config read in try/catch
-  - [ ] log fallback cleanly
-  - [ ] validate watchdog suites
-
-### Lower Priority
-
-- [ ] **S2-D1** Decide whether a dashboard-specific SSE wrapper is worth introducing
-  - [ ] audit dashboard/logs/optimize stream overlap
-  - [ ] either document no-op decision or extract wrapper
-
-- [ ] **S2-E1** Add archival note under `docs/plans/`
-  - [ ] explain historical-doc purpose
-  - [ ] avoid rewriting historical content unless requested
-
-- [ ] **S2-E2** Refresh architecture docs after code settles
-  - [ ] update `README.md`
-  - [ ] update `CLAUDE.md`
-  - [ ] optionally add `docs/architecture/current-state.md`
+- Completed:
+  - [x] `gatewayWatchdog.js` top-level config fallback hardening
+  - [x] `/api/watchdog/toggle` boolean validation
+  - [x] watchdog escalation regression coverage
+- Scope covered:
+  - module-level config load now falls back safely with structured logging
+  - invalid `enabled` payloads now fail fast with `400 invalid_enabled`
+  - escalation path is covered through `healthCheckLoop` instead of the non-accumulating `triggerRepair` path
+- Validation:
+  - [x] `NODE_PATH=/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/node_modules /Users/openclaw/.openclaw/shared/projects/agent-monitor-web/node_modules/.bin/jest tests/gatewayWatchdog.test.js tests/gatewayWatchdogExtended.test.js tests/apiRoutes.test.js --runInBand`
+  - [x] `npm test -- --runInBand`
