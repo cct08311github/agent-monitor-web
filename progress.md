@@ -57,6 +57,8 @@ Last updated: 2026-03-07 Asia/Taipei
 - `3fc4b6c` `feat(s1): move command interactions to api client`
 - `34611f7` `feat(s1): centralize frontend dashboard state`
 - `0cdac1a` `feat(s1): add frontend stream manager`
+- `6e75fca` `feat(s1): split app command and error modules`
+- `9e36c20` `feat(s1): split app navigation and detail modules`
 
 ## Current Architecture Improvements Already Landed
 
@@ -79,8 +81,13 @@ Last updated: 2026-03-07 Asia/Taipei
 - Shared `api-client.js` exists.
 - Shared `state.js` exists with `window.appState` aliases.
 - Shared `stream-manager.js` exists.
+- Shared `navigation.js` exists for desktop/sub-tab switching and summary card updates.
+- Shared `detail-view.js` exists for agent detail rendering and session modal flows.
+- Shared `command-actions.js` exists for command execution and output modal handling.
+- Shared `error-center.js` exists for dashboard error banners, SRE flows, and error helpers.
 - `charts.js`, `cron.js`, `taskhub.js`, `chat.js`, and large parts of `app.js` already use `window.apiClient`.
 - Dashboard stream, log stream, and optimize stream now go through `stream-manager.js`.
+- `app.js` no longer owns the full command/error/navigation/detail workflow blocks.
 
 ## Verified Test/Validation Coverage
 
@@ -115,6 +122,10 @@ Last updated: 2026-03-07 Asia/Taipei
 - `node -c src/frontend/public/js/api-client.js`
 - `node -c src/frontend/public/js/state.js`
 - `node -c src/frontend/public/js/stream-manager.js`
+- `node -c src/frontend/public/js/navigation.js`
+- `node -c src/frontend/public/js/detail-view.js`
+- `node -c src/frontend/public/js/error-center.js`
+- `node -c src/frontend/public/js/command-actions.js`
 - `node -c src/frontend/public/js/app.js`
 - `node -c src/frontend/public/js/modules/charts.js`
 - `node -c src/frontend/public/js/modules/cron.js`
@@ -126,13 +137,9 @@ Last updated: 2026-03-07 Asia/Taipei
 
 ### Frontend
 
-- Split `app.js` into:
-  - `navigation.js`
-  - `detail-view.js`
-  - `command-actions.js`
-  - `error-center.js`
 - Reduce direct global alias usage in modules and move to explicit imports/globals via `window.appState`.
 - Consider a dedicated `dashboard-stream.js` wrapper over `stream-manager.js`.
+- Continue shrinking `app.js` around watchdog/auth/bootstrap logic if worth the churn.
 
 ### Backend
 
@@ -153,12 +160,11 @@ Last updated: 2026-03-07 Asia/Taipei
 ### Slice A
 
 - Worktree: frontend
-- Goal: split `app.js` command/error logic into a dedicated module
+- Goal: reduce remaining `app.js` bootstrap and global alias surface
 - Files:
   - `src/frontend/public/js/app.js`
-  - new `src/frontend/public/js/command-actions.js`
-  - new `src/frontend/public/js/error-center.js`
-  - `src/frontend/public/index.html`
+  - `src/frontend/public/js/modules/*.js`
+  - optional new helper modules only if they cut clear responsibility boundaries
 
 ### Slice B
 
