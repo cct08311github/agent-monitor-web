@@ -7,33 +7,7 @@
    4) SRE response panel with follow-up conversation
    ================================================ */
 
-currentExchangeRate = 32.0; // Fallback default
-latestDashboard = null;
-previousAgentsMap = {};
-currentDesktopTab = 'monitor';
-currentSubTab = 'agents';
-isMobile = window.matchMedia('(max-width: 768px)').matches;
-agentSearchQuery = '';
-_currentDetailAgentId = '';
 function onAgentSearch(val) { agentSearchQuery = (val || '').trim(); if (latestDashboard) renderDashboard(latestDashboard); }
-lastErrors = [];
-// Persist dismissed/shown errors in localStorage so they survive page refresh
-function loadErrorKeys(key) {
-    try {
-        const stored = JSON.parse(localStorage.getItem(key) || '{}');
-        return new Map(Object.entries(stored));
-    } catch { return new Map(); }
-}
-function saveErrorKeys(key, map) {
-    try { localStorage.setItem(key, JSON.stringify(Object.fromEntries(map))); } catch { }
-}
-dismissedErrorMap = loadErrorKeys('oc_dismissed_errors');
-shownErrorMap = loadErrorKeys('oc_shown_errors');
-commandRunning = false;
-lastSseTs = 0;
-_connTimerHandle = null;
-chatSending = false;
-
 
 window.matchMedia('(max-width: 768px)').addEventListener('change', (e) => {
     isMobile = e.matches;

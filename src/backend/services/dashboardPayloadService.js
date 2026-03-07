@@ -8,6 +8,7 @@ const { exec, execFile } = require('child_process');
 const fetch = require('node-fetch');
 
 const execFilePromise = util.promisify(execFile);
+const logger = require('../utils/logger');
 const tsdbService = require('./tsdbService');
 const agentWatcherService = require('./agentWatcherService');
 const alertEngine = require('./alertEngine');
@@ -110,7 +111,7 @@ async function getExchangeRate() {
             return data.rates.TWD;
         }
     } catch (e) {
-        console.error('[ExchangeRate] Fetch failed:', e.message);
+        logger.error('exchange_rate_fetch_failed', { msg: e.message });
     }
     return exchangeRateCache.rate;
 }
@@ -494,7 +495,7 @@ async function doUpdateSharedData() {
 
         return true;
     } catch (e) {
-        console.error('[Poller] Update failed:', e);
+        logger.error('poller_update_failed', { msg: e.message });
         return false;
     }
 }
@@ -525,13 +526,13 @@ function startGlobalPolling() {
         clearTimeout(watcherDebounceTimer);
         watcherDebounceTimer = setTimeout(async () => {
             await updateSharedData();
-            doBroadcast().catch((e) => console.error('[Poller] Broadcast error:', e));
+            doBroadcast().catch((e) => logger.error('poller_broadcast_error', { msg: e.message }));
         }, 300);
     });
 
     setInterval(async () => {
         await updateSharedData();
-        doBroadcast().catch((e) => console.error('[Poller] Broadcast error:', e));
+        doBroadcast().catch((e) => logger.error('poller_broadcast_error', { msg: e.message }));
     }, 15000).unref();
 }
 

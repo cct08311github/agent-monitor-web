@@ -1,4 +1,5 @@
 const openclawClient = require('../services/openclawClient');
+const logger = require('./logger');
 
 const MODEL_COOLDOWN_CACHE_TTL = 3000;
 let modelCache = { ts: 0, cooldowns: {} };
@@ -45,7 +46,7 @@ async function fetchModelCooldowns() {
         modelCache = { ts: now, cooldowns };
         return cooldowns;
     } catch (error) {
-        console.error('[Model Monitor] Failed to fetch models status:', error);
+        logger.error('model_monitor_fetch_failed', { msg: error.message });
         return /* istanbul ignore next */ modelCache.cooldowns || {}; // return last known state or empty
     }
 }

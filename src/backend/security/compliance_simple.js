@@ -4,6 +4,8 @@
  * 合規報告系統 - 簡化版本
  */
 
+const logger = require('../utils/logger');
+
 class ComplianceSystem {
   constructor() {
     this.standards = {
@@ -24,7 +26,7 @@ class ComplianceSystem {
     };
     
     this.history = [];
-    console.log('📋 合規報告系統初始化');
+    logger.info('security_compliance_init', { standards: Object.keys(this.standards) });
   }
   
   analyze(system) {
@@ -63,7 +65,7 @@ class ComplianceSystem {
     };
     
     this.history.push(analysis);
-    console.log(`📊 合規分析完成: ${score.toFixed(1)}% (${level})`);
+    logger.info('security_compliance_analyzed', { score: score.toFixed(1), level });
     
     return analysis;
   }

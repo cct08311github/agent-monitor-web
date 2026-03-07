@@ -1,20 +1,31 @@
 (function () {
+    function loadErrorKeys(key) {
+        try {
+            const stored = JSON.parse(localStorage.getItem(key) || '{}');
+            return new Map(Object.entries(stored));
+        } catch { return new Map(); }
+    }
+
     const state = {
         currentExchangeRate: 32.0,
         latestDashboard: null,
         previousAgentsMap: {},
         currentDesktopTab: 'monitor',
         currentSubTab: 'agents',
-        isMobile: false,
+        isMobile: window.matchMedia('(max-width: 768px)').matches,
         agentSearchQuery: '',
         _currentDetailAgentId: '',
         lastErrors: [],
-        dismissedErrorMap: null,
-        shownErrorMap: null,
+        dismissedErrorMap: loadErrorKeys('oc_dismissed_errors'),
+        shownErrorMap: loadErrorKeys('oc_shown_errors'),
         commandRunning: false,
         lastSseTs: 0,
         _connTimerHandle: null,
         chatSending: false,
+    };
+
+    window.saveErrorKeys = function (key, map) {
+        try { localStorage.setItem(key, JSON.stringify(Object.fromEntries(map))); } catch { }
     };
 
     const aliases = [
