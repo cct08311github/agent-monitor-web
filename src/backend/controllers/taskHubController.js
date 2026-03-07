@@ -8,6 +8,7 @@
 
 const { getTaskHubConfig } = require('../config');
 const { sendOk, sendFail } = require('../utils/apiResponse');
+const logger = require('../utils/logger');
 
 const DOMAIN_TABLES = {
     work: 'work_tasks',
@@ -28,10 +29,10 @@ function getDb() {
         db = new Database(dbPath, { readonly: false, fileMustExist: true });
         db.pragma('journal_mode = WAL');
         db.pragma('foreign_keys = ON');
-        console.log('[TaskHub] DB connected:', dbPath);
+        logger.info('taskhub_db_connected', { dbPath });
         return db;
     } catch (err) {
-        console.error('[TaskHub] DB connect failed:', err.message);
+        logger.error('taskhub_db_connect_error', { details: logger.toErrorFields(err) });
         throw err;
     }
 }
@@ -63,7 +64,7 @@ async function getStats(req, res) {
 
         return sendOk(res, { stats: result });
     } catch (err) {
-        console.error('[TaskHub] getStats error:', err.message);
+        logger.error('taskhub_stats_error', { requestId: req.requestId, details: logger.toErrorFields(err) });
         return sendFail(res, 500, err.message);
     }
 }
@@ -126,7 +127,7 @@ async function getTasks(req, res) {
 
         return sendOk(res, { tasks: allTasks.slice(0, parseInt(limit) || 100), total: allTasks.length });
     } catch (err) {
-        console.error('[TaskHub] getTasks error:', err.message);
+        logger.error('taskhub_get_tasks_error', { requestId: req.requestId, details: logger.toErrorFields(err) });
         return sendFail(res, 500, err.message);
     }
 }
@@ -209,7 +210,7 @@ async function updateTask(req, res) {
         const updated = conn.prepare(`SELECT *, '${domain}' as domain FROM ${table} WHERE id = ?`).get(id);
         return sendOk(res, { task: { ...updated, tags: tryParseJson(updated.tags, []) } });
     } catch (err) {
-        console.error('[TaskHub] updateTask error:', err.message);
+        logger.error('taskhub_update_task_error', { requestId: req.requestId, details: logger.toErrorFields(err) });
         return sendFail(res, 500, err.message);
     }
 }
@@ -229,10 +230,10 @@ async function deleteTask(req, res) {
         if (!existing) return sendFail(res, 404, '找不到任務');
 
         conn.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id);
-        console.log(`[TaskHub] Deleted task ${id} (${existing.title}) from ${domain}`);
+        logger.info('taskhub_task_deleted', { requestId: req.requestId, id, title: existing.title, domain });
         return sendOk(res, { deleted: { id, title: existing.title, domain } });
     } catch (err) {
-        console.error('[TaskHub] deleteTask error:', err.message);
+        logger.error('taskhub_delete_task_error', { requestId: req.requestId, details: logger.toErrorFields(err) });
         return sendFail(res, 500, err.message);
     }
 }
@@ -279,7 +280,7 @@ async function createTask(req, res) {
         const created = conn.prepare(`SELECT *, '${domain}' as domain FROM ${table} WHERE id = ?`).get(id);
         return sendOk(res, { task: { ...created, tags: tryParseJson(created.tags, []) } }, 201);
     } catch (err) {
-        console.error('[TaskHub] createTask error:', err.message);
+        logger.error('taskhub_create_task_error', { requestId: req.requestId, details: logger.toErrorFields(err) });
         return sendFail(res, 500, err.message);
     }
 }
