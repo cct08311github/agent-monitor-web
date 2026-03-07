@@ -2,6 +2,7 @@ const chokidar = require('chokidar');
 const path = require('path');
 const { EventEmitter } = require('events');
 const { getOpenClawConfig } = require('../config');
+const logger = require('../utils/logger');
 
 class AgentWatcherService extends EventEmitter {
     constructor() {
@@ -29,7 +30,7 @@ class AgentWatcherService extends EventEmitter {
             .on('add', (filePath) => this.emitChange('state_update', filePath))
             .on('change', (filePath) => this.emitChange('state_update', filePath));
 
-        console.log('[EventBus] Subscribed to Agent Filesystem state updates.');
+        logger.info('agent_watcher_subscribed');
     }
 
     emitChange(eventType, filePath) {

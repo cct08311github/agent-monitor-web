@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const logger = require('../utils/logger');
 
 function getClientIp(req) {
     return (req.ip || req.connection?.remoteAddress || '').toString();
@@ -28,7 +29,7 @@ function appendAuditLog(record) {
 
         fs.appendFileSync(filePath, `${JSON.stringify(record)}\n`, 'utf8');
     } catch (e) {
-        console.error('[hud] Failed to write audit log:', e);
+        logger.error('control_audit_write_failed', { msg: e.message });
     }
 }
 

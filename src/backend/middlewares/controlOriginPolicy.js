@@ -1,3 +1,5 @@
+const logger = require('../utils/logger');
+
 const ALLOWED_HOST_PREFIXES = [
     'localhost', '127.0.0.1', '[::1]', '::1', '192.168.0.198',
     'shenghuoguanjiademac-mini.local', 'qiujuntingdeimac.local',
@@ -23,7 +25,7 @@ function localhostOnlyControl(req, res, next) {
     const origin = (req.headers.origin || '').toString().toLowerCase();
 
     if (!isAllowedHost(hostHeader)) {
-        console.warn(`[auth] forbidden_host: host="${hostHeader}", origin="${origin}", ip="${getClientIp(req)}"`);
+        logger.warn('control_forbidden_host', { host: hostHeader, origin, ip: getClientIp(req) });
         return res.status(403).json({ success: false, error: 'forbidden_host', message: 'Restricted', _debug_host: hostHeader, _debug_origin: origin });
     }
 
