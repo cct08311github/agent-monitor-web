@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-03-07T15:59 Asia/Taipei
+Last updated: 2026-03-07T16:05 Asia/Taipei
 
 ## Collaboration Rules
 
@@ -95,21 +95,21 @@ All Sprint 1 items are done. Collapsed for reference.
 
 ## Sprint 2 Checklist
 
-Current status: 34/34 suites, 431/431 tests, coverage snapshot still pending refresh after the latest test additions.
+Current status: 35/35 suites, 435/435 tests, coverage snapshot still pending refresh after the latest test additions.
 
 ### S2-A: Test Coverage — Untested Modules
 
 9 source modules have no dedicated test file. Prioritized by risk.
 
-- [ ] **S2-A1.** Add `dashboardPayloadService` tests (coverage: 85% stmts, 74% branches — lowest)
+- [x] **S2-A1.** Add `dashboardPayloadService` tests (coverage: 85% stmts, 74% branches — lowest)
   - File: `src/backend/services/dashboardPayloadService.js`
-  - Create: `tests/dashboardPayloadService.test.js`
+  - Create: `tests/dashboardPayloadService.test.js` (`2026-03-07`)
   - Steps:
-    - [ ] S2-A1.1 Read service, identify untested branches (lines 71-72, 104, 109-111, 174-176, 201-205, 231, 246-247, 331, 369, 490-535)
-    - [ ] S2-A1.2 Write tests for exchange rate fetch failure path
-    - [ ] S2-A1.3 Write tests for poller edge cases (broadcast error, empty payload)
-    - [ ] S2-A1.4 Write tests for SSE client connect/disconnect lifecycle
-    - [ ] S2-A1.5 Validate: `npx jest tests/dashboardPayloadService.test.js`
+    - [x] S2-A1.1 Read service, identify untested branches (lines 71-72, 104, 109-111, 174-176, 201-205, 231, 246-247, 331, 369, 490-535)
+    - [x] S2-A1.2 Write tests for exchange rate fetch failure path
+    - [x] S2-A1.3 Write tests for poller/shared update edge cases (pending update dedupe, explicit client removal, snapshot persistence)
+    - [x] S2-A1.4 Write tests for SSE/polling lifecycle entrypoints (`addSseClient`, `removeSseClient`, `startGlobalPolling`)
+    - [x] S2-A1.5 Validate: `npx jest tests/dashboardPayloadService.test.js --runInBand`
 
 - [x] **S2-A2.** Add `sessionReadService` tests
   - File: `src/backend/services/sessionReadService.js`
@@ -237,8 +237,8 @@ Lowest-coverage files:
 
 ### Untested Modules
 
-7 source modules without dedicated test files:
-`agentWatcherService`, `authController`, `complianceController`, `dashboardPayloadService`, `sessionService`, `systemController`, `taskHubController`
+6 source modules without dedicated test files:
+`agentWatcherService`, `authController`, `complianceController`, `sessionService`, `systemController`, `taskHubController`
 
 ### Frontend Globals Inventory
 
@@ -290,16 +290,34 @@ Lowest-coverage files:
   - [x] `npx jest tests/dashboardReadController.test.js tests/dashboardReadControllerCoverage.test.js --runInBand`
   - [x] `npm test -- --runInBand`
 
+### 2026-03-07 — Coverage batch 2
+
+- Completed:
+  - [x] `tests/dashboardPayloadService.test.js` added
+- Scope covered:
+  - shared payload update success path
+  - sensitive path redaction and workspace masking
+  - alert emission to SSE clients
+  - pending update dedupe
+  - single-start polling guard
+  - explicit SSE client removal
+  - `runOpenclawRead()` forwarding
+- Validation:
+  - [x] `npx jest tests/dashboardPayloadService.test.js --runInBand`
+  - [x] `npx jest tests/dashboardReadController.test.js tests/dashboardReadControllerCoverage.test.js --runInBand`
+  - [x] `npm test -- --runInBand`
+
 ## Latest QA Result
 
 - Date: `2026-03-07`
 - Result: `PASS`
 - Full suite:
-  - [x] 34/34 suites
-  - [x] 431/431 tests
+  - [x] 35/35 suites
+  - [x] 435/435 tests
 - New in this pass:
   - [x] historyService dedicated unit coverage
   - [x] sessionReadService dedicated unit coverage
+  - [x] dashboardPayloadService dedicated unit coverage
 - Non-blocking observations:
   - Structured logger output still appears in Jest console for expected error-path tests.
   - Current `progress.md` is ahead of coverage snapshot text; refresh exact percentage only after the next formal coverage run.
@@ -309,12 +327,6 @@ Lowest-coverage files:
 Use these as pick-up tasks. Each checkbox item is intended to be independently owned.
 
 ### Highest Priority
-
-- [ ] **S2-A1** Add `dashboardPayloadService` dedicated tests
-  - [ ] cover exchange-rate fetch failure
-  - [ ] cover SSE client lifecycle
-  - [ ] cover polling/broadcast edge paths
-  - [ ] run `npx jest tests/dashboardPayloadService.test.js --runInBand`
 
 - [ ] **S2-B1** Audit silent catches in `dashboardPayloadService.js`
   - [ ] classify each empty catch as intentional vs hidden failure
