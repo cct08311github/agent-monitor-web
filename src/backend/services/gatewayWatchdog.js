@@ -14,13 +14,19 @@ const { execFile, exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+const { getOpenClawConfig, getOptimizeConfig, getProjectRoot } = require('../config');
+const logger = require('../utils/logger');
 
 const execFilePromise = util.promisify(execFile);
 const execPromise = util.promisify(exec);
 
-const OPENCLAW_PATH = '/opt/homebrew/bin/openclaw';
+const openclawConfig = getOpenClawConfig();
+const optimizeConfig = getOptimizeConfig();
+const OPENCLAW_PATH = openclawConfig.binPath;
 const GATEWAY_PORT = 18789;
 const GATEWAY_HOST = '127.0.0.1';
+const OPENCLAW_CONFIG_PATH = openclawConfig.configPath;
+const OPENCLAW_LOG_DIR = path.join(openclawConfig.root, 'logs');
 
 // --- Configuration ---
 const CONFIG = {
@@ -32,7 +38,7 @@ const CONFIG = {
     restartGracePeriodMs: 45_000,    // 重啟後的保護期：45 秒內不做健康檢查
     telegramCooldownMs: 300_000,     // Telegram 通知最短間隔 5 分鐘
     geminiTimeoutMs: 180_000,        // Gemini CLI 超時 3 分鐘（修 config 通常 30-60 秒）
-    logDir: path.join(__dirname, '../../../../logs/watchdog'),
+    logDir: path.join(getProjectRoot(), 'logs', 'watchdog'),
 };
 
 // --- State ---
@@ -71,7 +77,12 @@ function log(level, msg, details = {}) {
         msg,
         ...details,
     };
-    console.log(`[Watchdog][${level.toUpperCase()}] ${msg}`, details.error || '');
+    const loggerLevel = level === 'err' ? 'error' : (level === 'warn' ? 'warn' : 'info');
+    logger[loggerLevel]('gateway_watchdog', {
+        msg,
+        watchdogLevel: level,
+        details: Object.keys(details).length ? details : undefined,
+    });
 
     // Add to in-memory events (keep last 100)
     state.events.push(entry);
@@ -86,7 +97,9 @@ function log(level, msg, details = {}) {
         const logFile = path.join(CONFIG.logDir, `watchdog-${dateStr}.jsonl`);
         fs.appendFileSync(logFile, JSON.stringify(entry) + '\n', 'utf8');
     } catch (e) {
-        console.error('[Watchdog] Failed to write log:', e.message);
+        logger.error('gateway_watchdog_log_write_failed', {
+            details: logger.toErrorFields(e),
+        });
     }
 }
 
@@ -176,7 +189,7 @@ async function collectDiagnostics(reason) {
         const d = new Date();
         const ymd = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
         const logPaths = [
-            `/Users/openclaw/.openclaw/logs/openclaw-${ymd}.log`,
+            path.join(OPENCLAW_LOG_DIR, `openclaw-${ymd}.log`),
             `/tmp/openclaw-1000/openclaw-${ymd}.log`
         ].join(' ');
 
@@ -280,7 +293,7 @@ Processes:
 ${diagnostics.processes}
 
 Common causes:
-- Invalid JSON in /Users/openclaw/.openclaw/openclaw.json
+- Invalid JSON in ${OPENCLAW_CONFIG_PATH}
 - Broken plugin references in plugins.load.paths
 - EADDRINUSE (Port 18789 in use by a zombie process)
 
@@ -288,7 +301,7 @@ Common causes:
 - **禁止執行 openclaw gateway restart** — 重啟由 Watchdog 統一管理。
 - **禁止執行 kill -9 任何 openclaw 進程** — 這會中斷正在執行的 Sub-Agent。
 - Prefer minimal changes to config files only.
-- After fixing config, verify JSON: python3 -m json.tool /Users/openclaw/.openclaw/openclaw.json > /dev/null
+- After fixing config, verify JSON: python3 -m json.tool ${OPENCLAW_CONFIG_PATH} > /dev/null
 - If port is stuck by a zombie process, only kill that specific zombie PID, not the main gateway.
 
 Show what you changed.`;
@@ -449,7 +462,7 @@ async function sendTelegramNotification(type, details) {
             // Method 2: If agent talk fails, try direct message send
             log('info', '📨 Agent talk 失敗，嘗試直接 message send...');
             await execFilePromise(OPENCLAW_PATH, [
-                'message', 'send', '--channel', 'telegram', '--target', '-1003873859338', '--message', message
+                'message', 'send', '--channel', optimizeConfig.telegramChannel, '--target', optimizeConfig.telegramTarget, '--message', message
             ], { timeout: 30_000 });
         });
 
