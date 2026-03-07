@@ -84,7 +84,7 @@ Last updated: 2026-03-07 Asia/Taipei
 - New controller names exist:
   - `dashboardReadController.js`
   - `controlController.js`
-- Legacy controller files remain as compatibility wrappers.
+- Legacy controller wrapper files are removed.
 - Test entrypoints now target `dashboardReadController` / `controlController` naming instead of `legacy*`.
 
 ### Frontend
@@ -169,7 +169,6 @@ Last updated: 2026-03-07 Asia/Taipei
 
 ### Backend
 
-- Continue retiring `legacy` naming in tests/docs once wrappers are no longer needed.
 - Extend structured logging/request-id coverage beyond core API middleware into service-level logs.
 - Expand dependency health from file checks to richer readiness semantics if desired.
 
