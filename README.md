@@ -91,7 +91,9 @@ src/
             ├── optimize-runner.js      # optimize SSE / progress UI
             ├── dashboard-runtime.js    # dashboard SSE / connection status
             ├── bootstrap.js            # DOMContentLoaded bootstrap
-            ├── app.js                  # 剩餘 dashboard render / helpers
+            ├── alert-config.js         # alert config modal / alert detection
+            ├── dashboard-render.js     # dashboard agent/subagent rendering
+            ├── app.js                  # 剩餘 shared utilities / data update glue
             └── modules/
                 ├── charts.js           # drawSparkline / drawBarChart / drawHBarChart
                 ├── logs.js
