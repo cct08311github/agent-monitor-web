@@ -278,4 +278,64 @@ describe('dashboardPayloadService', () => {
         expect(result).toEqual({ stdout: '', stderr: '' });
         expect(mockExecFilePromise).toHaveBeenLastCalledWith('/tmp/home/.openclaw/bin/openclaw', ['status']);
     });
+
+    it('warns when agent activity cannot be read but still returns the fallback detail', async () => {
+        mockFs.readFileSync.mockImplementation((targetPath) => {
+            if (targetPath.endsWith('sessions.json')) {
+                throw new Error('sessions broken');
+            }
+            return '';
+        });
+
+        const result = await service.updateSharedData();
+
+        expect(result).toBe(true);
+        expect(mockLogger.warn).toHaveBeenCalledWith('agent_activity_read_failed', expect.objectContaining({
+            agentId: 'main',
+            msg: 'sessions broken',
+        }));
+        expect(service.getSharedPayload().agents[0]).toEqual(expect.objectContaining({
+            status: 'inactive',
+            currentTask: { label: 'Idle', task: '' },
+        }));
+    });
+
+    it('warns when subagent sessions json or cron json cannot be parsed', async () => {
+        const agentsRoot = '/tmp/home/.openclaw/agents';
+        const sessionsDir = path.join(agentsRoot, 'main', 'sessions');
+        const sessionsJsonPath = path.join(sessionsDir, 'sessions.json');
+
+        mockFs.existsSync.mockImplementation((targetPath) => (
+            targetPath === '/tmp/home/.openclaw/bin/openclaw' ||
+            targetPath === sessionsDir ||
+            targetPath === sessionsJsonPath
+        ));
+        mockFs.readdirSync.mockImplementation((targetPath) => {
+            if (targetPath === agentsRoot) return ['main'];
+            if (targetPath === sessionsDir) return [];
+            return [];
+        });
+        mockFs.readFileSync.mockImplementation((targetPath) => {
+            if (targetPath === sessionsJsonPath) return '{bad json';
+            throw new Error(`unexpected path ${targetPath}`);
+        });
+        mockExecFilePromise.mockImplementation((bin, args) => {
+            if (bin === 'free') return Promise.resolve({ stdout: 'Mem: 16000000000 8000000000 4000000000 0 0 4000000000', stderr: '' });
+            if (bin === 'df') return Promise.resolve({ stdout: 'Filesystem\n/dev/disk1 100G 50G 50G 50% /', stderr: '' });
+            if (args && args[0] === '--version') return Promise.resolve({ stdout: 'openclaw 1.2.3', stderr: '' });
+            if (args && args[0] === 'agents') return Promise.resolve({ stdout: '- main (Main Agent)', stderr: '' });
+            if (args && args[0] === 'cron') return Promise.resolve({ stdout: '{bad json', stderr: '' });
+            throw new Error(`unexpected execFile call ${bin} ${JSON.stringify(args)}`);
+        });
+
+        const result = await service.updateSharedData();
+
+        expect(result).toBe(true);
+        expect(mockLogger.warn).toHaveBeenCalledWith('subagent_sessions_parse_failed', expect.objectContaining({
+            agentDirName: 'main',
+        }));
+        expect(mockLogger.warn).toHaveBeenCalledWith('cron_jobs_parse_failed', expect.objectContaining({
+            msg: expect.stringContaining('Expected property name'),
+        }));
+    });
 });
