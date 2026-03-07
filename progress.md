@@ -266,18 +266,92 @@ Lowest-coverage files:
 
 ## Next Checklist
 
-- [ ] **S2-A5.1** Add `tests/authController.test.js` for login/logout/session flows
-- [ ] **S2-A5.2** Add `tests/complianceController.test.js` for analyze endpoint
-- [ ] **S2-A5.3** Add `tests/systemController.test.js` for system info endpoint
-- [ ] **S2-A5.4** Add `tests/taskHubController.test.js` for CRUD surface
-- [ ] **S2-B2.1** Audit remaining silent catches in `sessionReadService.js`
-- [ ] **S2-B2.2** Audit remaining silent catches in `optimizeService.js`
-- [ ] **S2-B2.3** Audit remaining silent catches in `gatewayWatchdog.js`
-- [ ] **S2-B2.4** Audit remaining silent catches in `controlAudit.js`
-- [ ] **S2-D1.1** Audit SSE usage across `stream-manager.js`, `dashboard-runtime.js`, `modules/logs.js`, `optimize-runner.js`
-- [ ] **S2-D1.2** Decide and document whether a dashboard-specific stream wrapper is worth extracting
-- [ ] **S2-E1.1** Review `docs/plans/` for stale references and archival note
-- [ ] **S2-E2.1** Refresh README/CLAUDE architecture snapshot after Sprint 2 closes
+Use the batches below as independent ownership units. One AI should own one batch at a time.
+
+### Batch A — Controller Test Coverage
+
+- [ ] Owner:
+- [ ] Suggested worktree: `codex/s2-controller-tests`
+- [ ] Scope:
+  - [ ] **S2-A5.1** Add [tests/authController.test.js](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/tests/authController.test.js) for login/logout/session flows
+  - [ ] **S2-A5.2** Add [tests/complianceController.test.js](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/tests/complianceController.test.js) for analyze endpoint
+  - [ ] **S2-A5.3** Add [tests/systemController.test.js](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/tests/systemController.test.js) for system info endpoint
+  - [ ] **S2-A5.4** Add [tests/taskHubController.test.js](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/tests/taskHubController.test.js) for CRUD surface
+- [ ] Validate:
+  - [ ] `npx jest tests/authController.test.js tests/complianceController.test.js tests/systemController.test.js tests/taskHubController.test.js --runInBand`
+  - [ ] `npm test -- --runInBand` after cherry-pick to main
+- [ ] Done when:
+  - [ ] all 4 controller suites exist
+  - [ ] no behavior regressions in API route tests
+  - [ ] `progress.md` counts are updated
+
+### Batch B — Silent Catch Audit
+
+- [ ] Owner:
+- [ ] Suggested worktree: `codex/s2-silent-catch-audit`
+- [ ] Scope:
+  - [ ] **S2-B2.1** Audit remaining silent catches in [sessionReadService.js](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/src/backend/services/sessionReadService.js)
+  - [ ] **S2-B2.2** Audit remaining silent catches in [optimizeService.js](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/src/backend/services/optimizeService.js)
+  - [ ] **S2-B2.3** Audit remaining silent catches in [gatewayWatchdog.js](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/src/backend/services/gatewayWatchdog.js)
+  - [ ] **S2-B2.4** Audit remaining silent catches in [controlAudit.js](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/src/backend/middlewares/controlAudit.js)
+- [ ] Steps:
+  - [ ] classify each catch as intentional fallback vs hidden failure
+  - [ ] add comment for intentional fallback
+  - [ ] add structured logger for hidden failure paths
+  - [ ] add or update tests where log-worthy behavior changes
+- [ ] Validate:
+  - [ ] `npx jest tests/sessionReadService.test.js tests/gatewayWatchdogExtended.test.js tests/authIntegration.test.js --runInBand`
+  - [ ] `npm test -- --runInBand` after cherry-pick to main
+- [ ] Done when:
+  - [ ] no unexplained empty `catch {}` remain in Sprint 2 target files
+  - [ ] `progress.md` silent-catch section is updated
+
+### Batch C — Frontend SSE Decision
+
+- [ ] Owner:
+- [ ] Suggested worktree: `codex/s2-frontend-streams`
+- [ ] Scope:
+  - [ ] **S2-D1.1** Audit SSE usage across [stream-manager.js](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/src/frontend/public/js/stream-manager.js), [dashboard-runtime.js](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/src/frontend/public/js/dashboard-runtime.js), [logs.js](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/src/frontend/public/js/modules/logs.js), [optimize-runner.js](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/src/frontend/public/js/optimize-runner.js)
+  - [ ] **S2-D1.2** Decide whether a dashboard-specific stream wrapper should exist
+  - [ ] **S2-D1.3** If yes, implement it and wire scripts/query strings
+- [ ] Validate:
+  - [ ] `node -c` all changed frontend JS files
+  - [ ] manual smoke check for dashboard stream + logs stream + optimize stream
+- [ ] Done when:
+  - [ ] decision is documented in `progress.md`
+  - [ ] if code changed, `index.html` cache-busting is updated
+
+### Batch D — Docs And Archive Cleanup
+
+- [ ] Owner:
+- [ ] Suggested worktree: `codex/s2-doc-refresh`
+- [ ] Dependencies:
+  - [ ] start only after Batch A and Batch B are merged, or limit scope to archival note only
+- [ ] Scope:
+  - [ ] **S2-E1.1** Review `docs/plans/` for stale references and add archival note
+  - [ ] **S2-E2.1** Refresh [README.md](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/README.md) and [CLAUDE.md](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/CLAUDE.md) architecture snapshot after Sprint 2 closes
+- [ ] Validate:
+  - [ ] references point to existing files
+  - [ ] README / CLAUDE wording matches current architecture
+- [ ] Done when:
+  - [ ] docs no longer mention removed legacy controllers
+  - [ ] Sprint 2 state in docs matches `progress.md`
+
+### Merge Order
+
+- [ ] Merge Batch A or Batch B first; they are independent
+- [ ] Merge Batch C anytime; low coupling
+- [ ] Merge Batch D last unless it only adds archival note
+
+### Handoff Update Rules
+
+- [ ] Before starting a batch, fill in `Owner:` and worktree branch if changed
+- [ ] After each subtask, mark the checkbox directly in `progress.md`
+- [ ] After each batch lands, update:
+  - [ ] `Last updated`
+  - [ ] `Current status`
+  - [ ] `Recent QA`
+  - [ ] `Sprint 2 Work Log`
 
 ## Notes For Other AI Workers
 
