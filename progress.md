@@ -60,6 +60,7 @@ Last updated: 2026-03-07 Asia/Taipei
 - `0cdac1a` `feat(s1): add frontend stream manager`
 - `6e75fca` `feat(s1): split app command and error modules`
 - `9e36c20` `feat(s1): split app navigation and detail modules`
+- pending cherry-pick from frontend worktree: `split app runtime modules`
 
 ## Current Architecture Improvements Already Landed
 
@@ -77,6 +78,7 @@ Last updated: 2026-03-07 Asia/Taipei
   - `dashboardReadController.js`
   - `controlController.js`
 - Legacy controller files remain as compatibility wrappers.
+- Test entrypoints now target `dashboardReadController` / `controlController` naming instead of `legacy*`.
 
 ### Frontend
 
@@ -87,6 +89,7 @@ Last updated: 2026-03-07 Asia/Taipei
 - Shared `detail-view.js` exists for agent detail rendering and session modal flows.
 - Shared `command-actions.js` exists for command execution and output modal handling.
 - Shared `error-center.js` exists for dashboard error banners, SRE flows, and error helpers.
+- Runtime modules for auth/watchdog/optimize are split in frontend worktree and awaiting cherry-pick.
 - `charts.js`, `cron.js`, `taskhub.js`, `chat.js`, and large parts of `app.js` already use `window.apiClient`.
 - Dashboard stream, log stream, and optimize stream now go through `stream-manager.js`.
 - `app.js` no longer owns the full command/error/navigation/detail workflow blocks.
@@ -101,7 +104,7 @@ Last updated: 2026-03-07 Asia/Taipei
 - `tests/authIntegration.test.js`
 - `tests/apiRoutes.test.js`
 - `tests/cronController.test.js`
-- `tests/legacyControl.test.js`
+- `tests/controlController.test.js`
 - `tests/openclawClient.test.js`
 - `tests/openclawService.test.js`
 - `tests/optimizeService.test.js`
@@ -109,8 +112,8 @@ Last updated: 2026-03-07 Asia/Taipei
 - `tests/modelMonitor.test.js`
 - `tests/taskHub.test.js`
 - `tests/taskHubErrors.test.js`
-- `tests/legacyDashboard.test.js`
-- `tests/legacyDashboardCoverage2.test.js`
+- `tests/dashboardReadController.test.js`
+- `tests/dashboardReadControllerCoverage.test.js`
 - `tests/securityController.test.js`
 - `tests/securityAPI.test.js`
 - `tests/systemAPI.test.js`
@@ -135,6 +138,9 @@ Last updated: 2026-03-07 Asia/Taipei
 - `node -c src/frontend/public/js/modules/taskhub.js`
 - `node -c src/frontend/public/js/modules/chat.js`
 - `node -c src/frontend/public/js/modules/logs.js`
+- `node -c src/frontend/public/js/watchdog-ui.js`
+- `node -c src/frontend/public/js/auth-ui.js`
+- `node -c src/frontend/public/js/optimize-runner.js`
 
 ## Remaining High-Value Work
 
