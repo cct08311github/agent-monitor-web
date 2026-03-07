@@ -49,6 +49,7 @@ Last updated: 2026-03-07 Asia/Taipei
 - `1044158` `feat(s1): align controller api responses`
 - `63af241` `feat(s1): add readiness and dependency health endpoints`
 - `40aa47c` `feat(s1): replace legacy controller entrypoints`
+- pending commit in worktree: request-id and structured API logging batch
 
 ### Frontend
 
@@ -71,6 +72,7 @@ Last updated: 2026-03-07 Asia/Taipei
 - Dashboard read logic and payload building are extracted into services.
 - API response helper and express error handling exist.
 - Readiness/liveness/dependency endpoints exist.
+- Request context middleware exists in worktree with `x-request-id` propagation and structured API request/error logs.
 - New controller names exist:
   - `dashboardReadController.js`
   - `controlController.js`
@@ -116,6 +118,7 @@ Last updated: 2026-03-07 Asia/Taipei
 - `tests/agentController.test.js`
 - `tests/alertController.test.js`
 - `tests/healthService.test.js`
+- `tests/requestContext.test.js`
 
 ### Frontend validation already run
 
@@ -144,7 +147,7 @@ Last updated: 2026-03-07 Asia/Taipei
 ### Backend
 
 - Continue retiring `legacy` naming in tests/docs once wrappers are no longer needed.
-- Improve structured logging/request-id coverage.
+- Extend structured logging/request-id coverage beyond core API middleware into service-level logs.
 - Expand dependency health from file checks to richer readiness semantics if desired.
 
 ### Docs

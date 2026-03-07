@@ -3,6 +3,8 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 const apiRoutes = require('./routes/api');
 const errorHandler = require('./middlewares/errorHandler');
+const requestContext = require('./middlewares/requestContext');
+const requestLogger = require('./middlewares/requestLogger');
 
 const app = express();
 
@@ -17,6 +19,8 @@ app.use(express.static(path.join(__dirname, '../frontend/public'), {
 }));
 app.use(express.json());
 app.use(cookieParser());
+app.use(requestContext);
+app.use(requestLogger);
 
 // Routes
 app.use('/api', apiRoutes);

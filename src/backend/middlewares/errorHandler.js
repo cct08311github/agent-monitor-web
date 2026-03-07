@@ -1,6 +1,7 @@
 'use strict';
 
 const { sendFail } = require('../utils/apiResponse');
+const logger = require('../utils/logger');
 
 function errorHandler(err, req, res, next) {
     if (res.headersSent) return next(err);
@@ -9,11 +10,16 @@ function errorHandler(err, req, res, next) {
     const error = err && err.error ? err.error : (statusCode >= 500 ? 'internal_error' : 'request_failed');
     const extras = err && err.extras && typeof err.extras === 'object' ? err.extras : {};
 
-    if (statusCode >= 500) {
-        console.error('[API] Unhandled error:', err);
-    }
+    logger.error('api_error', {
+        requestId: req.requestId,
+        method: req.method,
+        path: req.originalUrl,
+        statusCode,
+        error,
+        details: logger.toErrorFields(err),
+    });
 
-    return sendFail(res, statusCode, error, extras);
+    return sendFail(res, statusCode, error, { requestId: req.requestId, ...extras });
 }
 
 module.exports = errorHandler;
