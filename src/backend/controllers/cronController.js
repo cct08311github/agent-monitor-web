@@ -2,6 +2,7 @@ const fs = require('fs');
 const { getOpenClawConfig } = require('../config');
 const openclawClient = require('../services/openclawClient');
 const { sendOk, sendFail } = require('../utils/apiResponse');
+const logger = require('../utils/logger');
 
 function getPaths() {
     const openclaw = getOpenClawConfig();
@@ -15,18 +16,18 @@ class CronController {
      * 獲取所有 Cron 任務
      */
     async getJobs(req, res) {
-        console.log('[CronController] Fetching jobs...');
+        logger.info('cron_jobs_fetch_start', { requestId: req.requestId });
         try {
             const { jobsFile } = getPaths();
             if (!fs.existsSync(jobsFile)) {
-                console.warn('[CronController] Jobs file not found at:', jobsFile);
+                logger.warn('cron_jobs_file_missing', { requestId: req.requestId, jobsFile });
                 return sendOk(res, { jobs: [] });
             }
             const data = JSON.parse(fs.readFileSync(jobsFile, 'utf8'));
-            console.log(`[CronController] Found ${data.jobs?.length || 0} jobs.`);
+            logger.info('cron_jobs_fetch_done', { requestId: req.requestId, count: data.jobs?.length || 0 });
             return sendOk(res, { jobs: data.jobs || [] });
         } catch (error) {
-            console.error('獲取 Cron 任務失敗:', error);
+            logger.error('cron_jobs_fetch_error', { requestId: req.requestId, details: logger.toErrorFields(error) });
             return sendFail(res, 500, error.message);
         }
     }
@@ -60,7 +61,7 @@ class CronController {
 
             return sendOk(res, { job: data.jobs[jobIndex] });
         } catch (error) {
-            console.error('更新 Cron 任務失敗:', error);
+            logger.error('cron_job_toggle_error', { requestId: req.requestId, id, details: logger.toErrorFields(error) });
             return sendFail(res, 500, error.message);
         }
     }
@@ -82,10 +83,10 @@ class CronController {
                 return sendFail(res, 404, '找不到該任務');
             }
             fs.writeFileSync(jobsFile, JSON.stringify(data, null, 2), 'utf8');
-            console.log(`[CronController] Deleted job ${id}`);
+            logger.info('cron_job_deleted', { requestId: req.requestId, id });
             return sendOk(res);
         } catch (error) {
-            console.error('[CronController] Delete failed:', error);
+            logger.error('cron_job_delete_error', { requestId: req.requestId, id, details: logger.toErrorFields(error) });
             return sendFail(res, 500, error.message);
         }
     }
@@ -95,7 +96,7 @@ class CronController {
      */
     async runJob(req, res) {
         const { id } = req.params;
-        console.log(`[CronController] Manual run requested for job id: ${id}`);
+        logger.info('cron_job_run_requested', { requestId: req.requestId, id });
 
         try {
             // 驗證任務存在
@@ -109,7 +110,7 @@ class CronController {
                 return sendFail(res, 404, '找不到該任務');
             }
 
-            console.log(`[CronController] Spawning: ${openclawClient.getBinaryPath()} cron run ${id}`);
+            logger.info('cron_job_spawn', { requestId: req.requestId, id, binPath: openclawClient.getBinaryPath() });
 
             const child = openclawClient.spawnArgs(['cron', 'run', id], {
                 detached: true,
@@ -122,7 +123,7 @@ class CronController {
                 jobId: id
             });
         } catch (error) {
-            console.error('[CronController] Unexpected error:', error);
+            logger.error('cron_job_run_error', { requestId: req.requestId, id, details: logger.toErrorFields(error) });
             return sendFail(res, 500, error.message);
         }
     }

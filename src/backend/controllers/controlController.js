@@ -2,6 +2,7 @@ const fs = require('fs');
 const { getOpenClawConfig } = require('../config');
 const openclawClient = require('../services/openclawClient');
 const { sendOk, sendFail } = require('../utils/apiResponse');
+const logger = require('../utils/logger');
 
 function getPaths() {
     const openclaw = getOpenClawConfig();
@@ -81,7 +82,13 @@ class ControlController {
                 setTimeout(() => {
                     openclawClient.execArgs(args, /* istanbul ignore next */ (error) => {
                         /* istanbul ignore next */
-                        if (error) console.error(`[Control] ${command} failed:`, error.message);
+                        if (error) {
+                            logger.error('control_command_failed', {
+                                requestId: req.requestId,
+                                command,
+                                details: logger.toErrorFields(error),
+                            });
+                        }
                     });
                 }, 500);
                 return;
@@ -107,8 +114,11 @@ class ControlController {
             }
         /* istanbul ignore next */
         } catch (error) {
-            /* istanbul ignore next */
-            console.error(`[Control] Error executing ${command}:`, error.message);
+            logger.error('control_command_error', {
+                requestId: req.requestId,
+                command,
+                details: logger.toErrorFields(error),
+            });
             /* istanbul ignore next */
             return sendFail(res, 500, 'command_failed', { output: error.stdout || error.stderr || error.message });
         }
