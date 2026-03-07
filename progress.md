@@ -1,12 +1,12 @@
 # Progress
 
-Last updated: 2026-03-07T15:30 Asia/Taipei
+Last updated: 2026-03-07T15:59 Asia/Taipei
 
 ## Collaboration Rules
 
 - Main worktree: `/Users/openclaw/.openclaw/shared/projects/agent-monitor-web`
 - Frontend worktree: `/Users/openclaw/.openclaw/shared/projects/agent-monitor-web-frontend`
-- Commit format: `feat(s1): ...`
+- Commit format: `feat(s2): ...`
 - When changing frontend JS, update `index.html` query strings (`?v=YYYYMMDD`).
 - Both worktrees clean at last handoff.
 
@@ -79,17 +79,9 @@ All Sprint 1 items are done. Collapsed for reference.
 </details>
 
 <details>
-<summary>Frontend IIFE Wrapping (1 item)</summary>
+<summary>Frontend IIFE Wrapping + QA Verification (9 items)</summary>
 
-- [x] **A3.** Wrap non-IIFE modules in IIFEs to eliminate 52 accidental globals (`ce91ecf`)
-  - Files: `app.js`, `theme-manager.js`, `modules/chat.js`, `modules/logs.js`, `modules/taskhub.js`, `modules/charts.js`, `modules/cron.js`
-  - 46 symbols exposed via `window.X =`, 52 accidentals now private
-
-</details>
-
-<details>
-<summary>QA Verification (8 items)</summary>
-
+- [x] Wrap non-IIFE modules in IIFEs to eliminate 52 accidental globals (`ce91ecf`)
 - [x] Full test suite: 32/32 suites, 421/421 tests
 - [x] Frontend syntax: all 21 JS files pass `node -c`
 - [x] Frontend module completeness: 21 files = 21 script tags
@@ -101,62 +93,152 @@ All Sprint 1 items are done. Collapsed for reference.
 
 </details>
 
-## Next Steps — Optional Improvements
+## Sprint 2 Checklist
 
-All remaining items are optional. Pick any item and mark `[x]` when done.
+Current status: 34/34 suites, 431/431 tests, coverage snapshot still pending refresh after the latest test additions.
 
-### Priority 1 — Frontend Polish
+### S2-A: Test Coverage — Untested Modules
 
-- [ ] **A4.** Dashboard-specific stream wrapper
-  - Goal: extract SSE connection logic shared by dashboard/logs/optimize into a thin wrapper
-  - Files to review: `stream-manager.js`, `dashboard-runtime.js`, `modules/logs.js`, `optimize-runner.js`
-  - Decision needed: does a `dashboard-stream.js` add clarity, or is current code clear enough?
+9 source modules have no dedicated test file. Prioritized by risk.
+
+- [ ] **S2-A1.** Add `dashboardPayloadService` tests (coverage: 85% stmts, 74% branches — lowest)
+  - File: `src/backend/services/dashboardPayloadService.js`
+  - Create: `tests/dashboardPayloadService.test.js`
   - Steps:
-    - [ ] A4.1 Audit current SSE usage across the 4 files, list shared patterns
-    - [ ] A4.2 Decide: extract wrapper vs. keep as-is (document rationale)
-    - [ ] A4.3 If extracting: create `dashboard-stream.js`, migrate callers, add script tag
-    - [ ] A4.4 Validate: `node -c` all changed files + manual SSE smoke test
+    - [ ] S2-A1.1 Read service, identify untested branches (lines 71-72, 104, 109-111, 174-176, 201-205, 231, 246-247, 331, 369, 490-535)
+    - [ ] S2-A1.2 Write tests for exchange rate fetch failure path
+    - [ ] S2-A1.3 Write tests for poller edge cases (broadcast error, empty payload)
+    - [ ] S2-A1.4 Write tests for SSE client connect/disconnect lifecycle
+    - [ ] S2-A1.5 Validate: `npx jest tests/dashboardPayloadService.test.js`
 
-### Priority 2 — Health / Operability
-
-- [ ] **C1.** Readiness dependency depth review
-  - Goal: decide whether `/api/read/readiness` should probe CLI, TaskHub, watchdog
-  - Files: `src/backend/services/healthService.js`, `src/backend/routes/api.js`
+- [x] **S2-A2.** Add `sessionReadService` tests
+  - File: `src/backend/services/sessionReadService.js`
+  - Create: `tests/sessionReadService.test.js` (`2026-03-07`)
   - Steps:
-    - [ ] C1.1 Read current readiness checks and list what's probed vs. not
-    - [ ] C1.2 Decide: add CLI/TaskHub/watchdog probes? (trade-off: accuracy vs. latency)
-    - [ ] C1.3 If adding: implement probes with timeout guards
-    - [ ] C1.4 Validate: `npx jest tests/healthService.test.js tests/apiRoutes.test.js --testNamePattern="health|readiness"`
+    - [x] S2-A2.1 Read service, identify JSONL parsing edge cases
+    - [x] S2-A2.2 Write tests for malformed JSONL lines (silent catch at lines 44, 82, 84)
+    - [x] S2-A2.3 Write tests for missing session file / empty file
+    - [x] S2-A2.4 Validate: `npx jest tests/sessionReadService.test.js --runInBand`
 
-- [ ] **C3.** Watchdog optional hardening (from smoke findings)
-  - Goal: address 3 minor findings from watchdog smoke test
-  - Files: `src/backend/controllers/watchdogController.js`, `src/backend/services/gatewayWatchdog.js`
+- [x] **S2-A3.** Add `historyService` tests
+  - File: `src/backend/services/historyService.js`
+  - Create: `tests/historyService.test.js` (`2026-03-07`)
   - Steps:
-    - [ ] C3.1 Add `typeof enabled === 'boolean'` validation to toggle endpoint
-    - [ ] C3.2 Add test: 3 consecutive repair failures trigger escalation
-    - [ ] C3.3 Wrap module-level `getOpenClawConfig()` in try/catch
-    - [ ] C3.4 Validate: `npx jest tests/watchdog*.test.js`
+    - [x] S2-A3.1 Read service, list public methods
+    - [x] S2-A3.2 Write tests for normal history retrieval
+    - [x] S2-A3.3 Write tests for error/empty paths
+    - [x] S2-A3.4 Validate: `npx jest tests/historyService.test.js --runInBand`
 
-### Priority 3 — Documentation
+- [ ] **S2-A4.** Add `agentWatcherService` tests
+  - File: `src/backend/services/agentWatcherService.js`
+  - Create: `tests/agentWatcherService.test.js`
+  - Steps:
+    - [ ] S2-A4.1 Read service, identify subscribe/unsubscribe lifecycle
+    - [ ] S2-A4.2 Write tests for watcher event forwarding
+    - [ ] S2-A4.3 Validate: `npx jest tests/agentWatcherService.test.js`
 
-- [ ] **D1.** Historical docs decision
+- [ ] **S2-A5.** Add missing controller tests
+  - Untested controllers: `authController`, `complianceController`, `systemController`, `taskHubController`
+  - Steps:
+    - [ ] S2-A5.1 Add `tests/authController.test.js` (login/logout/session flows)
+    - [ ] S2-A5.2 Add `tests/complianceController.test.js` (analyze endpoint)
+    - [ ] S2-A5.3 Add `tests/systemController.test.js` (system info endpoint)
+    - [ ] S2-A5.4 Add `tests/taskHubController.test.js` (CRUD operations)
+    - [ ] S2-A5.5 Validate: `npx jest tests/*Controller.test.js`
+
+### S2-B: Silent Error Swallowing
+
+14 empty `catch {}` blocks across 5 files. These hide failures silently.
+
+- [ ] **S2-B1.** Audit and fix silent catches in `dashboardPayloadService.js` (7 occurrences)
+  - Lines: 87, 200, 206, 217, 356, 409, 442
+  - Steps:
+    - [ ] S2-B1.1 Read each catch block, classify: intentional (parse fallback) vs. hiding real errors
+    - [ ] S2-B1.2 Add `logger.warn(...)` to catches that could hide real failures
+    - [ ] S2-B1.3 Leave intentional parse-fallback catches as-is (add comment)
+    - [ ] S2-B1.4 Validate: `npx jest tests/dashboardPayloadService*.test.js`
+
+- [ ] **S2-B2.** Audit silent catches in remaining files
+  - `sessionReadService.js` (lines 44, 82, 84) — JSONL parse fallbacks
+  - `optimizeService.js` (line 36) — env file read fallback
+  - `gatewayWatchdog.js` (line 221) — kill process fallback
+  - `controlAudit.js` (line 60) — audit write fallback
+  - Steps:
+    - [ ] S2-B2.1 Classify each: intentional fallback vs. error hiding
+    - [ ] S2-B2.2 Add logger or comment as appropriate
+    - [ ] S2-B2.3 Validate: `npx jest --forceExit`
+
+### S2-C: Watchdog Hardening
+
+From Sprint 1 smoke findings. Low risk, small scope.
+
+- [ ] **S2-C1.** Add `enabled` type validation to toggle endpoint
+  - File: `src/backend/controllers/watchdogController.js`
+  - Steps:
+    - [ ] S2-C1.1 Add `typeof enabled !== 'boolean'` -> 400 response
+    - [ ] S2-C1.2 Add test for non-boolean `enabled` value
+    - [ ] S2-C1.3 Validate: `npx jest tests/watchdog*.test.js`
+
+- [ ] **S2-C2.** Add escalation path test coverage
+  - File: `src/backend/services/gatewayWatchdog.js`
+  - Steps:
+    - [ ] S2-C2.1 Read escalation logic (3 consecutive failures)
+    - [ ] S2-C2.2 Write test: 3 consecutive repair failures trigger escalation
+    - [ ] S2-C2.3 Validate: `npx jest tests/watchdog*.test.js`
+
+- [ ] **S2-C3.** Wrap module-level `getOpenClawConfig()` in try/catch
+  - File: `src/backend/services/gatewayWatchdog.js`
+  - Steps:
+    - [ ] S2-C3.1 Wrap top-level config read in try/catch with logger.error fallback
+    - [ ] S2-C3.2 Validate: `npx jest tests/watchdog*.test.js`
+
+### S2-D: Frontend Polish
+
+- [ ] **S2-D1.** Dashboard-specific stream wrapper (decision needed)
+  - Goal: evaluate whether SSE logic in dashboard/logs/optimize should share a thin wrapper
+  - Files: `stream-manager.js`, `dashboard-runtime.js`, `modules/logs.js`, `optimize-runner.js`
+  - Steps:
+    - [ ] S2-D1.1 Audit SSE usage across 4 files, list shared vs. unique patterns
+    - [ ] S2-D1.2 Decide: extract `dashboard-stream.js` or keep as-is (document rationale)
+    - [ ] S2-D1.3 If extracting: create wrapper, migrate callers, add script tag
+    - [ ] S2-D1.4 Validate: `node -c` all changed files + manual SSE smoke test
+
+### S2-E: Documentation
+
+- [ ] **S2-E1.** Historical docs decision
   - Files: `docs/plans/2026-03-02-*.md`
-  - Recommendation: preserve as-is (archival, not runtime)
   - Steps:
-    - [ ] D1.1 Review docs/plans/ contents, confirm no stale references
-    - [ ] D1.2 Add a one-line README in `docs/plans/` explaining archival purpose
+    - [ ] S2-E1.1 Review docs/plans/ contents, confirm no stale references
+    - [ ] S2-E1.2 Add one-line README in `docs/plans/` explaining archival purpose
 
-- [ ] **D2.** Architecture snapshot refresh
+- [ ] **S2-E2.** Architecture snapshot refresh
   - Goal: update README.md and CLAUDE.md to reflect post-Sprint-1 architecture
-  - Files: `README.md`, `CLAUDE.md`
-  - Prerequisite: do after all code changes are complete
+  - Prerequisite: do after all S2 code changes are complete
   - Steps:
-    - [ ] D2.1 Audit current README.md against actual project structure
-    - [ ] D2.2 Update README.md: file tree, module descriptions, API routes
-    - [ ] D2.3 Update CLAUDE.md: any new conventions, paths, or quirks
-    - [ ] D2.4 Validate: no broken references, consistent with codebase
+    - [ ] S2-E2.1 Audit README.md against actual project structure
+    - [ ] S2-E2.2 Update README.md: file tree, module descriptions, API routes
+    - [ ] S2-E2.3 Update CLAUDE.md: new conventions, paths, quirks
+    - [ ] S2-E2.4 Validate: no broken references, consistent with codebase
 
 ## Reference Data
+
+### Coverage Snapshot (Sprint 1 end)
+
+```
+Statements: 95.82% (1997/2084)
+Branches:   87.82% (923/1051)
+Functions:  95.69% (289/302)
+Lines:      97.24% (1833/1885)
+```
+
+Lowest-coverage files:
+- `dashboardPayloadService.js`: 85% stmts, 74% branches
+- `optimizeService.js`: 94% stmts, 86% branches
+
+### Untested Modules
+
+7 source modules without dedicated test files:
+`agentWatcherService`, `authController`, `complianceController`, `dashboardPayloadService`, `sessionService`, `systemController`, `taskHubController`
 
 ### Frontend Globals Inventory
 
@@ -167,22 +249,124 @@ All remaining items are optional. Pick any item and mark `[x]` when done.
 | inline-handler | 39 | Referenced from `index.html` onclick/oninput handlers |
 | accidental | ~~52~~ **0** | Eliminated by IIFE wrapping all 7 files |
 
-All 21 JS files use IIFE wrappers. `window.fetch` monkey-patched in `auth-ui.js` for 401 intercept (intentional).
-
 ### Watchdog Smoke Findings
 
-- All 36 tests pass (12 + 19 + 5), no blocking issues
-- Optional improvements (addressed by C3):
-  1. `/watchdog/status` has no auth guard (read-only, low risk)
-  2. `/watchdog/toggle` does not validate `req.body.enabled` type
-  3. Escalation path (3 consecutive failures) has no test coverage
-  4. Module-level `getOpenClawConfig()` call could crash on require if config broken
+- 36/36 tests pass, no blocking issues
+- Addressed by S2-C:
+  1. `/watchdog/toggle` does not validate `req.body.enabled` type
+  2. Escalation path (3 consecutive failures) has no test coverage
+  3. Module-level `getOpenClawConfig()` call could crash if config broken
 
 ## Notes For Other AI Workers
 
-- Sprint 1 is complete. All remaining work is **optional**.
+- Sprint 1 is complete. Sprint 2 focuses on **test coverage, error hygiene, and hardening**.
+- Commit format is now `feat(s2): ...`.
 - If you touch frontend JS, keep syntax-valid and run `node -c` on changed files.
 - If you touch backend routes/controllers, run the narrowest relevant Jest subset.
 - Check `git status --short` before each commit — do not stage unrelated files.
 - Mark sub-steps `[x]` as you go so other workers can see partial progress.
 - Always git-ship (push -> issue -> CI -> close) after completing a task group.
+- S2-A tasks (test coverage) are independent and can be parallelized across workers.
+- S2-B (silent catches) depends on understanding from S2-A1 for dashboardPayloadService.
+- S2-E2 (docs refresh) should be done last, after all code changes settle.
+
+## Sprint 2 Work Log
+
+### 2026-03-07 — Coverage batch 1
+
+- Completed:
+  - [x] `tests/historyService.test.js` added
+  - [x] `tests/sessionReadService.test.js` added
+- Scope covered:
+  - history payload happy path
+  - empty history payload path
+  - session param validation
+  - missing session file path
+  - JSONL malformed-line tolerance
+  - session list sorting / trim-to-20 behavior
+  - session read failure fallback behavior
+- Validation:
+  - [x] `npx jest tests/historyService.test.js tests/sessionReadService.test.js --runInBand`
+  - [x] `npx jest tests/dashboardReadController.test.js tests/dashboardReadControllerCoverage.test.js --runInBand`
+  - [x] `npm test -- --runInBand`
+
+## Latest QA Result
+
+- Date: `2026-03-07`
+- Result: `PASS`
+- Full suite:
+  - [x] 34/34 suites
+  - [x] 431/431 tests
+- New in this pass:
+  - [x] historyService dedicated unit coverage
+  - [x] sessionReadService dedicated unit coverage
+- Non-blocking observations:
+  - Structured logger output still appears in Jest console for expected error-path tests.
+  - Current `progress.md` is ahead of coverage snapshot text; refresh exact percentage only after the next formal coverage run.
+
+## Next-Step Checklist For Multi-AI Handoff
+
+Use these as pick-up tasks. Each checkbox item is intended to be independently owned.
+
+### Highest Priority
+
+- [ ] **S2-A1** Add `dashboardPayloadService` dedicated tests
+  - [ ] cover exchange-rate fetch failure
+  - [ ] cover SSE client lifecycle
+  - [ ] cover polling/broadcast edge paths
+  - [ ] run `npx jest tests/dashboardPayloadService.test.js --runInBand`
+
+- [ ] **S2-B1** Audit silent catches in `dashboardPayloadService.js`
+  - [ ] classify each empty catch as intentional vs hidden failure
+  - [ ] add `logger.warn` where signal is needed
+  - [ ] add comments where silent fallback is intentional
+  - [ ] rerun `dashboardPayloadService` and dashboard controller tests
+
+- [ ] **S2-C1** Add `enabled` boolean validation to watchdog toggle endpoint
+  - [ ] implement 400 response for non-boolean values
+  - [ ] add regression test
+  - [ ] run watchdog test subset
+
+### Medium Priority
+
+- [ ] **S2-A4** Add `agentWatcherService` dedicated tests
+  - [ ] watcher subscribe/unsubscribe lifecycle
+  - [ ] forwarded event emission
+  - [ ] run `npx jest tests/agentWatcherService.test.js --runInBand`
+
+- [ ] **S2-A5** Add dedicated controller unit tests
+  - [ ] `tests/authController.test.js`
+  - [ ] `tests/complianceController.test.js`
+  - [ ] `tests/systemController.test.js`
+  - [ ] `tests/taskHubController.test.js`
+  - [ ] run only touched controller suites
+
+- [ ] **S2-B2** Audit remaining silent catches outside dashboard payload
+  - [ ] `sessionReadService.js`
+  - [ ] `optimizeService.js`
+  - [ ] `gatewayWatchdog.js`
+  - [ ] `controlAudit.js`
+
+- [ ] **S2-C2** Add escalation-path watchdog test
+  - [ ] simulate 3 consecutive repair failures
+  - [ ] assert escalation path / state transition
+
+- [ ] **S2-C3** Harden top-level watchdog config read
+  - [ ] wrap config read in try/catch
+  - [ ] log fallback cleanly
+  - [ ] validate watchdog suites
+
+### Lower Priority
+
+- [ ] **S2-D1** Decide whether a dashboard-specific SSE wrapper is worth introducing
+  - [ ] audit dashboard/logs/optimize stream overlap
+  - [ ] either document no-op decision or extract wrapper
+
+- [ ] **S2-E1** Add archival note under `docs/plans/`
+  - [ ] explain historical-doc purpose
+  - [ ] avoid rewriting historical content unless requested
+
+- [ ] **S2-E2** Refresh architecture docs after code settles
+  - [ ] update `README.md`
+  - [ ] update `CLAUDE.md`
+  - [ ] optionally add `docs/architecture/current-state.md`
