@@ -295,6 +295,36 @@ describe('sendTelegramNotification - escalation', () => {
         const status = watchdog.getStatus();
         expect(status.totalRepairs).toBeGreaterThanOrEqual(1);
     }, 6000);
+
+    it('marks status escalated after failed auto-repair in healthCheckLoop', async () => {
+        jest.useFakeTimers();
+        makeHttpMock({ error: new Error('conn refused') });
+        mockExecFilePromise.mockRejectedValue(Object.assign(new Error('fail'), { stdout: '', stderr: '' }));
+        mockExecPromise.mockResolvedValue({ stdout: '', stderr: '' });
+
+        watchdog.CONFIG.telegramCooldownMs = 0;
+        watchdog.CONFIG.maxRepairAttempts = 1;
+        watchdog.CONFIG.repairCooldownMs = 0;
+        watchdog.CONFIG.checkIntervalMs = 50;
+        watchdog.CONFIG.repairWaitMs = 50;
+
+        watchdog.start();
+
+        for (let i = 0; i < 60; i++) {
+            await jest.advanceTimersByTimeAsync(250);
+            const status = watchdog.getStatus();
+            if (status.currentStatus === 'escalated') {
+                expect(status.totalAlerts).toBeGreaterThanOrEqual(1);
+                expect(status.repairAttempts).toBe(0);
+                watchdog.stop();
+                return;
+            }
+        }
+
+        const status = watchdog.getStatus();
+        watchdog.stop();
+        throw new Error(`expected escalated status, received ${status.currentStatus}`);
+    }, 7000);
 });
 
 describe('sendTelegramNotification - method 2 fallback', () => {
@@ -412,4 +442,20 @@ describe('getStatus - with lastRestartTime set', () => {
         // lastRepairTime should now be set (not null)
         expect(status.lastRepairTime).toBeDefined();
     }, 3000);
+});
+
+describe('module config fallback', () => {
+    it('falls back to default paths when config loading throws', () => {
+        jest.isolateModules(() => {
+            jest.doMock('../src/backend/config', () => ({
+                getOpenClawConfig: jest.fn(() => { throw new Error('broken config'); }),
+                getOptimizeConfig: jest.fn(() => { throw new Error('broken config'); }),
+                getProjectRoot: jest.fn(() => '/tmp/project'),
+            }));
+
+            const fallbackWatchdog = require('../src/backend/services/gatewayWatchdog');
+            expect(fallbackWatchdog.CONFIG.logDir).toBe('/tmp/project/logs/watchdog');
+            expect(fallbackWatchdog.getStatus().currentStatus).toBeDefined();
+        });
+    });
 });
