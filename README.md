@@ -86,7 +86,12 @@ src/
             ├── detail-view.js          # agent detail / session modal
             ├── error-center.js         # dashboard error banner / SRE flow
             ├── command-actions.js      # 控制指令 / output modal
-            ├── app.js                  # 剩餘 bootstrap / dashboard render / watchdog/auth
+            ├── watchdog-ui.js          # watchdog UI / control flows
+            ├── auth-ui.js              # auth redirect / logout / 401 handling
+            ├── optimize-runner.js      # optimize SSE / progress UI
+            ├── dashboard-runtime.js    # dashboard SSE / connection status
+            ├── bootstrap.js            # DOMContentLoaded bootstrap
+            ├── app.js                  # 剩餘 dashboard render / helpers
             └── modules/
                 ├── charts.js           # drawSparkline / drawBarChart / drawHBarChart
                 ├── logs.js
