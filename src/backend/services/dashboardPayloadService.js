@@ -84,7 +84,10 @@ async function resolveOpenclawBin() {
                 RESOLVED_OPENCLAW_BIN = cand;
                 return RESOLVED_OPENCLAW_BIN;
             }
-        } catch (e) {}
+        } catch (e) {
+            // Candidate probing is expected to fail on machines where only one
+            // OpenClaw binary location exists, so keep this path silent.
+        }
     }
 
     RESOLVED_OPENCLAW_BIN = 'openclaw';
@@ -197,13 +200,17 @@ async function getSystemResources() {
                 const occupied = getVal('Pages occupied by compressor');
                 const usedMem = active + wired + occupied;
                 if (usedMem > 0) freeMem = Math.max(0, totalMem - usedMem);
-            } catch (e) {}
+            } catch (e) {
+                // vm_stat is optional best-effort enrichment on macOS.
+            }
         } else if (os.platform() === 'linux') {
             try {
                 const { stdout } = await execFilePromise('free', ['-b']);
                 const memMatch = stdout.match(/Mem:\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+(\d+)/);
                 if (memMatch) freeMem = parseInt(memMatch[1], 10);
-            } catch (e) {}
+            } catch (e) {
+                // free(1) is optional best-effort enrichment on Linux.
+            }
         }
 
         const memUsage = ((totalMem - freeMem) / totalMem * 100).toFixed(1);
@@ -214,7 +221,9 @@ async function getSystemResources() {
             const lastLine = stdout.trim().split('\n').pop();
             const match = lastLine.match(/(\d+)%/);
             if (match) diskUsage = match[1];
-        } catch (e) {}
+        } catch (e) {
+            // Disk usage is non-critical; preserve payload generation if df fails.
+        }
 
         const uptimeSeconds = os.uptime();
         const hours = Math.floor(uptimeSeconds / 3600);
@@ -353,7 +362,9 @@ function detectDetailedActivity(agentId) {
                                 found = true;
                                 break;
                             }
-                        } catch (e) {}
+                        } catch (e) {
+                            // Session JSONL may contain partial or malformed lines; skip them.
+                        }
                     }
                     if (found) break;
                 }
@@ -366,6 +377,7 @@ function detectDetailedActivity(agentId) {
         }
         return detail;
     } catch (e) {
+        logger.warn('agent_activity_read_failed', { agentId, msg: e.message });
         return detail;
     }
 }
@@ -378,7 +390,12 @@ function buildSubagentStatus() {
             const sessionsPath = path.join(AGENTS_ROOT, agentDirName, 'sessions', 'sessions.json');
             if (!fs.existsSync(sessionsPath)) continue;
             let sessions;
-            try { sessions = JSON.parse(fs.readFileSync(sessionsPath, 'utf8')); } catch (e) { continue; }
+            try {
+                sessions = JSON.parse(fs.readFileSync(sessionsPath, 'utf8'));
+            } catch (e) {
+                logger.warn('subagent_sessions_parse_failed', { agentDirName, msg: e.message });
+                continue;
+            }
 
             for (const [sessionKey, meta] of Object.entries(sessions)) {
                 if (!sessionKey.includes(':subagent:')) continue;
@@ -406,7 +423,9 @@ function buildSubagentStatus() {
                 });
             }
         }
-    } catch (e) {}
+    } catch (e) {
+        logger.warn('subagent_status_build_failed', { msg: e.message });
+    }
     const rank = { running: 0, recent: 1, idle: 2 };
     subagents.sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9) || (a.minutesAgo ?? 999999) - (b.minutesAgo ?? 999999));
     return subagents;
@@ -439,7 +458,9 @@ async function buildDashboardPayload() {
     try {
         const parsedCron = JSON.parse(cronResult.stdout || '{"jobs":[]}');
         cronJobs = Array.isArray(parsedCron.jobs) ? parsedCron.jobs : [];
-    } catch (e) {}
+    } catch (e) {
+        logger.warn('cron_jobs_parse_failed', { msg: e.message });
+    }
 
     const cron = cronJobs.map((j) => ({
         id: j.id,

@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-03-07T16:05 Asia/Taipei
+Last updated: 2026-03-07T16:09 Asia/Taipei
 
 ## Collaboration Rules
 
@@ -95,7 +95,7 @@ All Sprint 1 items are done. Collapsed for reference.
 
 ## Sprint 2 Checklist
 
-Current status: 35/35 suites, 435/435 tests, coverage snapshot still pending refresh after the latest test additions.
+Current status: 35/35 suites, 437/437 tests, coverage snapshot still pending refresh after the latest test additions.
 
 ### S2-A: Test Coverage — Untested Modules
 
@@ -150,13 +150,13 @@ Current status: 35/35 suites, 435/435 tests, coverage snapshot still pending ref
 
 14 empty `catch {}` blocks across 5 files. These hide failures silently.
 
-- [ ] **S2-B1.** Audit and fix silent catches in `dashboardPayloadService.js` (7 occurrences)
+- [x] **S2-B1.** Audit and fix silent catches in `dashboardPayloadService.js` (7 occurrences)
   - Lines: 87, 200, 206, 217, 356, 409, 442
   - Steps:
-    - [ ] S2-B1.1 Read each catch block, classify: intentional (parse fallback) vs. hiding real errors
-    - [ ] S2-B1.2 Add `logger.warn(...)` to catches that could hide real failures
-    - [ ] S2-B1.3 Leave intentional parse-fallback catches as-is (add comment)
-    - [ ] S2-B1.4 Validate: `npx jest tests/dashboardPayloadService*.test.js`
+    - [x] S2-B1.1 Read each catch block, classify: intentional (parse fallback) vs. hiding real errors
+    - [x] S2-B1.2 Add `logger.warn(...)` to catches that could hide real failures
+    - [x] S2-B1.3 Leave intentional parse-fallback catches as-is (add comment)
+    - [x] S2-B1.4 Validate: `npx jest tests/dashboardPayloadService.test.js tests/dashboardReadController*.test.js --runInBand`
 
 - [ ] **S2-B2.** Audit silent catches in remaining files
   - `sessionReadService.js` (lines 44, 82, 84) — JSONL parse fallbacks
@@ -307,17 +307,33 @@ Lowest-coverage files:
   - [x] `npx jest tests/dashboardReadController.test.js tests/dashboardReadControllerCoverage.test.js --runInBand`
   - [x] `npm test -- --runInBand`
 
+### 2026-03-07 — Error hygiene batch 1
+
+- Completed:
+  - [x] `dashboardPayloadService.js` silent catch audit
+- Scope covered:
+  - kept binary-probe and OS-specific metric fallback catches intentionally silent with comments
+  - added `logger.warn` for agent activity read failure
+  - added `logger.warn` for malformed subagent `sessions.json`
+  - added `logger.warn` for invalid cron JSON
+  - added dedicated tests for the new warning paths
+- Validation:
+  - [x] `npx jest tests/dashboardPayloadService.test.js --runInBand`
+  - [x] `npx jest tests/dashboardReadController.test.js tests/dashboardReadControllerCoverage.test.js --runInBand`
+  - [x] `npm test -- --runInBand`
+
 ## Latest QA Result
 
 - Date: `2026-03-07`
 - Result: `PASS`
 - Full suite:
   - [x] 35/35 suites
-  - [x] 435/435 tests
+  - [x] 437/437 tests
 - New in this pass:
   - [x] historyService dedicated unit coverage
   - [x] sessionReadService dedicated unit coverage
   - [x] dashboardPayloadService dedicated unit coverage
+  - [x] dashboardPayloadService silent-catch warning coverage
 - Non-blocking observations:
   - Structured logger output still appears in Jest console for expected error-path tests.
   - Current `progress.md` is ahead of coverage snapshot text; refresh exact percentage only after the next formal coverage run.
@@ -327,12 +343,6 @@ Lowest-coverage files:
 Use these as pick-up tasks. Each checkbox item is intended to be independently owned.
 
 ### Highest Priority
-
-- [ ] **S2-B1** Audit silent catches in `dashboardPayloadService.js`
-  - [ ] classify each empty catch as intentional vs hidden failure
-  - [ ] add `logger.warn` where signal is needed
-  - [ ] add comments where silent fallback is intentional
-  - [ ] rerun `dashboardPayloadService` and dashboard controller tests
 
 - [ ] **S2-C1** Add `enabled` boolean validation to watchdog toggle endpoint
   - [ ] implement 400 response for non-boolean values
