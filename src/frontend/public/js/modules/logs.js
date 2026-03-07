@@ -1,4 +1,5 @@
 // --- OpenClaw Live Log Streaming ---
+(function () {
 let ocLogSource = null;  // EventSource connection
 const OC_LOG_MAX_LINES = 500; // Rolling buffer limit
 
@@ -22,11 +23,11 @@ function startOcLog() {
     const btn = document.getElementById('ocLogToggleBtn');
     if (!terminal) return;
 
-    terminal.innerHTML = '<span class="oc-log-line info">連接中...</span>';
+    terminal.innerHTML = '<span class="oc-log-line info">\u9023\u63A5\u4E2D...</span>';
     ocLogSource = window.streamManager.connect('/api/logs/stream', {
         onOpen() {
-            if (badge) { badge.textContent = '● 監看中'; badge.className = 'oc-log-badge live'; }
-            if (btn) btn.innerHTML = '⏹ 停止監看';
+            if (badge) { badge.textContent = '\u25CF \u76E3\u770B\u4E2D'; badge.className = 'oc-log-badge live'; }
+            if (btn) btn.textContent = '\u23F9 \u505C\u6B62\u76E3\u770B';
         },
         onMessage(e) {
             try {
@@ -35,7 +36,7 @@ function startOcLog() {
             } catch (_) { }
         },
         onError() {
-            appendOcLogLine(terminal, '[連線中斷，請重新開始監看]');
+            appendOcLogLine(terminal, '[\u9023\u7DDA\u4E2D\u65B7\uFF0C\u8ACB\u91CD\u65B0\u958B\u59CB\u76E3\u770B]');
             stopOcLog();
         },
         autoReconnect: false
@@ -49,13 +50,19 @@ function stopOcLog() {
     }
     const badge = document.getElementById('ocLogStatus');
     const btn = document.getElementById('ocLogToggleBtn');
-    if (badge) { badge.textContent = '● 已停止'; badge.className = 'oc-log-badge'; }
-    if (btn) btn.innerHTML = '▶ 開始監看';
+    if (badge) { badge.textContent = '\u25CF \u5DF2\u505C\u6B62'; badge.className = 'oc-log-badge'; }
+    if (btn) btn.textContent = '\u25B6 \u958B\u59CB\u76E3\u770B';
 }
 
 function clearOcLog() {
     const terminal = document.getElementById('ocLogTerminal');
-    if (terminal) terminal.innerHTML = '<span class="oc-log-line">日誌已清除</span>';
+    if (terminal) {
+        terminal.textContent = '';
+        const span = document.createElement('span');
+        span.className = 'oc-log-line';
+        span.textContent = '\u65E5\u8A8C\u5DF2\u6E05\u9664';
+        terminal.appendChild(span);
+    }
 }
 
 function appendOcLogLine(terminal, line) {
@@ -151,3 +158,11 @@ function toggleWarnOnly() {
     document.getElementById('logFilterError')?.classList.remove('active-error');
     applyLogFilter();
 }
+
+// Expose cross-module and inline-handler symbols
+window.toggleOcLog = toggleOcLog;
+window.clearOcLog = clearOcLog;
+window.setLogFilter = setLogFilter;
+window.toggleErrorOnly = toggleErrorOnly;
+window.toggleWarnOnly = toggleWarnOnly;
+})();

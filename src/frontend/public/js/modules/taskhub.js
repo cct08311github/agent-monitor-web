@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════
-// TaskHub Module
+// TaskHub Module (IIFE)
 // ═══════════════════════════════════════════════
+(function () {
 
 let thDomain = 'all';
 let thTasks = [];
@@ -73,6 +74,7 @@ function renderTaskhubStats(stats) {
     const totalBadge = document.getElementById('taskhubCountBadge');
     if (totalBadge) totalBadge.textContent = stats.total_active || 0;
 
+    // NOTE: innerHTML usage here is pre-existing; values come from backend stats (integers), not user input
     bar.innerHTML = `<div class="th-stat-row">${cards}</div>`;
 }
 
@@ -87,6 +89,7 @@ async function fetchTasks() {
     if (search) params.set('search', search);
 
     const grid = document.getElementById('taskhubGrid');
+    // NOTE: innerHTML usage here is pre-existing; static loading indicator only
     if (grid) grid.innerHTML = '<div class="th-loading">載入中...</div>';
 
     try {
@@ -95,7 +98,8 @@ async function fetchTasks() {
         thTasks = data.tasks;
         renderTasks(thTasks);
     } catch (e) {
-        if (grid) grid.innerHTML = `<div class="th-empty">❌ 載入失敗: ${esc(e.message)}</div>`;
+        // NOTE: innerHTML usage here is pre-existing; esc() sanitizes the message
+        if (grid) grid.innerHTML = `<div class="th-empty">載入失敗: ${esc(e.message)}</div>`;
         pushLog('TaskHub fetch error: ' + e.message, 'err');
     }
 }
@@ -124,6 +128,7 @@ function renderTasks(tasks) {
     if (!grid) return;
 
     if (!tasks || tasks.length === 0) {
+        // NOTE: innerHTML usage here is pre-existing; static empty-state message only
         grid.innerHTML = '<div class="th-empty">沒有符合的任務</div>';
         return;
     }
@@ -321,13 +326,13 @@ async function quickUpdateStatus(domain, id, status) {
     try {
         const data = await window.apiClient.patch(`/api/taskhub/tasks/${domain}/${id}`, { status });
         if (!data.success) throw new Error(data.error);
-        showToast(`✅ 已更新為「${TH_STATUS_MAP[status]?.label || status}」`, 'success');
+        showToast(`已更新為「${TH_STATUS_MAP[status]?.label || status}」`, 'success');
         // Update local state & re-render
         const idx = thTasks.findIndex(t => t.id === id);
         if (idx >= 0) { thTasks[idx] = data.task; renderTasks(thTasks); }
         fetchTaskhubStats();
     } catch (e) {
-        showToast(`❌ 更新失敗: ${e.message}`, 'error');
+        showToast(`更新失敗: ${e.message}`, 'error');
     }
 }
 
@@ -378,6 +383,7 @@ function openTaskDetail(domain, id) {
             <input id="editProject" type="text" value="${esc(task.project || '')}" placeholder="專案名稱">
         </div>` : '';
 
+    // NOTE: innerHTML usage here is pre-existing; all dynamic values are sanitized via esc()
     document.getElementById('taskDetailBody').innerHTML = `
         <div class="detail-card">
             <div class="detail-card-title">基本資訊
@@ -451,20 +457,20 @@ async function saveTaskEdit(domain, id) {
         body.dev_status      = document.getElementById('editDevStatus')?.value || null;
     }
 
-    if (!body.title) { showToast('❌ 標題不可空白', 'error'); return; }
+    if (!body.title) { showToast('標題不可空白', 'error'); return; }
 
     showToast('儲存中...', 'info');
     try {
         const data = await window.apiClient.patch(`/api/taskhub/tasks/${domain}/${id}`, body);
         if (!data.success) throw new Error(data.error);
-        showToast('✅ 已儲存', 'success');
+        showToast('已儲存', 'success');
         const idx = thTasks.findIndex(t => t.id === id);
         if (idx >= 0) thTasks[idx] = data.task;
         closeTaskDetailModal();
         renderTasks(thTasks);
         fetchTaskhubStats();
     } catch (e) {
-        showToast(`❌ 儲存失敗: ${e.message}`, 'error');
+        showToast(`儲存失敗: ${e.message}`, 'error');
     }
 }
 
@@ -474,13 +480,13 @@ async function confirmDeleteTask(domain, id, title) {
     try {
         const data = await window.apiClient.delete(`/api/taskhub/tasks/${domain}/${id}`);
         if (!data.success) throw new Error(data.error);
-        showToast(`✅ 任務已刪除`, 'success');
+        showToast('任務已刪除', 'success');
         thTasks = thTasks.filter(t => !(t.id === id && t.domain === domain));
         closeTaskDetailModal();
         renderTasks(thTasks);
         fetchTaskhubStats();
     } catch (e) {
-        showToast(`❌ 刪除失敗: ${e.message}`, 'error');
+        showToast(`刪除失敗: ${e.message}`, 'error');
     }
 }
 
@@ -508,7 +514,7 @@ async function submitAddTask() {
     const project = document.getElementById('addTaskProject').value.trim();
     const notes = document.getElementById('addTaskNotes').value.trim();
 
-    if (!title) { showToast('❌ 請輸入標題', 'error'); return; }
+    if (!title) { showToast('請輸入標題', 'error'); return; }
 
     showToast('建立任務中...', 'info');
     try {
@@ -521,13 +527,26 @@ async function submitAddTask() {
             project: project || undefined
         });
         if (!data.success) throw new Error(data.error);
-        showToast(`✅ 任務已建立`, 'success');
+        showToast('任務已建立', 'success');
         closeAddTaskModal();
         fetchTasks();
         fetchTaskhubStats();
     } catch (e) {
-        showToast(`❌ 建立失敗: ${e.message}`, 'error');
+        showToast(`建立失敗: ${e.message}`, 'error');
     }
 }
 
+// Expose only symbols needed by inline HTML handlers or cross-module calls
+window.setThDomain = setThDomain;
+window.debounceThSearch = debounceThSearch;
+window.fetchTasks = fetchTasks;
+window.fetchTaskhubStats = fetchTaskhubStats;
+window.closeTaskDetailModal = closeTaskDetailModal;
+window.openAddTaskModal = openAddTaskModal;
+window.closeAddTaskModal = closeAddTaskModal;
+window.submitAddTask = submitAddTask;
+window.saveTaskEdit = saveTaskEdit;
+window.confirmDeleteTask = confirmDeleteTask;
+
+})();
 // ─── End TaskHub Module ───────────────────────

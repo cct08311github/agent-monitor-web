@@ -3,6 +3,8 @@
    Handles dark/light mode switching with system preference detection and localStorage persistence.
    ======================================== */
 
+(function () {
+
 const ThemeManager = {
     // Configuration
     STORAGE_KEY: 'oc_theme',
@@ -195,11 +197,8 @@ if (document.readyState === 'loading') {
     ThemeManager.init();
 }
 
-// Global access
-window.ThemeManager = ThemeManager;
-
 // Simple toggle function for inline onclick handler
-window.toggleTheme = function() {
+function toggleTheme() {
     console.log('toggleTheme called');
     if (typeof ThemeManager === 'undefined') {
         console.error('ThemeManager not defined');
@@ -210,8 +209,14 @@ window.toggleTheme = function() {
     if (typeof showToast === 'function') {
         const effective = ThemeManager.getEffectiveTheme();
         const isAuto = ThemeManager.getCurrentTheme() === 'auto';
-        const message = isAuto ? '主題: 自動 (跟隨系統)' : 
+        const message = isAuto ? '主題: 自動 (跟隨系統)' :
                         effective === 'dark' ? '主題: 深色模式' : '主題: 淺色模式';
         showToast(message, 'info');
     }
-};
+}
+
+// --- Expose cross-module / inline-handler symbols ---
+window.ThemeManager = ThemeManager;
+window.toggleTheme = toggleTheme;
+
+})();

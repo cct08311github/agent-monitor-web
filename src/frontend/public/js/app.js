@@ -7,6 +7,8 @@
    4) SRE response panel with follow-up conversation
    ================================================ */
 
+(function () {
+
 function onAgentSearch(val) { agentSearchQuery = (val || '').trim(); if (latestDashboard) renderDashboard(latestDashboard); }
 
 window.matchMedia('(max-width: 768px)').addEventListener('change', (e) => {
@@ -89,3 +91,17 @@ async function update(force = false) {
         pushLog('連線中斷...', 'err');
     }
 }
+
+// --- Expose cross-module / inline-handler symbols ---
+window.onAgentSearch = onAgentSearch;
+window.esc = esc;
+window.formatTokens = formatTokens;
+window.formatTWD = formatTWD;
+window.fmtTime = fmtTime;
+window.showToast = showToast;
+window.getAgentEmoji = getAgentEmoji;
+window.getStatusInfo = getStatusInfo;
+window.pushLog = pushLog;
+window.update = update;
+
+})();

@@ -1,6 +1,9 @@
-// --- Charts ---
+// --- Charts (IIFE) ---
+(function () {
+
 let sysHistoryData = [];
 let costHistoryData = [];
+let tokenSpendersData = [];
 
 function drawSparkline(canvasId, data, labels) {
     const canvas = document.getElementById(canvasId);
@@ -73,7 +76,6 @@ function drawSparkline(canvasId, data, labels) {
     });
 }
 
-let tokenSpendersData = [];
 function updateCharts() {
     if (sysHistoryData.length < 2) return;
     drawSparkline('sysChart', [sysHistoryData.map(d => d.cpu), sysHistoryData.map(d => d.memory)],
@@ -216,3 +218,13 @@ function updateCostDisplay() {
     const chartValues = sortedAgents.map(a => parseFloat(range === 'all' ? (a.costs?.total ?? a.cost ?? 0) : (a.costs?.[range] ?? a.cost ?? 0)));
     drawBarChart('agentCostChart', chartLabels, chartValues);
 }
+
+// Expose only symbols needed by other modules or inline HTML handlers
+window.drawSparkline = drawSparkline;
+window.updateCharts = updateCharts;
+window.fetchHistory = fetchHistory;
+window.drawBarChart = drawBarChart;
+window.drawHBarChart = drawHBarChart;
+window.updateCostDisplay = updateCostDisplay;
+
+})();

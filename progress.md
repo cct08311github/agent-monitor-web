@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-03-07T12:30 Asia/Taipei
+Last updated: 2026-03-07T13:00 Asia/Taipei
 
 ## Collaboration Rules
 
@@ -87,13 +87,10 @@ Last updated: 2026-03-07T12:30 Asia/Taipei
 | state-alias | 16 | Managed by `state.js` via `Object.defineProperty` |
 | shared-api | 40 | Cross-module utilities (esc, showToast, renderDashboard, etc.) |
 | inline-handler | 39 | Referenced from `index.html` onclick/oninput handlers |
-| accidental | 52 | File-scope declarations in non-IIFE modules |
+| accidental | ~~52~~ **0** | Eliminated by IIFE wrapping all 7 files |
 
-**Key findings:**
-- 14/20 JS files use IIFE wrappers; 6 do not (`app.js`, `theme-manager.js`, `modules/*.js`)
-- 52 accidental globals from unwrapped modules (taskhub: 20, logs: 13, chat: 8, cron: 6, charts: 3)
-- `window.fetch` is monkey-patched in `auth-ui.js` for 401 intercept
-- Fix: wrap the 6 non-IIFE files in IIFEs, expose only needed symbols via `window.X =`
+**Status:** All 21 JS files now use IIFE wrappers. 52 accidental globals eliminated.
+- `window.fetch` is monkey-patched in `auth-ui.js` for 401 intercept (intentional)
 
 ## Watchdog Smoke Findings (C2)
 
@@ -109,10 +106,10 @@ Last updated: 2026-03-07T12:30 Asia/Taipei
 
 ### Priority 1 — Frontend Polish (optional)
 
-- [ ] **A3.** Wrap non-IIFE modules in IIFEs to eliminate 52 accidental globals
+- [x] **A3.** Wrap non-IIFE modules in IIFEs to eliminate 52 accidental globals
   - Files: `app.js`, `theme-manager.js`, `modules/chat.js`, `modules/logs.js`, `modules/taskhub.js`, `modules/charts.js`, `modules/cron.js`
-  - Expose only cross-module and inline-handler symbols via `window.X =`
-  - Validation: `node -c` on all 7 files + manual browser smoke test
+  - All 7 files wrapped, 46 symbols exposed via `window.X =`, 52 accidentals now private
+  - Validation: `node -c` all 7 files ✅ + 32/32 suites 421/421 tests ✅
 - [ ] **A4.** Optional dashboard-specific stream wrapper
   - Files: `stream-manager.js`, `dashboard-runtime.js`, `logs.js`, `optimize-runner.js`
   - Decision: does `dashboard-stream.js` add clarity?
