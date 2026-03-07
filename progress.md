@@ -52,6 +52,7 @@ Last updated: 2026-03-07 Asia/Taipei
 - `2b6b157` `feat(s1): add request context logging`
 - `a31fab7` `feat(s1): align controller test naming`
 - `8db5918` `feat(s1): add structured controller logging`
+- pending commit in main worktree: gatewayWatchdog config/logging cleanup
 
 ### Frontend
 
@@ -79,6 +80,7 @@ Last updated: 2026-03-07 Asia/Taipei
 - Readiness/liveness/dependency endpoints exist.
 - Request context middleware exists with `x-request-id` propagation and structured API request/error logs.
 - Cron/control/taskhub controllers now emit structured logger events instead of raw `console.*`.
+- `gatewayWatchdog.js` cleanup is in progress on main: config-driven paths/targets and structured watchdog logging.
 - New controller names exist:
   - `dashboardReadController.js`
   - `controlController.js`
@@ -129,6 +131,8 @@ Last updated: 2026-03-07 Asia/Taipei
 - `tests/alertController.test.js`
 - `tests/healthService.test.js`
 - `tests/requestContext.test.js`
+- `tests/gatewayWatchdog.test.js`
+- `tests/gatewayWatchdogExtended.test.js`
 
 ### Frontend validation already run
 
@@ -152,6 +156,7 @@ Last updated: 2026-03-07 Asia/Taipei
 - `node -c src/frontend/public/js/bootstrap.js`
 - `node -c src/frontend/public/js/alert-config.js`
 - `node -c src/frontend/public/js/dashboard-render.js`
+- `node -c src/backend/services/gatewayWatchdog.js`
 
 ## Remaining High-Value Work
 
