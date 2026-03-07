@@ -6,11 +6,10 @@ Last updated: 2026-03-07 Asia/Taipei
 
 - Main worktree: `/Users/openclaw/.openclaw/shared/projects/agent-monitor-web`
 - Frontend worktree: `/Users/openclaw/.openclaw/shared/projects/agent-monitor-web-frontend`
-- Do not touch user-owned dirty files:
-  - `src/backend/services/gatewayWatchdog.js`
-  - `AGENTS.md`
 - Commit format: `feat(s1): ...`
 - When changing frontend JS, update `index.html` query strings and note cache-busting impact.
+- Current main worktree status at handoff: clean.
+- Current frontend worktree status at handoff: clean.
 
 ## Current Worktree Split
 
@@ -29,10 +28,8 @@ Last updated: 2026-03-07 Asia/Taipei
 - Path: `/Users/openclaw/.openclaw/shared/projects/agent-monitor-web-frontend`
 - Branch: `codex/frontend-split`
 - Purpose: frontend modularization and low-risk JS refactors before cherry-pick to `main`
-- Current focus:
-  - `src/frontend/public/js/app.js`
-  - `src/frontend/public/js/modules/*.js`
-  - `src/frontend/public/index.html`
+- Current state:
+  - clean and no unmerged frontend-only changes remain
 
 ## Completed Batches
 
@@ -52,7 +49,9 @@ Last updated: 2026-03-07 Asia/Taipei
 - `2b6b157` `feat(s1): add request context logging`
 - `a31fab7` `feat(s1): align controller test naming`
 - `8db5918` `feat(s1): add structured controller logging`
-- pending commit in main worktree: gatewayWatchdog config/logging cleanup
+- `25b4575` `feat(s1): clean up watchdog config paths`
+- `ac7d45c` `feat(s1): remove legacy controller wrappers`
+- `25d3fb1` `feat(s1): add project agent instructions`
 
 ### Frontend
 
@@ -80,7 +79,7 @@ Last updated: 2026-03-07 Asia/Taipei
 - Readiness/liveness/dependency endpoints exist.
 - Request context middleware exists with `x-request-id` propagation and structured API request/error logs.
 - Cron/control/taskhub controllers now emit structured logger events instead of raw `console.*`.
-- `gatewayWatchdog.js` cleanup is in progress on main: config-driven paths/targets and structured watchdog logging.
+- `gatewayWatchdog.js` now uses config-driven paths/targets and structured watchdog logging.
 - New controller names exist:
   - `dashboardReadController.js`
   - `controlController.js`
@@ -133,6 +132,7 @@ Last updated: 2026-03-07 Asia/Taipei
 - `tests/requestContext.test.js`
 - `tests/gatewayWatchdog.test.js`
 - `tests/gatewayWatchdogExtended.test.js`
+- `tests/apiRoutes.test.js --testNamePattern="Watchdog Routes"`
 
 ### Frontend validation already run
 
@@ -164,47 +164,43 @@ Last updated: 2026-03-07 Asia/Taipei
 
 - Reduce direct global alias usage in modules and move to explicit imports/globals via `window.appState`.
 - Consider a dedicated `dashboard-stream.js` wrapper over `stream-manager.js`.
-- Continue shrinking `app.js` around watchdog/auth/bootstrap logic if worth the churn.
-- Decide whether remaining helpers should stay global or move under a shared UI namespace.
+- Decide whether remaining globals should stay as compatibility shims or move under a shared UI namespace.
 
 ### Backend
 
 - Extend structured logging/request-id coverage beyond core API middleware into service-level logs.
 - Expand dependency health from file checks to richer readiness semantics if desired.
+- Optionally replace remaining ad hoc `console.*` usage in security/dashboard payload services with shared logger.
 
 ### Docs
 
-- Update README/CLAUDE/architecture notes to reflect:
-  - `api-client.js`
-  - `state.js`
-  - `stream-manager.js`
-  - controller renames and compatibility wrappers
-  - latest frontend split modules and `app.js` shrink
+- Historical `docs/plans/` files still reference removed `legacyDashboardController.js`.
+  Those are archival design notes, not runtime dependencies.
+  Only update them if the team wants historical docs normalized.
 
 ## Recommended Next Batch Slices
 
 ### Slice A
 
 - Worktree: frontend
-- Goal: reduce remaining `app.js` render/helper surface only where ownership becomes clearer
+- Goal: optional final namespace/global cleanup only if the team still wants it
 - Files:
   - `src/frontend/public/js/app.js`
   - `src/frontend/public/js/modules/*.js`
-  - optional new helper modules only if they cut clear responsibility boundaries
+  - `src/frontend/public/index.html`
 
 ### Slice B
 
 - Worktree: main
-- Goal: update docs and remove outdated `legacy*` references from docs/tests where safe
+- Goal: optional logger normalization in remaining backend services
 - Files:
-  - `README.md`
-  - `CLAUDE.md`
-  - `progress.md`
-  - selective tests/comments only when compatibility is preserved
+  - `src/backend/services/dashboardPayloadService.js`
+  - `src/backend/security/*.js`
+  - narrow test subsets only
 
 ## Notes For Other AI Workers
 
-- If you work in the frontend worktree, commit there first, then cherry-pick to `main`.
-- Do not reset or overwrite `gatewayWatchdog.js`.
+- If you work in the frontend worktree again, commit there first, then cherry-pick to `main`.
 - If you touch frontend JS, keep syntax-valid and run `node -c` on changed files.
 - If you touch backend routes/controllers, run the narrowest relevant Jest subset before commit.
+- The primary roadmap items are complete; remaining work is optional cleanup, not core restructuring.
