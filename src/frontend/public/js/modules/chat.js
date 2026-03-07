@@ -1,4 +1,5 @@
 // ========== Chat & Model Switch Module ==========
+(function () {
 let chatPageAgent = 'main';
 let chatPageSending = false;
 let chatModalSending = false;
@@ -23,8 +24,8 @@ function initChatPage() {
     const log = document.getElementById('chatPageLog');
     if (log && !log.children.length) {
         log.innerHTML = `<div class="chat-page-empty">
-            <div class="chat-page-empty-icon">💬</div>
-            <div class="chat-page-empty-text">與 <strong>${esc(chatPageAgent)}</strong> 開始對話<br><span style="font-size:12px;opacity:.6">輸入訊息後按 Shift+Enter 送出</span></div>
+            <div class="chat-page-empty-icon">\u{1F4AC}</div>
+            <div class="chat-page-empty-text">\u8207 <strong>${esc(chatPageAgent)}</strong> \u958B\u59CB\u5C0D\u8A71<br><span style="font-size:12px;opacity:.6">\u8F38\u5165\u8A0A\u606F\u5F8C\u6309 Shift+Enter \u9001\u51FA</span></div>
         </div>`;
     }
 
@@ -44,7 +45,7 @@ function initChatPage() {
         }
         // Mobile: round arrow button
         const sendBtn = document.getElementById('chatPageSendBtn');
-        if (sendBtn && isMobile) sendBtn.innerHTML = '↑';
+        if (sendBtn && isMobile) sendBtn.textContent = '\u2191';
     }
 }
 
@@ -57,7 +58,7 @@ function selectChatAgent(agentId) {
     if (log) {
         log.innerHTML = `<div class="chat-page-empty">
             <div class="chat-page-empty-icon">${getAgentEmoji(agentId)}</div>
-            <div class="chat-page-empty-text">與 <strong>${esc(agentId)}</strong> 開始對話<br><span style="font-size:12px;opacity:.6">輸入訊息後按 Shift+Enter 送出</span></div>
+            <div class="chat-page-empty-text">\u8207 <strong>${esc(agentId)}</strong> \u958B\u59CB\u5C0D\u8A71<br><span style="font-size:12px;opacity:.6">\u8F38\u5165\u8A0A\u606F\u5F8C\u6309 Shift+Enter \u9001\u51FA</span></div>
         </div>`;
     }
     document.getElementById('chatPageInput')?.focus();
@@ -68,8 +69,8 @@ async function sendChatPage() {
     const input = document.getElementById('chatPageInput');
     const msg = input?.value.trim();
     if (!msg) return;
-    if (msg.length > 2000) { showToast('❌ 訊息超過 2000 字', 'error'); return; }
-    if (!chatPageAgent || !/^[A-Za-z0-9_-]+$/.test(chatPageAgent)) { showToast('❌ 無效的 Agent ID', 'error'); return; }
+    if (msg.length > 2000) { showToast('\u274C \u8A0A\u606F\u8D85\u904E 2000 \u5B57', 'error'); return; }
+    if (!chatPageAgent || !/^[A-Za-z0-9_-]+$/.test(chatPageAgent)) { showToast('\u274C \u7121\u6548\u7684 Agent ID', 'error'); return; }
 
     chatPageSending = true;
     const log = document.getElementById('chatPageLog');
@@ -86,7 +87,10 @@ async function sendChatPage() {
     const typingEl = document.createElement('div');
     typingEl.id = typingId;
     typingEl.className = 'chat-msg agent';
-    typingEl.innerHTML = '<span style="opacity:.5">···</span>';
+    const typingSpan = document.createElement('span');
+    typingSpan.style.opacity = '.5';
+    typingSpan.textContent = '\u00B7\u00B7\u00B7';
+    typingEl.appendChild(typingSpan);
     log.appendChild(typingEl);
     log.scrollTop = log.scrollHeight;
 
@@ -100,7 +104,7 @@ async function sendChatPage() {
         appendChatPageMsg(log, data.output, 'agent');
     } catch (e) {
         document.getElementById(typingId)?.remove();
-        appendChatPageMsg(log, `❌ ${e.message}`, 'error');
+        appendChatPageMsg(log, `\u274C ${e.message}`, 'error');
         pushLog(`ChatPage error (${chatPageAgent}): ${e.message}`, 'err');
     }
     chatPageSending = false;
@@ -117,20 +121,25 @@ function appendChatPageMsg(log, text, type) {
 
 // --- Chat ---
 function openChat(agentId) {
-    if (!/^[A-Za-z0-9_-]+$/.test(agentId)) { showToast('❌ 無效的 Agent ID', 'error'); return; }
+    if (!/^[A-Za-z0-9_-]+$/.test(agentId)) { showToast('\u274C \u7121\u6548\u7684 Agent ID', 'error'); return; }
     currentTargetAgent = agentId;
     // Title: show full name on desktop, compact on mobile
     const emoji = getAgentEmoji(agentId);
-    document.getElementById('chatTitle').innerHTML = `${emoji} <strong>${agentId}</strong>`;
+    const titleEl = document.getElementById('chatTitle');
+    titleEl.textContent = '';
+    titleEl.append(emoji + ' ');
+    const strong = document.createElement('strong');
+    strong.textContent = agentId;
+    titleEl.appendChild(strong);
     const log = document.getElementById('chatLog');
-    log.innerHTML = '';
+    log.textContent = '';
     const input = document.getElementById('chatInput');
     input.value = '';
     input.style.height = 'auto';
     updateCharCount();
     // Update send button icon for mobile
     const sendBtn = document.querySelector('#chatModal .chat-send');
-    if (sendBtn) sendBtn.innerHTML = isMobile ? '↑' : '發送';
+    if (sendBtn) sendBtn.textContent = isMobile ? '\u2191' : '\u767C\u9001';
     document.getElementById('chatModal').style.display = 'flex';
     // Small delay to let modal render before focusing (critical for iOS keyboard)
     setTimeout(() => {
@@ -139,7 +148,10 @@ function openChat(agentId) {
     }, 100);
 
     // Auto-send "hi"
-    log.innerHTML += `<div class="chat-msg system">正在連接 ${agentId}...</div>`;
+    const sysDiv = document.createElement('div');
+    sysDiv.className = 'chat-msg system';
+    sysDiv.textContent = `\u6B63\u5728\u9023\u63A5 ${agentId}...`;
+    log.appendChild(sysDiv);
     autoSendHi(agentId);
 }
 
@@ -153,8 +165,14 @@ async function autoSendHi(agentId) {
         });
         const sysMsg = log.querySelector('.chat-msg.system');
         if (sysMsg) sysMsg.remove();
-        log.innerHTML += `<div class="chat-msg user">hi</div>`;
-        log.innerHTML += `<div class="chat-msg agent">${esc(data.output)}</div>`;
+        const userDiv = document.createElement('div');
+        userDiv.className = 'chat-msg user';
+        userDiv.textContent = 'hi';
+        log.appendChild(userDiv);
+        const agentDiv = document.createElement('div');
+        agentDiv.className = 'chat-msg agent';
+        agentDiv.textContent = data.output;
+        log.appendChild(agentDiv);
     } catch (e) {
         const sysMsg = log.querySelector('.chat-msg.system');
         if (sysMsg) sysMsg.remove();
@@ -162,7 +180,10 @@ async function autoSendHi(agentId) {
         let message = e.message;
         if (payload && payload._debug_host) message += ` (host: ${payload._debug_host})`;
         if (payload && payload._debug_origin) message += ` (origin: ${payload._debug_origin})`;
-        log.innerHTML += `<div class="chat-msg error">❌ 連接失敗: ${esc(message)}</div>`;
+        const errDiv = document.createElement('div');
+        errDiv.className = 'chat-msg error';
+        errDiv.textContent = `\u274C \u9023\u63A5\u5931\u6557: ${message}`;
+        log.appendChild(errDiv);
         pushLog(`Chat error (${agentId}): ${message}`, 'err');
     }
     log.scrollTop = log.scrollHeight;
@@ -186,12 +207,15 @@ async function sendChat() {
     const input = document.getElementById('chatInput');
     const msg = input.value.trim();
     if (!msg) return;
-    if (msg.length > 2000) { showToast('❌ 訊息超過 2000 字', 'error'); return; }
-    if (!currentTargetAgent || !/^[A-Za-z0-9_-]+$/.test(currentTargetAgent)) { showToast('❌ 無效的 Agent ID', 'error'); return; }
+    if (msg.length > 2000) { showToast('\u274C \u8A0A\u606F\u8D85\u904E 2000 \u5B57', 'error'); return; }
+    if (!currentTargetAgent || !/^[A-Za-z0-9_-]+$/.test(currentTargetAgent)) { showToast('\u274C \u7121\u6548\u7684 Agent ID', 'error'); return; }
 
     chatModalSending = true;
     const log = document.getElementById('chatLog');
-    log.innerHTML += `<div class="chat-msg user">${esc(msg)}</div>`;
+    const userDiv = document.createElement('div');
+    userDiv.className = 'chat-msg user';
+    userDiv.textContent = msg;
+    log.appendChild(userDiv);
     input.value = '';
     input.style.height = 'auto'; // Reset textarea height
     updateCharCount();
@@ -203,12 +227,18 @@ async function sendChat() {
             agentId: currentTargetAgent,
             message: msg
         });
-        log.innerHTML += `<div class="chat-msg agent">${esc(data.output)}</div>`;
+        const agentDiv = document.createElement('div');
+        agentDiv.className = 'chat-msg agent';
+        agentDiv.textContent = data.output;
+        log.appendChild(agentDiv);
     } catch (e) {
         const payload = e && e.payload ? e.payload : null;
         let message = e.message;
         if (payload && payload._debug_host) message += ` (host: ${payload._debug_host})`;
-        log.innerHTML += `<div class="chat-msg error">❌ ${esc(message)}</div>`;
+        const errDiv = document.createElement('div');
+        errDiv.className = 'chat-msg error';
+        errDiv.textContent = `\u274C ${message}`;
+        log.appendChild(errDiv);
         pushLog(`Chat error (${currentTargetAgent}): ${message}`, 'err');
     }
     chatModalSending = false;
@@ -218,9 +248,9 @@ async function sendChat() {
 
 // --- Model Switch ---
 function openModelModal(agentId, currentModel) {
-    if (!/^[A-Za-z0-9_-]+$/.test(agentId)) { showToast('❌ 無效的 Agent ID', 'error'); return; }
+    if (!/^[A-Za-z0-9_-]+$/.test(agentId)) { showToast('\u274C \u7121\u6548\u7684 Agent ID', 'error'); return; }
     modelSwitchTarget = agentId;
-    document.getElementById('modelCurrentInfo').textContent = `Agent: ${agentId} | 目前模型: ${currentModel || '未知'}`;
+    document.getElementById('modelCurrentInfo').textContent = `Agent: ${agentId} | \u76EE\u524D\u6A21\u578B: ${currentModel || '\u672A\u77E5'}`;
     document.getElementById('modelModal').style.display = 'flex';
 }
 function closeModelModal() { document.getElementById('modelModal').style.display = 'none'; }
@@ -228,23 +258,37 @@ function closeModelModal() { document.getElementById('modelModal').style.display
 async function confirmModelSwitch() {
     const model = document.getElementById('modelSelect').value;
     if (!modelSwitchTarget || !model) return;
-    if (!/^[A-Za-z0-9._/-]+$/.test(model)) { showToast('❌ 無效的模型名稱', 'error'); return; }
+    if (!/^[A-Za-z0-9._/-]+$/.test(model)) { showToast('\u274C \u7121\u6548\u7684\u6A21\u578B\u540D\u7A31', 'error'); return; }
     closeModelModal();
-    showToast(`正在切換 ${modelSwitchTarget} → ${model}...`, 'info');
+    showToast(`\u6B63\u5728\u5207\u63DB ${modelSwitchTarget} \u2192 ${model}...`, 'info');
     try {
         const data = await window.apiClient.post('/api/command', {
             command: 'switch-model',
             agentId: modelSwitchTarget,
             model
         });
-        showToast(`✅ ${modelSwitchTarget} 已切換至 ${model}`, 'success');
-        pushLog(`Model switched: ${modelSwitchTarget} → ${model}`, 'info');
+        showToast(`\u2705 ${modelSwitchTarget} \u5DF2\u5207\u63DB\u81F3 ${model}`, 'success');
+        pushLog(`Model switched: ${modelSwitchTarget} \u2192 ${model}`, 'info');
         await update(true);
         if (currentDesktopTab === 'detail' && modelSwitchTarget) {
             showAgentDetail(modelSwitchTarget);
         }
     } catch (e) {
-        showToast(`❌ 切換失敗: ${e.message}`, 'error');
+        showToast(`\u274C \u5207\u63DB\u5931\u6557: ${e.message}`, 'error');
         pushLog(`Model switch failed: ${e.message}`, 'err');
     }
 }
+
+// Expose cross-module and inline-handler symbols
+window.initChatPage = initChatPage;
+window.selectChatAgent = selectChatAgent;
+window.sendChatPage = sendChatPage;
+window.openChat = openChat;
+window.closeChat = closeChat;
+window.updateCharCount = updateCharCount;
+window.autoGrowTextarea = autoGrowTextarea;
+window.sendChat = sendChat;
+window.openModelModal = openModelModal;
+window.closeModelModal = closeModelModal;
+window.confirmModelSwitch = confirmModelSwitch;
+})();

@@ -1,4 +1,6 @@
-// --- Cron Jobs ---
+// --- Cron Jobs (IIFE) ---
+(function () {
+
 let cronJobs = [];
 let isCronLoading = false;
 
@@ -207,3 +209,9 @@ async function runCronJob(id) {
         fetchCronJobs();
     }
 }
+
+// Expose only symbols needed by other modules
+window.fetchCronJobs = fetchCronJobs;
+window.renderCronJobs = renderCronJobs;
+
+})();
