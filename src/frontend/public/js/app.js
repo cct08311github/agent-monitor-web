@@ -872,34 +872,34 @@ async function update(force = false) {
 
 function initRealtime() {
     pushLog('連接即時串流...', 'info');
-    const es = new EventSource('/api/read/stream');
-
-    es.onmessage = (e) => {
-        try {
-            renderDashboard(JSON.parse(e.data));
-            lastSseTs = Date.now();
-            _setConnDot('online');
-        } catch (x) { }
-    };
-
-    es.addEventListener('alert', (e) => {
-        try {
-            const { alerts } = JSON.parse(e.data);
-            alerts.forEach(a => {
-                const type = a.severity === 'critical' ? 'error' : (a.severity === 'warning' ? 'warning' : 'info');
-                showToast(`🚨 ${a.message}`, type);
-                pushLog(`[ALERT] ${a.message}`, a.severity === 'critical' ? 'err' : 'warn');
-            });
-            incrementAlertBadge(alerts.length);
-        } catch (x) { }
+    window.streamManager.connect('/api/read/stream', {
+        autoReconnect: true,
+        reconnectMs: 5000,
+        onMessage(e) {
+            try {
+                renderDashboard(JSON.parse(e.data));
+                lastSseTs = Date.now();
+                _setConnDot('online');
+            } catch (_) { }
+        },
+        events: {
+            alert(e) {
+                try {
+                    const { alerts } = JSON.parse(e.data);
+                    alerts.forEach(a => {
+                        const type = a.severity === 'critical' ? 'error' : (a.severity === 'warning' ? 'warning' : 'info');
+                        showToast(`🚨 ${a.message}`, type);
+                        pushLog(`[ALERT] ${a.message}`, a.severity === 'critical' ? 'err' : 'warn');
+                    });
+                    incrementAlertBadge(alerts.length);
+                } catch (_) { }
+            }
+        },
+        onError() {
+            pushLog('串流中斷，5s 後重連...', 'err');
+            _setConnDot('offline');
+        }
     });
-
-    es.onerror = () => {
-        pushLog('串流中斷，5s 後重連...', 'err');
-        es.close();
-        _setConnDot('offline');
-        setTimeout(initRealtime, 5000);
-    };
 }
 
 function _setConnDot(state) {
@@ -1111,76 +1111,75 @@ function runAutoOptimize() {
         el.textContent = (done ? '✅ ' : '⏳ ') + msg;
     }
 
-    const es = new EventSource('/api/optimize/run');
-
-    es.addEventListener('progress', (e) => {
-        try {
-            const { step, msg } = JSON.parse(e.data);
-            const prevEl = document.getElementById('opt-step-' + (step - 1));
-            if (prevEl && prevEl.textContent.startsWith('⏳')) {
-                prevEl.textContent = '✅ ' + prevEl.textContent.slice(3);
+    const stream = window.streamManager.connect('/api/optimize/run', {
+        autoReconnect: false,
+        events: {
+            progress(e) {
+                try {
+                    const { step, msg } = JSON.parse(e.data);
+                    const prevEl = document.getElementById('opt-step-' + (step - 1));
+                    if (prevEl && prevEl.textContent.startsWith('⏳')) {
+                        prevEl.textContent = '✅ ' + prevEl.textContent.slice(3);
+                    }
+                    upsertStep(step, msg, false);
+                } catch (_) {}
+            },
+            done(e) {
+                try {
+                    const { filename, opusFailed } = JSON.parse(e.data);
+                    [6, 7].forEach(n => {
+                        const el = document.getElementById('opt-step-' + n);
+                        if (el && el.textContent.startsWith('⏳')) el.textContent = '✅ ' + el.textContent.slice(3);
+                    });
+                    const result = document.createElement('div');
+                    result.style.cssText = 'margin-top:8px;padding:8px;background:var(--bg-muted);border-radius:6px';
+                    const label = document.createTextNode('✅ 報告已生成：');
+                    const strong = document.createElement('strong');
+                    strong.textContent = filename;
+                    result.appendChild(label);
+                    result.appendChild(strong);
+                    if (opusFailed) {
+                        const note = document.createElement('span');
+                        note.style.color = 'var(--text-muted)';
+                        note.textContent = ' (未完整經 Opus 審查)';
+                        result.appendChild(note);
+                    }
+                    progressEl.appendChild(result);
+                } catch (_) {}
+                btn.disabled = false;
+                btn.textContent = '🔍 執行自主優化';
+                stream.close();
+            },
+            cooldown(e) {
+                try {
+                    const { remaining } = JSON.parse(e.data);
+                    const infoEl = document.createElement('div');
+                    infoEl.style.cssText = 'color:var(--text-muted);margin-top:8px';
+                    infoEl.textContent = `⏸ 優化冷卻中，還需等待約 ${remaining} 分鐘`;
+                    progressEl.appendChild(infoEl);
+                } catch (_) {}
+                btn.disabled = false;
+                btn.textContent = '🔍 執行自主優化';
+                progressEl.style.display = 'none';
+                stream.close();
+            },
+            error(e) {
+                try {
+                    const { msg } = JSON.parse(e.data);
+                    const errEl = document.createElement('div');
+                    errEl.style.cssText = 'color:var(--red,#e74c3c);margin-top:8px';
+                    errEl.textContent = '❌ ' + msg;
+                    progressEl.appendChild(errEl);
+                } catch (_) {}
+                btn.disabled = false;
+                btn.textContent = '🔍 執行自主優化';
+                stream.close();
             }
-            upsertStep(step, msg, false);
-        } catch (_) {}
+        },
+        onError() {
+            btn.disabled = false;
+            btn.textContent = '🔍 執行自主優化';
+            stream.close();
+        }
     });
-
-    es.addEventListener('done', (e) => {
-        try {
-            const { filename, opusFailed } = JSON.parse(e.data);
-            [6, 7].forEach(n => {
-                const el = document.getElementById('opt-step-' + n);
-                if (el && el.textContent.startsWith('⏳')) el.textContent = '✅ ' + el.textContent.slice(3);
-            });
-            const result = document.createElement('div');
-            result.style.cssText = 'margin-top:8px;padding:8px;background:var(--bg-muted);border-radius:6px';
-            const label = document.createTextNode('✅ 報告已生成：');
-            const strong = document.createElement('strong');
-            strong.textContent = filename;
-            result.appendChild(label);
-            result.appendChild(strong);
-            if (opusFailed) {
-                const note = document.createElement('span');
-                note.style.color = 'var(--text-muted)';
-                note.textContent = ' (未完整經 Opus 審查)';
-                result.appendChild(note);
-            }
-            progressEl.appendChild(result);
-        } catch (_) {}
-        btn.disabled = false;
-        btn.textContent = '🔍 執行自主優化';
-        es.close();
-    });
-
-    es.addEventListener('cooldown', (e) => {
-        try {
-            const { remaining } = JSON.parse(e.data);
-            const infoEl = document.createElement('div');
-            infoEl.style.cssText = 'color:var(--text-muted);margin-top:8px';
-            infoEl.textContent = `⏸ 優化冷卻中，還需等待約 ${remaining} 分鐘`;
-            progressEl.appendChild(infoEl);
-        } catch (_) {}
-        btn.disabled = false;
-        btn.textContent = '🔍 執行自主優化';
-        progressEl.style.display = 'none';
-        es.close();
-    });
-
-    es.addEventListener('error', (e) => {
-        try {
-            const { msg } = JSON.parse(e.data);
-            const errEl = document.createElement('div');
-            errEl.style.cssText = 'color:var(--red,#e74c3c);margin-top:8px';
-            errEl.textContent = '❌ ' + msg;
-            progressEl.appendChild(errEl);
-        } catch (_) {}
-        btn.disabled = false;
-        btn.textContent = '🔍 執行自主優化';
-        es.close();
-    });
-
-    es.onerror = () => {
-        btn.disabled = false;
-        btn.textContent = '🔍 執行自主優化';
-        es.close();
-    };
 }
