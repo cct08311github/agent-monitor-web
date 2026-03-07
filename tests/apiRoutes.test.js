@@ -102,6 +102,16 @@ describe('API Routes', () => {
             expect(res.statusCode).toBe(200);
         });
 
+        it('POST /api/watchdog/toggle rejects non-boolean enabled values', async () => {
+            const res = await request(app)
+                .post('/api/watchdog/toggle')
+                .set('host', 'localhost:3000')
+                .send({ enabled: 'true' });
+            expect(res.statusCode).toBe(400);
+            expect(res.body.success).toBe(false);
+            expect(res.body.error).toBe('invalid_enabled');
+        });
+
         it('POST /api/watchdog/repair returns 500 when triggerRepair throws', async () => {
             const gatewayWatchdog = require('../src/backend/services/gatewayWatchdog');
             jest.spyOn(gatewayWatchdog, 'triggerRepair').mockRejectedValueOnce(new Error('repair failed'));

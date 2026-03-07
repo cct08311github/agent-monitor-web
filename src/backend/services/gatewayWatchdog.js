@@ -20,8 +20,43 @@ const logger = require('../utils/logger');
 const execFilePromise = util.promisify(execFile);
 const execPromise = util.promisify(exec);
 
-const openclawConfig = getOpenClawConfig();
-const optimizeConfig = getOptimizeConfig();
+function getFallbackOpenClawConfig() {
+    const homeDir = process.env.HOME || '/tmp';
+    const root = path.join(homeDir, '.openclaw');
+    return {
+        root,
+        binPath: path.join(root, 'bin', 'openclaw'),
+        configPath: path.join(root, 'config.json'),
+    };
+}
+
+function getFallbackOptimizeConfig() {
+    return {
+        telegramChannel: '',
+        telegramTarget: '',
+    };
+}
+
+function loadWatchdogConfig() {
+    try {
+        return {
+            openclawConfig: getOpenClawConfig(),
+            optimizeConfig: getOptimizeConfig(),
+        };
+    } catch (error) {
+        logger.error('gateway_watchdog_config_load_failed', {
+            details: logger.toErrorFields(error),
+        });
+        return {
+            openclawConfig: getFallbackOpenClawConfig(),
+            optimizeConfig: getFallbackOptimizeConfig(),
+        };
+    }
+}
+
+const loadedConfig = loadWatchdogConfig();
+const openclawConfig = loadedConfig.openclawConfig;
+const optimizeConfig = loadedConfig.optimizeConfig;
 const OPENCLAW_PATH = openclawConfig.binPath;
 const GATEWAY_PORT = 18789;
 const GATEWAY_HOST = '127.0.0.1';
