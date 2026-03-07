@@ -49,7 +49,8 @@ Last updated: 2026-03-07 Asia/Taipei
 - `1044158` `feat(s1): align controller api responses`
 - `63af241` `feat(s1): add readiness and dependency health endpoints`
 - `40aa47c` `feat(s1): replace legacy controller entrypoints`
-- pending commit in worktree: request-id and structured API logging batch
+- `2b6b157` `feat(s1): add request context logging`
+- `a31fab7` `feat(s1): align controller test naming`
 
 ### Frontend
 
@@ -60,7 +61,8 @@ Last updated: 2026-03-07 Asia/Taipei
 - `0cdac1a` `feat(s1): add frontend stream manager`
 - `6e75fca` `feat(s1): split app command and error modules`
 - `9e36c20` `feat(s1): split app navigation and detail modules`
-- pending cherry-pick from frontend worktree: `split app runtime modules`
+- `87045b4` `feat(s1): split app runtime modules`
+- `4d2bc79` `feat(s1): split app bootstrap runtime`
 
 ## Current Architecture Improvements Already Landed
 
@@ -73,7 +75,7 @@ Last updated: 2026-03-07 Asia/Taipei
 - Dashboard read logic and payload building are extracted into services.
 - API response helper and express error handling exist.
 - Readiness/liveness/dependency endpoints exist.
-- Request context middleware exists in worktree with `x-request-id` propagation and structured API request/error logs.
+- Request context middleware exists with `x-request-id` propagation and structured API request/error logs.
 - New controller names exist:
   - `dashboardReadController.js`
   - `controlController.js`
@@ -89,10 +91,11 @@ Last updated: 2026-03-07 Asia/Taipei
 - Shared `detail-view.js` exists for agent detail rendering and session modal flows.
 - Shared `command-actions.js` exists for command execution and output modal handling.
 - Shared `error-center.js` exists for dashboard error banners, SRE flows, and error helpers.
-- Runtime modules for auth/watchdog/optimize are split in frontend worktree and awaiting cherry-pick.
+- Shared `watchdog-ui.js`, `auth-ui.js`, and `optimize-runner.js` own runtime control flows previously in `app.js`.
+- Shared `dashboard-runtime.js` and `bootstrap.js` own SSE/bootstrap lifecycle setup.
 - `charts.js`, `cron.js`, `taskhub.js`, `chat.js`, and large parts of `app.js` already use `window.apiClient`.
 - Dashboard stream, log stream, and optimize stream now go through `stream-manager.js`.
-- `app.js` no longer owns the full command/error/navigation/detail workflow blocks.
+- `app.js` is down to 505 lines and no longer owns the full command/error/navigation/detail/runtime/bootstrap workflow blocks.
 
 ## Verified Test/Validation Coverage
 
@@ -141,6 +144,8 @@ Last updated: 2026-03-07 Asia/Taipei
 - `node -c src/frontend/public/js/watchdog-ui.js`
 - `node -c src/frontend/public/js/auth-ui.js`
 - `node -c src/frontend/public/js/optimize-runner.js`
+- `node -c src/frontend/public/js/dashboard-runtime.js`
+- `node -c src/frontend/public/js/bootstrap.js`
 
 ## Remaining High-Value Work
 
@@ -149,6 +154,7 @@ Last updated: 2026-03-07 Asia/Taipei
 - Reduce direct global alias usage in modules and move to explicit imports/globals via `window.appState`.
 - Consider a dedicated `dashboard-stream.js` wrapper over `stream-manager.js`.
 - Continue shrinking `app.js` around watchdog/auth/bootstrap logic if worth the churn.
+- Decide whether remaining helpers should stay global or move under a shared UI namespace.
 
 ### Backend
 
@@ -169,7 +175,7 @@ Last updated: 2026-03-07 Asia/Taipei
 ### Slice A
 
 - Worktree: frontend
-- Goal: reduce remaining `app.js` bootstrap and global alias surface
+- Goal: reduce remaining `app.js` render/helper surface only where ownership becomes clearer
 - Files:
   - `src/frontend/public/js/app.js`
   - `src/frontend/public/js/modules/*.js`
