@@ -7,18 +7,16 @@
    4) SRE response panel with follow-up conversation
    ================================================ */
 
-let currentExchangeRate = 32.0; // Fallback default
-
-// --- State ---
-let latestDashboard = null;
-let previousAgentsMap = {};
-let currentDesktopTab = 'monitor';
-let currentSubTab = 'agents';
-let isMobile = window.matchMedia('(max-width: 768px)').matches;
-let agentSearchQuery = '';
-let _currentDetailAgentId = '';
+currentExchangeRate = 32.0; // Fallback default
+latestDashboard = null;
+previousAgentsMap = {};
+currentDesktopTab = 'monitor';
+currentSubTab = 'agents';
+isMobile = window.matchMedia('(max-width: 768px)').matches;
+agentSearchQuery = '';
+_currentDetailAgentId = '';
 function onAgentSearch(val) { agentSearchQuery = (val || '').trim(); if (latestDashboard) renderDashboard(latestDashboard); }
-let lastErrors = [];
+lastErrors = [];
 // Persist dismissed/shown errors in localStorage so they survive page refresh
 function loadErrorKeys(key) {
     try {
@@ -29,12 +27,12 @@ function loadErrorKeys(key) {
 function saveErrorKeys(key, map) {
     try { localStorage.setItem(key, JSON.stringify(Object.fromEntries(map))); } catch { }
 }
-let dismissedErrorMap = loadErrorKeys('oc_dismissed_errors');
-let shownErrorMap = loadErrorKeys('oc_shown_errors');
-let commandRunning = false;
-let lastSseTs = 0;
-let _connTimerHandle = null;
-let chatSending = false;
+dismissedErrorMap = loadErrorKeys('oc_dismissed_errors');
+shownErrorMap = loadErrorKeys('oc_shown_errors');
+commandRunning = false;
+lastSseTs = 0;
+_connTimerHandle = null;
+chatSending = false;
 
 
 window.matchMedia('(max-width: 768px)').addEventListener('change', (e) => {
