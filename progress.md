@@ -102,6 +102,15 @@ Last updated: 2026-03-07 Asia/Taipei
 - Dashboard stream, log stream, and optimize stream now go through `stream-manager.js`.
 - `app.js` is now down to roughly 120 lines of shared utilities/data update glue.
 
+## QA Results — 2026-03-07
+
+### Full Suite QA
+
+- **Backend tests:** 32/32 suites, 421/421 tests passed ✅
+- **Frontend syntax:** all 16 JS files pass `node -c` ✅
+- **Fixes applied during QA:**
+  - `tests/optimizeService.test.js`: `saveAndNotify` tests timed out because Telegram mock still targeted the old code path instead of `openclawClient.runArgs` (current path). Added `jest.mock` for `openclawClient` at module level and updated the Telegram-failure test accordingly.
+
 ## Verified Test/Validation Coverage
 
 ### Backend tests already run successfully in prior batches

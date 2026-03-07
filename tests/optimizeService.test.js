@@ -10,6 +10,9 @@ jest.mock('../src/backend/services/alertEngine', () => ({
 jest.mock('../src/backend/services/openclawService', () => ({
     getOpenClawData: jest.fn(async () => []),
 }));
+jest.mock('../src/backend/services/openclawClient', () => ({
+    runArgs: jest.fn(async () => ({ stdout: '', stderr: '' })),
+}));
 
 const optimizeService = require('../src/backend/services/optimizeService');
 
@@ -145,9 +148,6 @@ describe('optimizeService.saveAndNotify', () => {
         const fs = require('fs');
         mkdirSpy = jest.spyOn(fs.promises, 'mkdir').mockResolvedValue(undefined);
         writeSpy = jest.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined);
-        jest.spyOn(require('child_process'), 'execFile').mockImplementation(
-            (bin, args, opts, cb) => cb(null, '', '')
-        );
     });
 
     afterEach(() => {
@@ -161,10 +161,9 @@ describe('optimizeService.saveAndNotify', () => {
         expect(writeSpy).toHaveBeenCalled();
     });
 
-    it('does not throw if Telegram execFile fails', async () => {
-        jest.spyOn(require('child_process'), 'execFile').mockImplementation(
-            (bin, args, opts, cb) => cb(new Error('Telegram fail'), '', '')
-        );
+    it('does not throw if Telegram notification fails', async () => {
+        const openclawClient = require('../src/backend/services/openclawClient');
+        openclawClient.runArgs.mockRejectedValueOnce(new Error('Telegram fail'));
         await expect(
             optimizeService.saveAndNotify('## 報告', false, () => {})
         ).resolves.not.toThrow();
