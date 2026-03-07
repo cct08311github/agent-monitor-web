@@ -69,17 +69,20 @@ npm test
 ```
 src/
 ├── backend/
-│   ├── controllers/    # legacyDashboardController (含 getSessions, getSessionContent)
+│   ├── controllers/    # dashboardReadController / controlController，legacy* 僅保留 compatibility wrapper
 │   ├── routes/         # api.js — 所有 API 路由
-│   ├── middlewares/    # auth.js — localhostOnly, bearerToken, rateLimit, auditLog
+│   ├── middlewares/    # session/control/origin/rate/audit/errorHandler
 │   ├── security/       # threatIntel, adaptiveSecurity, compliance
-│   └── services/       # alertEngine, gatewayWatchdog, tsdbService, openclawService
+│   └── services/       # dashboardPayloadService, historyService, sessionReadService, openclawClient, healthService
 └── frontend/
     └── public/
         ├── index.html
         ├── css/        # style.css, theme.css, taskhub.css
         └── js/
-            ├── app.js                  # 主邏輯
+            ├── state.js                # 前端共享狀態容器
+            ├── stream-manager.js       # SSE / EventSource 共用封裝
+            ├── api-client.js           # fetch / JSON / API error 共用封裝
+            ├── app.js                  # 主邏輯（逐步拆分中）
             └── modules/
                 ├── charts.js           # drawSparkline / drawBarChart / drawHBarChart
                 ├── logs.js
@@ -96,6 +99,9 @@ tests/                  # Jest 測試，對應 src/backend/ 結構
 | GET | `/api/read/dashboard` | 完整 dashboard payload |
 | GET | `/api/read/stream` | SSE 即時推送 |
 | GET | `/api/read/history` | 系統歷史 + 成本 + token 排行 |
+| GET | `/api/read/liveness` | 程序存活檢查 |
+| GET | `/api/read/readiness` | readiness 與 startup/dependency 狀態 |
+| GET | `/api/read/dependencies` | 依賴檢查明細 |
 | GET | `/api/agents/:id/sessions` | Agent sessions 列表 |
 | GET | `/api/agents/:id/sessions/:sid` | Session 訊息內容 |
 | GET | `/api/alerts/config` | 告警設定 |
@@ -111,8 +117,12 @@ tests/                  # Jest 測試，對應 src/backend/ 結構
 
 commit 格式：`feat(sN): <description>`（N = sprint 編號）
 
+## 協作進度
+
+- 目前重構進度與工作樹分工記錄在 [progress.md](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/progress.md)
+- 建議 frontend 重構先在額外 worktree 做完再 cherry-pick 回 `main`
+
 ---
 
-**最後更新**：2026-03-04
-**測試覆蓋**：340 tests，24 suites，全部通過
-**狀態**：生產就緒
+**最後更新**：2026-03-07
+**狀態**：重構進行中，主線可運作
