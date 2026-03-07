@@ -23,24 +23,23 @@ function startOcLog() {
     if (!terminal) return;
 
     terminal.innerHTML = '<span class="oc-log-line info">連接中...</span>';
-    ocLogSource = new EventSource('/api/logs/stream');
-
-    ocLogSource.onopen = () => {
-        if (badge) { badge.textContent = '● 監看中'; badge.className = 'oc-log-badge live'; }
-        if (btn) btn.innerHTML = '⏹ 停止監看';
-    };
-
-    ocLogSource.onmessage = (e) => {
-        try {
-            const { line } = JSON.parse(e.data);
-            appendOcLogLine(terminal, line);
-        } catch (_) { }
-    };
-
-    ocLogSource.onerror = () => {
-        appendOcLogLine(terminal, '[連線中斷，請重新開始監看]');
-        stopOcLog();
-    };
+    ocLogSource = window.streamManager.connect('/api/logs/stream', {
+        onOpen() {
+            if (badge) { badge.textContent = '● 監看中'; badge.className = 'oc-log-badge live'; }
+            if (btn) btn.innerHTML = '⏹ 停止監看';
+        },
+        onMessage(e) {
+            try {
+                const { line } = JSON.parse(e.data);
+                appendOcLogLine(terminal, line);
+            } catch (_) { }
+        },
+        onError() {
+            appendOcLogLine(terminal, '[連線中斷，請重新開始監看]');
+            stopOcLog();
+        },
+        autoReconnect: false
+    });
 }
 
 function stopOcLog() {
