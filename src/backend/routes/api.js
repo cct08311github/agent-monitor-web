@@ -109,6 +109,9 @@ router.post('/watchdog/repair', auth.localhostOnlyControl, auth.rateLimit, async
 
 router.post('/watchdog/toggle', auth.localhostOnlyControl, auth.rateLimit, (req, res) => {
     const enabled = req.body?.enabled;
+    if (typeof enabled !== 'boolean') {
+        throw new AppError(400, 'invalid_enabled', 'enabled must be boolean');
+    }
     if (enabled) {
         gatewayWatchdog.start();
     } else {
