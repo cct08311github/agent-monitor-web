@@ -69,7 +69,7 @@ npm test
 ```
 src/
 ├── backend/
-│   ├── controllers/    # dashboardReadController / controlController，legacy* 僅保留 compatibility wrapper
+│   ├── controllers/    # dashboardReadController / controlController 等現行 controller
 │   ├── routes/         # api.js — 所有 API 路由
 │   ├── middlewares/    # session/control/origin/rate/audit/errorHandler/requestContext/requestLogger
 │   ├── security/       # threatIntel, adaptiveSecurity, compliance

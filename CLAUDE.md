@@ -64,7 +64,7 @@ commit 格式：`feat(sN): <description>`（N = sprint 編號）
 | `bootstrap.js` | 頁面初始化與事件綁定 |
 | `alert-config.js` | 告警設定與 dashboard error detection |
 | `dashboard-render.js` | Agent/Sub-Agent render 與統計更新 |
-| `app.js` | 主邏輯：shared utility 與 update glue（逐步拆分中） |
+| `app.js` | 主邏輯：shared utility 與 update glue |
 | `charts.js` | drawSparkline、drawBarChart、drawHBarChart、fetchHistory、updateCostDisplay |
 | `logs.js` | SSE log 串流 |
 | `chat.js` | Agent 對話 |
@@ -86,7 +86,7 @@ commit 格式：`feat(sN): <description>`（N = sprint 編號）
 ## 注意事項
 - 不把 cron job JSON dump 輸出到 log stream
 - 所有後端 API 走 `src/backend/routes/api.js`
-- 新 controller 名稱已是 `dashboardReadController.js` / `controlController.js`；`legacy*.js` 僅供相容與舊測試使用
+- 現行 controller 以 `dashboardReadController.js` / `controlController.js` 為主，`legacy*.js` wrapper 已移除
 - request id 與 API request/error structured log 已由 `requestContext.js` / `requestLogger.js` 接管
 - 安全/合規模組在 `src/backend/security/`，修改前確認影響範圍
 - `agent-group-header`、`agent-grid-inner`、`agent-group-details` 需要 `grid-column: 1/-1` 才能在 agent-grid 內橫跨整行
