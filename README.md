@@ -71,7 +71,7 @@ src/
 ├── backend/
 │   ├── controllers/    # dashboardReadController / controlController，legacy* 僅保留 compatibility wrapper
 │   ├── routes/         # api.js — 所有 API 路由
-│   ├── middlewares/    # session/control/origin/rate/audit/errorHandler
+│   ├── middlewares/    # session/control/origin/rate/audit/errorHandler/requestContext/requestLogger
 │   ├── security/       # threatIntel, adaptiveSecurity, compliance
 │   └── services/       # dashboardPayloadService, historyService, sessionReadService, openclawClient, healthService
 └── frontend/
@@ -82,7 +82,11 @@ src/
             ├── state.js                # 前端共享狀態容器
             ├── stream-manager.js       # SSE / EventSource 共用封裝
             ├── api-client.js           # fetch / JSON / API error 共用封裝
-            ├── app.js                  # 主邏輯（逐步拆分中）
+            ├── navigation.js           # tab / summary card 切換
+            ├── detail-view.js          # agent detail / session modal
+            ├── error-center.js         # dashboard error banner / SRE flow
+            ├── command-actions.js      # 控制指令 / output modal
+            ├── app.js                  # 剩餘 bootstrap / dashboard render / watchdog/auth
             └── modules/
                 ├── charts.js           # drawSparkline / drawBarChart / drawHBarChart
                 ├── logs.js
@@ -121,6 +125,7 @@ commit 格式：`feat(sN): <description>`（N = sprint 編號）
 
 - 目前重構進度與工作樹分工記錄在 [progress.md](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/progress.md)
 - 建議 frontend 重構先在額外 worktree 做完再 cherry-pick 回 `main`
+- 目前主工作樹處理 backend/integration，前端 worktree 專做 `src/frontend/public/js/**`
 
 ---
 
