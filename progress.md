@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-03-08T00:20 Asia/Taipei
+Last updated: 2026-03-08T00:34 Asia/Taipei
 
 ## Collaboration Rules
 
@@ -287,17 +287,28 @@ Controller-level test naming still inconsistent. Real coverage state:
     - [x] controller coverage gaps were overstated by filename-based checklisting
     - [x] 7 empty catch blocks still remain in Sprint 2 target files
     - [x] no branch with unique, still-needed functional changes was found outside `main`
+- [x] 2026-03-08 branch ancestry reconciliation
+  - Method:
+    - [x] temporarily stashed dirty `main` changes in `package.json`, `package-lock.json`, `server.js`
+    - [x] merged stale local heads into `main` with `git merge --no-ff -s ours` to preserve current content while reconciling ancestry
+    - [x] restored the stashed local changes after reconciliation
+  - Reconciled branches:
+    - [x] `backup/local-main-e3b80c6`
+    - [x] `codex/frontend-split`
+    - [x] `codex/watchdog-hardening`
+    - [x] `feat/issue-29-fix-agent-model-display`
+    - [x] `feat/issue-39-bug--openclaw`
 
 ## Branch Reconciliation
 
-- `main` is ahead of `origin/main` by 6 commits and contains the Sprint 2 progress/test/hardening work.
-- Non-merged branch heads were audited on 2026-03-08:
-  - `codex/frontend-split`: frontend modularization is already present on `main` via different commit hashes
-  - `codex/watchdog-hardening`: watchdog hardening is already present on `main` via commit `83bb755`
-  - `backup/local-main-e3b80c6`: backup branch only carries an old mobile-chat-button removal already represented on `main`
-  - `feat/issue-39-bug--openclaw`: its single extra commit removes a duplicate mobile chat button, but that behavior is already present on `main` via earlier equivalent changes
-- Conclusion: there is currently **no pending branch that must be merged for code completeness**.
-- Blocking note: because `package.json`, `package-lock.json`, and `server.js` are dirty on `main`, do not perform branch merges until those user changes are either committed or stashed intentionally.
+- As of 2026-03-08 00:34 Asia/Taipei, local branch ancestry has been reconciled into `main`.
+- `git branch --no-merged main` now returns no local branches.
+- Reconciliation used history-only merges for stale/equivalent branches so the current `main` content stayed unchanged.
+- Dirty working tree note still applies:
+  - `package.json`
+  - `package-lock.json`
+  - `server.js`
+  These three files remain uncommitted local work on `main` and were restored after reconciliation.
 
 ## Next Checklist
 
