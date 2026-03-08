@@ -29,9 +29,9 @@ Migration issue:
 
 - #104 Add direct controller and API-focused coverage for remaining controllers
 - #105 Audit and document remaining silent catch blocks
-- #106 Evaluate shared dashboard SSE wrapper for frontend streams
+- #108 Evaluate shared dashboard SSE wrapper for frontend streams
 - #107 Archive docs/plans backlog into summary documentation
-- #108 Refresh README and CLAUDE architecture snapshot after Sprint 2
+- #106 Refresh README and CLAUDE architecture snapshot after Sprint 2
 
 ## Handoff Guidance
 
