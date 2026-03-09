@@ -217,7 +217,7 @@ async function collectDiagnostics(reason) {
         diag.cpu = (os.loadavg()[0] / os.cpus().length * 100).toFixed(1) + '%';
         diag.memory = ((1 - os.freemem() / os.totalmem()) * 100).toFixed(1) + '%';
         diag.uptime = Math.floor(os.uptime() / 3600) + 'h';
-    } catch (e) { /* ignore */ }
+    } catch (e) { /* OS stats best-effort — non-critical */ }
 
     try {
         // Collect errors exactly like the shell script does (tail logs, grep errors)
@@ -253,7 +253,7 @@ async function findGeminiCli() {
         for (const p of paths) {
             if (fs.existsSync(p)) return p;
         }
-    } catch (e) { }
+    } catch (e) { /* gemini cli lookup — returns null if unavailable */ }
     return null;
 }
 

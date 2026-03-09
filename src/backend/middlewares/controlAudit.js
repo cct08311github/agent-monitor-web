@@ -57,7 +57,9 @@ function controlAuditMiddleware(req, res, next) {
                 latencyMs: Math.round(latencyMs),
                 success: statusCode >= 200 && statusCode < 300,
             });
-        } catch (e) {}
+        } catch (e) {
+            logger.error('control_audit_middleware_error', { msg: e.message });
+        }
     });
     return next();
 }

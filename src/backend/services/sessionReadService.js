@@ -41,7 +41,7 @@ function readSessionContent(agentIdInput, sessionIdInput) {
             const text = blocks.filter((b) => b.type === 'text').map((b) => b.text || '').join('');
             const toolUses = blocks.filter((b) => b.type === 'tool_use').map((b) => b.name || '').filter(Boolean);
             messages.push({ role, text, toolUses, ts: obj.timestamp || null });
-        } catch (_) {}
+        } catch (_) { /* malformed JSONL line — skip */ }
     }
 
     return { statusCode: 200, body: ok({ sessionId, messages }) };
@@ -79,9 +79,9 @@ function readSessions(agentIdInput) {
                         lastTs = obj.ts || obj.timestamp || obj.created_at;
                         break;
                     }
-                } catch (_) {}
+                } catch (_) { /* malformed line — skip */ }
             }
-        } catch (_) {}
+        } catch (_) { /* file read fail — return defaults */ }
         return { id: f.replace('.jsonl', ''), messageCount, lastTs };
     });
 

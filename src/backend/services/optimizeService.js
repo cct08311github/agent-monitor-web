@@ -33,7 +33,7 @@ async function collectData() {
             .sort()
             .reverse()
             .slice(0, 20);
-    } catch (_) {}
+    } catch (_) { /* plans dir may not exist — return empty */ }
 
     return { costHistory, agents, alerts, existingPlans };
 }
