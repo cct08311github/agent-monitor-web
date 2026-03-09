@@ -24,15 +24,17 @@
 ### 操作
 - **Live Log 串流** — SSE 即時串流 gateway logs，含篩選與 active filter 狀態
 - **Chat Tab** — 可選 Agent 傳送訊息
-- **Cron 狀態** — 顯示定時任務狀態
+- **Cron 管理** — 定時任務狀態、toggle、手動觸發、刪除
 - **TaskHub** — 任務管理（priority / status / due date 排序）
 - **系統指令** — 重啟 Gateway、查詢狀態、切換模型等
+- **Watchdog** — 自動偵測 Gateway 異常，可手動 repair / toggle
+- **自主優化** — Gemini 四步驟分析 → 報告 → Telegram 推播
 
 ### 安全
 - Localhost + Tailscale + 本地網域白名單
-- Bearer Token 驗證（控制端點）
-- Rate limiting、Audit log
-- 威脅情報 (6 條規則) + 自適應安全系統
+- HttpOnly sid cookie + HMAC session store + bcrypt + rate limit
+- 控制端點 Bearer Token 驗證
+- 威脅情報分析 + 自適應安全系統 + 合規檢查
 
 ## 快速開始
 
@@ -48,32 +50,34 @@ npm start
 
 ```bash
 npm test
-# 340 tests, 24 suites — jest --forceExit --detectOpenHandles
+# 440 tests, 35 suites — jest --forceExit --detectOpenHandles
 ```
 
 ## Configuration
 
-- `PORT` — HTTPS 服務埠，預設 `3001`
-- `HTTPS_KEY_PATH` / `HTTPS_CERT_PATH` — TLS 憑證路徑，預設為 `cert/key.pem` 與 `cert/cert.pem`
-- `OPENCLAW_ROOT` / `OPENCLAW_BIN` / `OPENCLAW_ENV_PATH` — OpenClaw 根目錄、執行檔與 `.env` 路徑
-- `PROJECT_PATH` / `PLANS_DIR` — 專案根目錄與自主優化報告輸出路徑
-- `AUTH_DISABLED` / `AUTH_USERNAME` / `AUTH_PASSWORD_HASH` / `AUTH_SESSION_SECRET` / `AUTH_SESSION_TTL_HOURS` — 後台登入與 session 設定
-- `HUD_CONTROL_TOKEN` 或 `OPENCLAW_HUD_CONTROL_TOKEN` — 控制端點 bearer token，未設定時 `/api/control/*` 會回 `503 control_not_configured`
-- `GEMINI_API_KEY` — 自主優化 pipeline 使用；未設定時會 fallback 讀取 OpenClaw `.env`
-- `OPENCLAW_NOTIFY_CHANNEL` / `OPENCLAW_NOTIFY_TARGET` — 自主優化通知目標，預設為 Telegram
+| 變數 | 說明 |
+|------|------|
+| `PORT` | HTTPS 服務埠（預設 `3001`） |
+| `HTTPS_KEY_PATH` / `HTTPS_CERT_PATH` | TLS 憑證路徑（預設 `cert/`） |
+| `OPENCLAW_ROOT` / `OPENCLAW_BIN` / `OPENCLAW_ENV_PATH` | OpenClaw 根目錄、執行檔與 `.env` |
+| `AUTH_DISABLED` | 停用登入驗證（測試用） |
+| `AUTH_USERNAME` / `AUTH_PASSWORD_HASH` / `AUTH_SESSION_SECRET` / `AUTH_SESSION_TTL_HOURS` | 後台登入與 session |
+| `HUD_CONTROL_TOKEN` | 控制端點 bearer token；未設定時回 `503` |
+| `GEMINI_API_KEY` | 自主優化 pipeline；fallback 讀 `~/.openclaw/.env` |
+| `OPENCLAW_NOTIFY_CHANNEL` / `OPENCLAW_NOTIFY_TARGET` | 優化通知目標（預設 Telegram） |
 
-啟動時會先檢查 TLS 憑證、OpenClaw binary 與必要 auth 設定；若缺少必要檔案或設定，server 會直接拒絕啟動並輸出明確錯誤。
+啟動時檢查 TLS 憑證、OpenClaw binary 與必要 auth 設定；缺少時拒絕啟動並輸出錯誤。
 
 ## 架構
 
 ```
 src/
 ├── backend/
-│   ├── controllers/    # dashboardReadController / controlController 等現行 controller
+│   ├── controllers/    # 11 controllers (dashboard, control, auth, alert, optimize, cron, taskHub, agent, security, compliance, system)
 │   ├── routes/         # api.js — 所有 API 路由
-│   ├── middlewares/    # session/control/origin/rate/audit/errorHandler/requestContext/requestLogger
+│   ├── middlewares/    # session/control auth, origin policy, rate limit, audit, error handler, request context/logger
 │   ├── security/       # threatIntel, adaptiveSecurity, compliance
-│   └── services/       # dashboardPayloadService, historyService, sessionReadService, openclawClient, healthService
+│   └── services/       # 12 services (dashboard, history, session, openclaw, health, optimize, alert, watchdog, tsdb, etc.)
 └── frontend/
     └── public/
         ├── index.html
@@ -93,7 +97,8 @@ src/
             ├── bootstrap.js            # DOMContentLoaded bootstrap
             ├── alert-config.js         # alert config modal / alert detection
             ├── dashboard-render.js     # dashboard agent/subagent rendering
-            ├── app.js                  # 剩餘 shared utilities / data update glue
+            ├── theme-manager.js        # dark/light theme toggle
+            ├── app.js                  # shared utilities / data update glue
             └── modules/
                 ├── charts.js           # drawSparkline / drawBarChart / drawHBarChart
                 ├── logs.js
@@ -110,14 +115,37 @@ tests/                  # Jest 測試，對應 src/backend/ 結構
 | GET | `/api/read/dashboard` | 完整 dashboard payload |
 | GET | `/api/read/stream` | SSE 即時推送 |
 | GET | `/api/read/history` | 系統歷史 + 成本 + token 排行 |
+| GET | `/api/read/status` | 系統狀態摘要 |
+| GET | `/api/read/models` | 模型列表 |
+| GET | `/api/read/agents` | Agent 列表 |
 | GET | `/api/read/liveness` | 程序存活檢查 |
 | GET | `/api/read/readiness` | readiness 與 startup/dependency 狀態 |
 | GET | `/api/read/dependencies` | 依賴檢查明細 |
 | GET | `/api/agents/:id/sessions` | Agent sessions 列表 |
 | GET | `/api/agents/:id/sessions/:sid` | Session 訊息內容 |
+| POST | `/api/auth/login` | 登入 |
+| POST | `/api/auth/logout` | 登出 |
+| GET | `/api/auth/me` | 當前使用者 |
 | GET | `/api/alerts/config` | 告警設定 |
+| PATCH | `/api/alerts/config` | 更新告警設定 |
+| GET | `/api/alerts/recent` | 近期告警 |
 | GET | `/api/taskhub/tasks` | TaskHub 任務列表 |
+| POST | `/api/taskhub/tasks` | 新增任務 |
+| PATCH | `/api/taskhub/tasks/:domain/:id` | 更新任務 |
+| DELETE | `/api/taskhub/tasks/:domain/:id` | 刪除任務 |
+| GET | `/api/cron/jobs` | Cron 任務列表 |
+| POST | `/api/cron/jobs/:id/toggle` | Toggle cron 任務 |
+| POST | `/api/cron/jobs/:id/run` | 手動執行 cron 任務 |
+| DELETE | `/api/cron/jobs/:id` | 刪除 cron 任務 |
 | POST | `/api/command` | 執行 openclaw 指令 |
+| GET | `/api/optimize/run` | 自主優化 pipeline（SSE） |
+| GET | `/api/watchdog/status` | Watchdog 狀態 |
+| POST | `/api/watchdog/repair` | 手動修復 |
+| POST | `/api/watchdog/toggle` | Toggle watchdog |
+| GET | `/api/logs/stream` | 即時 log 串流（SSE） |
+| GET | `/api/system/comprehensive` | 系統完整狀態 |
+| POST | `/api/security/analyze` | 安全分析 |
+| GET | `/api/compliance/status` | 合規狀態 |
 
 ## 開發流程
 
@@ -128,13 +156,7 @@ tests/                  # Jest 測試，對應 src/backend/ 結構
 
 commit 格式：`feat(sN): <description>`（N = sprint 編號）
 
-## 協作進度
-
-- 目前重構進度與工作樹分工記錄在 [progress.md](/Users/openclaw/.openclaw/shared/projects/agent-monitor-web/progress.md)
-- 建議 frontend 重構先在額外 worktree 做完再 cherry-pick 回 `main`
-- 目前主工作樹處理 backend/integration，前端 worktree 專做 `src/frontend/public/js/**`
-
 ---
 
-**最後更新**：2026-03-07
-**狀態**：重構進行中，主線可運作
+**最後更新**：2026-03-09
+**狀態**：Sprint 2 完成，優化期
