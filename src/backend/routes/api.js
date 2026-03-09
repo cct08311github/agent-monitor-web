@@ -204,7 +204,7 @@ router.get('/logs/stream', auth.localhostOnlyControl, /* istanbul ignore next */
 
     req.on('close', () => {
         clearInterval(heartbeat);
-        try { child.kill('SIGTERM'); } catch (_) { }
+        try { child.kill('SIGTERM'); } catch (_) { /* process already exited */ }
     });
 });
 
