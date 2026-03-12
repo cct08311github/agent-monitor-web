@@ -201,6 +201,17 @@ describe('getTasks', () => {
         data.tasks.forEach(t => expect(t.project).toBe('proj-a'));
     });
 
+    it('filters by project in domain=all without failing on personal_tasks', async () => {
+        const req = { query: { domain: 'all', project: 'proj-a' } };
+        const res = mockRes();
+        await taskHubController.getTasks(req, res);
+        const data = res.json.mock.calls[0][0];
+        expect(data.success).toBe(true);
+        // personal_tasks has no project column — should be excluded from results
+        data.tasks.forEach(t => expect(t.domain).not.toBe('personal'));
+        data.tasks.forEach(t => expect(t.project).toBe('proj-a'));
+    });
+
     it('returns 400 for invalid domain', async () => {
         const req = { query: { domain: 'invalid' } };
         const res = mockRes();
