@@ -330,6 +330,27 @@ describe('dashboardPayloadService', () => {
         }));
     });
 
+    it('serves cached agent data within TTL instead of rebuilding', async () => {
+        // First call builds payload
+        await service.updateSharedData();
+        const firstPayload = service.getSharedPayload();
+        expect(firstPayload).toBeTruthy();
+
+        // Record call counts after first build
+        const agentsCallCount = mockExecFilePromise.mock.calls
+            .filter(c => c[1] && c[1][0] === 'agents').length;
+
+        // Second call within TTL should reuse cache
+        await service.updateSharedData();
+        const secondPayload = service.getSharedPayload();
+
+        // agents CLI should NOT have been called again (10s TTL)
+        const agentsCallCount2 = mockExecFilePromise.mock.calls
+            .filter(c => c[1] && c[1][0] === 'agents').length;
+        expect(agentsCallCount2).toBe(agentsCallCount);
+        expect(secondPayload.agents).toEqual(firstPayload.agents);
+    });
+
     it('warns when subagent sessions json or cron json cannot be parsed', async () => {
         const agentsRoot = '/tmp/home/.openclaw/agents';
         const sessionsDir = path.join(agentsRoot, 'main', 'sessions');
