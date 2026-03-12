@@ -100,41 +100,55 @@ async function getTasks(req, res) {
         const parsedLimit = Math.min(parseInt(limit) || 100, 500);
         const domains = domain === 'all' ? Object.keys(DOMAIN_TABLES) : [domain];
 
-        // Build WHERE clause fragments
+        // Build WHERE clause fragments — shared across all domains
         const conditions = [];
         const params = [];
         if (status) { conditions.push('status = ?'); params.push(status); }
         if (priority) { conditions.push('priority = ?'); params.push(priority); }
-        if (project) { conditions.push('project = ?'); params.push(project); }
         if (search) {
             conditions.push('(title LIKE ? OR notes LIKE ?)');
             params.push(`%${search}%`, `%${search}%`);
         }
         const whereClause = conditions.length > 0 ? ' AND ' + conditions.join(' AND ') : '';
 
+        // project column only exists in work_tasks and sideproject_tasks
+        const DOMAINS_WITH_PROJECT = ['work', 'sideproject'];
+
         let allTasks;
 
         if (domain === 'all') {
-            // UNION ALL across all domains — single query, SQLite handles sort
-            const parts = domains.map(d => {
-                const table = DOMAIN_TABLES[d];
-                return `SELECT ${DOMAIN_SELECT[d]}, '${d}' as domain FROM ${table} WHERE 1=1${whereClause}`;
-            });
-            // Params must be repeated for each UNION branch
-            const allParams = [];
-            for (let i = 0; i < domains.length; i++) {
-                allParams.push(...params);
+            // When filtering by project, skip domains without the column
+            const effectiveDomains = project ? domains.filter(d => DOMAINS_WITH_PROJECT.includes(d)) : domains;
+
+            if (effectiveDomains.length === 0) {
+                allTasks = [];
+            } else {
+                const projectClause = project ? ' AND project = ?' : '';
+                const parts = effectiveDomains.map(d => {
+                    const table = DOMAIN_TABLES[d];
+                    return `SELECT ${DOMAIN_SELECT[d]}, '${d}' as domain FROM ${table} WHERE 1=1${whereClause}${projectClause}`;
+                });
+                const allParams = [];
+                for (const d of effectiveDomains) {
+                    allParams.push(...params);
+                    if (project) allParams.push(project);
+                }
+                allParams.push(parsedLimit);
+                const sql = `SELECT * FROM (${parts.join(' UNION ALL ')}) ${ORDER_CLAUSE} LIMIT ?`;
+                allTasks = conn.prepare(sql).all(...allParams);
             }
-            allParams.push(parsedLimit);
-            // Wrap UNION ALL in subquery so ORDER BY can use expressions
-            const sql = `SELECT * FROM (${parts.join(' UNION ALL ')}) ${ORDER_CLAUSE} LIMIT ?`;
-            allTasks = conn.prepare(sql).all(...allParams);
         } else {
             // Single domain — keep original simple query
             const table = DOMAIN_TABLES[domain];
-            let sql = `SELECT *, '${domain}' as domain FROM ${table} WHERE 1=1${whereClause}`;
+            const singleParams = [...params];
+            let singleWhere = whereClause;
+            if (project && DOMAINS_WITH_PROJECT.includes(domain)) {
+                singleWhere += ' AND project = ?';
+                singleParams.push(project);
+            }
+            let sql = `SELECT *, '${domain}' as domain FROM ${table} WHERE 1=1${singleWhere}`;
             sql += ` ${ORDER_CLAUSE} LIMIT ?`;
-            allTasks = conn.prepare(sql).all(...params, parsedLimit);
+            allTasks = conn.prepare(sql).all(...singleParams, parsedLimit);
         }
 
         allTasks = allTasks.map(r => ({ ...r, tags: tryParseJson(r.tags, []) }));
