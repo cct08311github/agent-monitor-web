@@ -14,7 +14,28 @@ const agentWatcherService = require('./agentWatcherService');
 const alertEngine = require('./alertEngine');
 const { fetchModelCooldowns } = require('../utils/modelMonitor');
 
-const DASHBOARD_CACHE_TTL_MS = 3000;
+const cache = {
+    sys:       { data: null, ts: 0, ttl: 5000 },
+    agents:    { data: null, ts: 0, ttl: 10000 },
+    subagents: { data: null, ts: 0, ttl: 10000 },
+    cron:      { data: null, ts: 0, ttl: 30000 },
+    cooldowns: { data: null, ts: 0, ttl: 15000 },
+};
+
+function isFresh(entry) {
+    return entry.data !== null && Date.now() - entry.ts < entry.ttl;
+}
+
+function updateCache(entry, data) {
+    entry.data = data;
+    entry.ts = Date.now();
+}
+
+function invalidateCache(entry) {
+    entry.data = null;
+    entry.ts = 0;
+}
+
 const HOME_DIR = os.homedir();
 const OPENCLAW_ROOT = path.join(HOME_DIR, '.openclaw');
 const DEFAULT_OPENCLAW_BIN = path.join(OPENCLAW_ROOT, 'bin', 'openclaw');
@@ -52,7 +73,6 @@ const MODEL_PRICING = {
 };
 
 let RESOLVED_OPENCLAW_BIN = null;
-let dashboardCache = { ts: 0, payload: null };
 let exchangeRateCache = { rate: 32.0, lastFetch: 0 };
 let previousCpuInfo = null;
 const sseClients = new Set();
@@ -443,59 +463,87 @@ async function buildSubagentStatus() {
 }
 
 async function buildDashboardPayload() {
-    const now = Date.now();
-    if (dashboardCache.payload && now - dashboardCache.ts < DASHBOARD_CACHE_TTL_MS) {
-        return dashboardCache.payload;
-    }
-
     const ocBin = await resolveOpenclawBin();
 
-    const [sys, agentsResult, cronResult, openclawVersionResult, exchangeRate] = await Promise.all([
-        getSystemResources(),
-        execFilePromise(ocBin, ['agents', 'list']).catch(() => ({ stdout: '' })),
-        execFilePromise(ocBin, ['cron', 'list', '--json']).catch(() => ({ stdout: '{"jobs":[]}' })),
+    const fetches = [];
+
+    if (!isFresh(cache.sys)) {
+        fetches.push(
+            getSystemResources().then(data => updateCache(cache.sys, data))
+        );
+    }
+
+    if (!isFresh(cache.agents)) {
+        fetches.push(
+            execFilePromise(ocBin, ['agents', 'list']).catch(() => ({ stdout: '' }))
+                .then(async (agentsResult) => {
+                    const agentList = parseAgentsList(agentsResult.stdout || '');
+                    const agents = await Promise.all(
+                        agentList.map(async (a) => {
+                            const activity = await detectDetailedActivity(a.id);
+                            return { ...a, ...activity, model: a.model || activity.activeModel, activeModel: activity.activeModel };
+                        })
+                    );
+                    updateCache(cache.agents, agents);
+                })
+        );
+    }
+
+    if (!isFresh(cache.subagents)) {
+        fetches.push(
+            buildSubagentStatus().then(data => updateCache(cache.subagents, data))
+        );
+    }
+
+    if (!isFresh(cache.cron)) {
+        fetches.push(
+            execFilePromise(ocBin, ['cron', 'list', '--json']).catch(() => ({ stdout: '{"jobs":[]}' }))
+                .then((cronResult) => {
+                    let cronJobs = [];
+                    try {
+                        const parsedCron = JSON.parse(cronResult.stdout || '{"jobs":[]}');
+                        cronJobs = Array.isArray(parsedCron.jobs) ? parsedCron.jobs : [];
+                    } catch (e) {
+                        logger.warn('cron_jobs_parse_failed', { msg: e.message });
+                    }
+                    const cron = cronJobs.map((j) => ({
+                        id: j.id, name: j.name, enabled: j.enabled !== false,
+                        next: j.state?.nextRunAtMs, status: j.state?.lastStatus || 'ok',
+                        lastRunAt: j.state?.lastRunAtMs, lastError: j.state?.lastError || '',
+                    }));
+                    updateCache(cache.cron, cron);
+                })
+        );
+    }
+
+    if (!isFresh(cache.cooldowns)) {
+        fetches.push(
+            fetchModelCooldowns().then(data => updateCache(cache.cooldowns, data))
+        );
+    }
+
+    // Version + exchange rate keep their existing caching
+    const [openclawVersionResult, exchangeRate] = await Promise.all([
         cachedOcVersion
             ? Promise.resolve({ stdout: cachedOcVersion, stderr: '' })
             : execFilePromise(ocBin, ['--version']).catch(() => ({ stdout: '' })),
         getExchangeRate(),
+        ...fetches,
     ]);
-
-    const agentList = parseAgentsList(agentsResult.stdout || '');
-    const [agents, subagents] = await Promise.all([
-        Promise.all(
-            agentList.map(async (a) => {
-                const activity = await detectDetailedActivity(a.id);
-                return { ...a, ...activity, model: a.model || activity.activeModel, activeModel: activity.activeModel };
-            })
-        ),
-        buildSubagentStatus(),
-    ]);
-
-    let cronJobs = [];
-    try {
-        const parsedCron = JSON.parse(cronResult.stdout || '{"jobs":[]}');
-        cronJobs = Array.isArray(parsedCron.jobs) ? parsedCron.jobs : [];
-    } catch (e) {
-        logger.warn('cron_jobs_parse_failed', { msg: e.message });
-    }
-
-    const cron = cronJobs.map((j) => ({
-        id: j.id,
-        name: j.name,
-        enabled: j.enabled !== false,
-        next: j.state?.nextRunAtMs,
-        status: j.state?.lastStatus || 'ok',
-        lastRunAt: j.state?.lastRunAtMs,
-        lastError: j.state?.lastError || '',
-    }));
-    const cooldowns = await fetchModelCooldowns();
 
     const openclawVersion = parseOpenclawVersionOutput(openclawVersionResult.stdout, openclawVersionResult.stderr);
     if (openclawVersion && !cachedOcVersion) cachedOcVersion = openclawVersion;
 
-    const payload = { success: true, openclaw: { version: openclawVersion || null }, sys, agents, cron, subagents, cooldowns, exchangeRate };
-    dashboardCache = { ts: now, payload };
-    return payload;
+    return {
+        success: true,
+        openclaw: { version: openclawVersion || null },
+        sys: cache.sys.data || {},
+        agents: cache.agents.data || [],
+        cron: cache.cron.data || [],
+        subagents: cache.subagents.data || [],
+        cooldowns: cache.cooldowns.data || {},
+        exchangeRate,
+    };
 }
 
 function minimizeDashboardPayload(payload) {
@@ -561,6 +609,8 @@ function startGlobalPolling() {
     agentWatcherService.on('state_update', () => {
         clearTimeout(watcherDebounceTimer);
         watcherDebounceTimer = setTimeout(async () => {
+            invalidateCache(cache.agents);
+            invalidateCache(cache.subagents);
             await updateSharedData();
             doBroadcast().catch((e) => logger.error('poller_broadcast_error', { msg: e.message }));
         }, 300);
@@ -583,6 +633,7 @@ function removeSseClient(res) {
 function invalidateSharedPayload() {
     sharedPayload = null;
     lastUpdateTs = 0;
+    Object.values(cache).forEach(entry => invalidateCache(entry));
 }
 
 function getSharedPayload() {
