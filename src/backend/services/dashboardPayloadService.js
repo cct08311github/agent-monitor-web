@@ -264,7 +264,7 @@ function parseAgentsList(text) {
     return agents;
 }
 
-function detectDetailedActivity(agentId) {
+async function detectDetailedActivity(agentId) {
     let detail = {
         status: 'inactive',
         cost: 0,
@@ -281,8 +281,9 @@ function detectDetailedActivity(agentId) {
         const agentDir = path.join(AGENTS_ROOT, agentId, 'sessions');
         const sessionJsonPath = path.join(agentDir, 'sessions.json');
 
-        if (fs.existsSync(sessionJsonPath)) {
-            const json = JSON.parse(fs.readFileSync(sessionJsonPath, 'utf8'));
+        const sessionJsonExists = await fs.promises.access(sessionJsonPath).then(() => true).catch(() => false);
+        if (sessionJsonExists) {
+            const json = JSON.parse(await fs.promises.readFile(sessionJsonPath, 'utf8'));
             let totalCost = 0;
             const modelUsage = {};
             let latestSessionTime = 0;
@@ -333,15 +334,21 @@ function detectDetailedActivity(agentId) {
             detail.modelUsage = modelUsage;
         }
 
-        if (fs.existsSync(agentDir)) {
-            const files = fs.readdirSync(agentDir)
-                .filter((f) => f.endsWith('.jsonl'))
-                .map((f) => ({ name: f, time: fs.statSync(path.join(agentDir, f)).mtimeMs }))
-                .sort((a, b) => b.time - a.time);
+        const agentDirExists = await fs.promises.access(agentDir).then(() => true).catch(() => false);
+        if (agentDirExists) {
+            const allFiles = await fs.promises.readdir(agentDir);
+            const jsonlFiles = allFiles.filter((f) => f.endsWith('.jsonl'));
+            const filesWithTime = await Promise.all(
+                jsonlFiles.map(async (f) => ({
+                    name: f,
+                    time: (await fs.promises.stat(path.join(agentDir, f))).mtimeMs,
+                }))
+            );
+            const files = filesWithTime.sort((a, b) => b.time - a.time);
 
             if (files.length > 0) {
                 const mtime = files[0].time;
-                const lines = fs.readFileSync(path.join(agentDir, files[0].name), 'utf8').trim().split('\n');
+                const lines = (await fs.promises.readFile(path.join(agentDir, files[0].name), 'utf8')).trim().split('\n');
                 const isExecuting = Date.now() - mtime < 300000;
                 let found = false;
                 for (const roleFilter of ['assistant', null]) {
@@ -382,16 +389,20 @@ function detectDetailedActivity(agentId) {
     }
 }
 
-function buildSubagentStatus() {
+async function buildSubagentStatus() {
     const subagents = [];
     try {
-        const agentDirs = fs.readdirSync(AGENTS_ROOT);
+        const agentDirs = await fs.promises.readdir(AGENTS_ROOT);
         for (const agentDirName of agentDirs) {
             const sessionsPath = path.join(AGENTS_ROOT, agentDirName, 'sessions', 'sessions.json');
-            if (!fs.existsSync(sessionsPath)) continue;
+            try {
+                await fs.promises.access(sessionsPath);
+            } catch {
+                continue;
+            }
             let sessions;
             try {
-                sessions = JSON.parse(fs.readFileSync(sessionsPath, 'utf8'));
+                sessions = JSON.parse(await fs.promises.readFile(sessionsPath, 'utf8'));
             } catch (e) {
                 logger.warn('subagent_sessions_parse_failed', { agentDirName, msg: e.message });
                 continue;
@@ -449,10 +460,16 @@ async function buildDashboardPayload() {
         getExchangeRate(),
     ]);
 
-    const agents = parseAgentsList(agentsResult.stdout || '').map((a) => {
-        const activity = detectDetailedActivity(a.id);
-        return { ...a, ...activity, model: a.model || activity.activeModel, activeModel: activity.activeModel };
-    });
+    const agentList = parseAgentsList(agentsResult.stdout || '');
+    const [agents, subagents] = await Promise.all([
+        Promise.all(
+            agentList.map(async (a) => {
+                const activity = await detectDetailedActivity(a.id);
+                return { ...a, ...activity, model: a.model || activity.activeModel, activeModel: activity.activeModel };
+            })
+        ),
+        buildSubagentStatus(),
+    ]);
 
     let cronJobs = [];
     try {
@@ -471,8 +488,6 @@ async function buildDashboardPayload() {
         lastRunAt: j.state?.lastRunAtMs,
         lastError: j.state?.lastError || '',
     }));
-
-    const subagents = buildSubagentStatus();
     const cooldowns = await fetchModelCooldowns();
 
     const openclawVersion = parseOpenclawVersionOutput(openclawVersionResult.stdout, openclawVersionResult.stderr);
