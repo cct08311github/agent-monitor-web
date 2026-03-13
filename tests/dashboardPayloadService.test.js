@@ -5,6 +5,12 @@ const mockFs = {
     readFileSync: jest.fn(),
     readdirSync: jest.fn(),
     statSync: jest.fn(),
+    promises: {
+        access: jest.fn(),
+        readFile: jest.fn(),
+        readdir: jest.fn(),
+        stat: jest.fn(),
+    },
 };
 
 const mockExecFilePromise = jest.fn();
@@ -77,11 +83,34 @@ function configureFsForDashboard({ sessionsJson = '{}', latestLog = '' } = {}) {
     const sessionsJsonPath = path.join(sessionsDir, 'sessions.json');
     const latestLogPath = path.join(sessionsDir, 'session1.jsonl');
 
+    // Sync mocks (kept for resolveOpenclawBin which still uses existsSync)
     mockFs.existsSync.mockImplementation((targetPath) => (
         targetPath === path.join(openclawRoot, 'bin', 'openclaw') ||
         targetPath === sessionsDir ||
         targetPath === sessionsJsonPath
     ));
+
+    // Async mocks for detectDetailedActivity + buildSubagentStatus
+    mockFs.promises.access.mockImplementation((targetPath) => {
+        if (targetPath === sessionsDir ||
+            targetPath === sessionsJsonPath) {
+            return Promise.resolve();
+        }
+        return Promise.reject(new Error('ENOENT'));
+    });
+    mockFs.promises.readdir.mockImplementation((targetPath) => {
+        if (targetPath === sessionsDir) return Promise.resolve(latestLog ? ['session1.jsonl'] : []);
+        if (targetPath === agentsRoot) return Promise.resolve(['main']);
+        return Promise.resolve([]);
+    });
+    mockFs.promises.stat.mockResolvedValue({ mtimeMs: Date.now() - 120000 });
+    mockFs.promises.readFile.mockImplementation((targetPath) => {
+        if (targetPath === sessionsJsonPath) return Promise.resolve(sessionsJson);
+        if (targetPath === latestLogPath) return Promise.resolve(latestLog);
+        return Promise.reject(new Error(`unexpected path ${targetPath}`));
+    });
+
+    // Keep sync mocks for any remaining sync callers
     mockFs.readdirSync.mockImplementation((targetPath) => {
         if (targetPath === sessionsDir) return latestLog ? ['session1.jsonl'] : [];
         if (targetPath === agentsRoot) return ['main'];
@@ -137,7 +166,8 @@ describe('dashboardPayloadService', () => {
         jest.clearAllMocks();
         jest.useRealTimers();
 
-        Object.values(mockFs).forEach((fn) => fn.mockReset());
+        Object.values(mockFs).forEach((fn) => typeof fn.mockReset === 'function' && fn.mockReset());
+        Object.values(mockFs.promises).forEach((fn) => fn.mockReset());
         Object.values(mockTsdb).forEach((fn) => fn.mockReset());
         Object.values(mockAgentWatcher).forEach((fn) => fn.mockReset());
         Object.values(mockAlertEngine).forEach((fn) => fn.mockReset());
@@ -280,11 +310,11 @@ describe('dashboardPayloadService', () => {
     });
 
     it('warns when agent activity cannot be read but still returns the fallback detail', async () => {
-        mockFs.readFileSync.mockImplementation((targetPath) => {
+        mockFs.promises.readFile.mockImplementation((targetPath) => {
             if (targetPath.endsWith('sessions.json')) {
-                throw new Error('sessions broken');
+                return Promise.reject(new Error('sessions broken'));
             }
-            return '';
+            return Promise.resolve('');
         });
 
         const result = await service.updateSharedData();
@@ -300,24 +330,51 @@ describe('dashboardPayloadService', () => {
         }));
     });
 
+    it('serves cached agent data within TTL instead of rebuilding', async () => {
+        // First call builds payload
+        await service.updateSharedData();
+        const firstPayload = service.getSharedPayload();
+        expect(firstPayload).toBeTruthy();
+
+        // Record call counts after first build
+        const agentsCallCount = mockExecFilePromise.mock.calls
+            .filter(c => c[1] && c[1][0] === 'agents').length;
+
+        // Second call within TTL should reuse cache
+        await service.updateSharedData();
+        const secondPayload = service.getSharedPayload();
+
+        // agents CLI should NOT have been called again (10s TTL)
+        const agentsCallCount2 = mockExecFilePromise.mock.calls
+            .filter(c => c[1] && c[1][0] === 'agents').length;
+        expect(agentsCallCount2).toBe(agentsCallCount);
+        expect(secondPayload.agents).toEqual(firstPayload.agents);
+    });
+
     it('warns when subagent sessions json or cron json cannot be parsed', async () => {
         const agentsRoot = '/tmp/home/.openclaw/agents';
         const sessionsDir = path.join(agentsRoot, 'main', 'sessions');
         const sessionsJsonPath = path.join(sessionsDir, 'sessions.json');
 
         mockFs.existsSync.mockImplementation((targetPath) => (
-            targetPath === '/tmp/home/.openclaw/bin/openclaw' ||
-            targetPath === sessionsDir ||
-            targetPath === sessionsJsonPath
+            targetPath === '/tmp/home/.openclaw/bin/openclaw'
         ));
-        mockFs.readdirSync.mockImplementation((targetPath) => {
-            if (targetPath === agentsRoot) return ['main'];
-            if (targetPath === sessionsDir) return [];
-            return [];
+        mockFs.promises.readdir.mockImplementation((targetPath) => {
+            if (targetPath === agentsRoot) return Promise.resolve(['main']);
+            if (targetPath === sessionsDir) return Promise.resolve([]);
+            return Promise.resolve([]);
         });
-        mockFs.readFileSync.mockImplementation((targetPath) => {
-            if (targetPath === sessionsJsonPath) return '{bad json';
-            throw new Error(`unexpected path ${targetPath}`);
+        mockFs.promises.access.mockImplementation((targetPath) => {
+            if (targetPath === '/tmp/home/.openclaw/bin/openclaw' ||
+                targetPath === sessionsDir ||
+                targetPath === sessionsJsonPath) {
+                return Promise.resolve();
+            }
+            return Promise.reject(new Error('ENOENT'));
+        });
+        mockFs.promises.readFile.mockImplementation((targetPath) => {
+            if (targetPath === sessionsJsonPath) return Promise.resolve('{bad json');
+            return Promise.reject(new Error(`unexpected path ${targetPath}`));
         });
         mockExecFilePromise.mockImplementation((bin, args) => {
             if (bin === 'free') return Promise.resolve({ stdout: 'Mem: 16000000000 8000000000 4000000000 0 0 4000000000', stderr: '' });

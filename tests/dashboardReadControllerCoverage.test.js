@@ -12,6 +12,12 @@ const mockFs = {
     readdirSync: jest.fn().mockReturnValue([]),
     statSync: jest.fn().mockReturnValue({ mtimeMs: Date.now() }),
     mkdirSync: jest.fn(),
+    promises: {
+        access: jest.fn().mockRejectedValue(new Error('ENOENT')),
+        readFile: jest.fn().mockResolvedValue(''),
+        readdir: jest.fn().mockResolvedValue([]),
+        stat: jest.fn().mockResolvedValue({ mtimeMs: Date.now() }),
+    },
 };
 jest.mock('fs', () => mockFs);
 
@@ -38,10 +44,15 @@ let ctrl;
 beforeEach(() => {
     jest.resetModules();
     Object.values(mockFs).forEach(fn => typeof fn.mockReset === 'function' && fn.mockReset());
+    Object.values(mockFs.promises).forEach(fn => fn.mockReset());
     mockFs.existsSync.mockReturnValue(false);
     mockFs.readdirSync.mockReturnValue([]);
     mockFs.statSync.mockReturnValue({ mtimeMs: Date.now() });
     mockFs.readFileSync.mockReturnValue('');
+    mockFs.promises.access.mockRejectedValue(new Error('ENOENT'));
+    mockFs.promises.readFile.mockResolvedValue('');
+    mockFs.promises.readdir.mockResolvedValue([]);
+    mockFs.promises.stat.mockResolvedValue({ mtimeMs: Date.now() });
     mockExecFilePromise.mockReset();
 
     jest.mock('fs', () => mockFs);
@@ -121,6 +132,7 @@ function setupFsForAgent({ jsonlContent = '', jsonlMtime = Date.now() - 10 * 60 
     const sessionsJsonPath = path.join(agentDir, 'sessions.json');
     const jsonlPath = path.join(agentDir, 'session1.jsonl');
 
+    // Sync mocks (kept for resolveOpenclawBin existsSync + other sync callers)
     mockFs.existsSync.mockImplementation((p) => {
         if (p === sessionsJsonPath) return true;
         if (p === agentDir) return true;
@@ -136,6 +148,23 @@ function setupFsForAgent({ jsonlContent = '', jsonlMtime = Date.now() - 10 * 60 
         if (p === sessionsJsonPath) return makeSessionsJson({ withSubagent });
         if (p === jsonlPath) return jsonlContent;
         throw Object.assign(new Error('ENOENT: ' + p), { code: 'ENOENT' });
+    });
+
+    // Async mocks for detectDetailedActivity + buildSubagentStatus
+    mockFs.promises.access.mockImplementation((p) => {
+        if (p === sessionsJsonPath || p === agentDir) return Promise.resolve();
+        return Promise.reject(new Error('ENOENT'));
+    });
+    mockFs.promises.readdir.mockImplementation((p) => {
+        if (p === agentDir) return Promise.resolve(jsonlContent ? ['session1.jsonl'] : []);
+        if (p === AGENTS_ROOT_PATH) return Promise.resolve(['main']);
+        return Promise.resolve([]);
+    });
+    mockFs.promises.stat.mockImplementation(() => Promise.resolve({ mtimeMs: jsonlMtime }));
+    mockFs.promises.readFile.mockImplementation((p) => {
+        if (p === sessionsJsonPath) return Promise.resolve(makeSessionsJson({ withSubagent }));
+        if (p === jsonlPath) return Promise.resolve(jsonlContent);
+        return Promise.reject(Object.assign(new Error('ENOENT: ' + p), { code: 'ENOENT' }));
     });
 }
 

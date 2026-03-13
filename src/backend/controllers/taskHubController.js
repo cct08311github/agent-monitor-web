@@ -19,6 +19,19 @@ const DOMAIN_TABLES = {
 const VALID_STATUSES = ['draft', 'not_started', 'in_progress', 'done', 'archived', 'blocked', 'cancelled'];
 const VALID_PRIORITIES = ['low', 'medium', 'high', 'urgent'];
 
+const COMMON_COLS = 'id, title, status, priority, due_date, completed_at, parent_id, tags, notes, notion_page_id, notion_dirty, notion_synced_at, created_at, updated_at';
+
+const DOMAIN_SELECT = {
+    work:        `${COMMON_COLS}, assignee, project, NULL as github_repo, NULL as github_issue_id, NULL as github_pr_id, NULL as github_branch, NULL as dev_status, NULL as automation_level`,
+    personal:    `${COMMON_COLS}, NULL as assignee, NULL as project, NULL as github_repo, NULL as github_issue_id, NULL as github_pr_id, NULL as github_branch, NULL as dev_status, NULL as automation_level`,
+    sideproject: `${COMMON_COLS}, NULL as assignee, project, github_repo, github_issue_id, github_pr_id, github_branch, dev_status, automation_level`,
+};
+
+const ORDER_CLAUSE = `ORDER BY
+    CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
+    CASE status WHEN 'blocked' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'not_started' THEN 2 ELSE 9 END,
+    updated_at DESC`;
+
 let db = null;
 
 function getDb() {
@@ -44,15 +57,17 @@ async function getStats(req, res) {
     try {
         const conn = getDb();
         const result = { domains: {}, total_active: 0 };
+        const INACTIVE_STATUSES = ['done', 'archived', 'cancelled'];
 
         for (const [domain, table] of Object.entries(DOMAIN_TABLES)) {
-            const total = conn.prepare(`SELECT COUNT(*) as n FROM ${table}`).get().n;
-            const active = conn.prepare(
-                `SELECT COUNT(*) as n FROM ${table} WHERE status NOT IN ('done','archived','cancelled')`
-            ).get().n;
             const byStatus = conn.prepare(
                 `SELECT status, COUNT(*) as n FROM ${table} GROUP BY status`
             ).all();
+
+            const total = byStatus.reduce((sum, r) => sum + r.n, 0);
+            const active = byStatus
+                .filter(r => !INACTIVE_STATUSES.includes(r.status))
+                .reduce((sum, r) => sum + r.n, 0);
 
             result.domains[domain] = {
                 total,
@@ -78,54 +93,67 @@ async function getTasks(req, res) {
         const conn = getDb();
         const { domain = 'all', status, priority, search, limit = 100, project } = req.query;
 
-        const domains = domain === 'all' ? Object.keys(DOMAIN_TABLES) : [domain];
         if (domain !== 'all' && !DOMAIN_TABLES[domain]) {
             return sendFail(res, 400, `Invalid domain: ${domain}`);
         }
 
-        let allTasks = [];
+        const parsedLimit = Math.min(parseInt(limit) || 100, 500);
+        const domains = domain === 'all' ? Object.keys(DOMAIN_TABLES) : [domain];
 
-        for (const d of domains) {
-            const table = DOMAIN_TABLES[d];
-            let sql = `SELECT *, '${d}' as domain FROM ${table} WHERE 1=1`;
-            const params = [];
+        // Build WHERE clause fragments — shared across all domains
+        const conditions = [];
+        const params = [];
+        if (status) { conditions.push('status = ?'); params.push(status); }
+        if (priority) { conditions.push('priority = ?'); params.push(priority); }
+        if (search) {
+            conditions.push('(title LIKE ? OR notes LIKE ?)');
+            params.push(`%${search}%`, `%${search}%`);
+        }
+        const whereClause = conditions.length > 0 ? ' AND ' + conditions.join(' AND ') : '';
 
-            if (status) { sql += ' AND status = ?'; params.push(status); }
-            if (priority) { sql += ' AND priority = ?'; params.push(priority); }
-            if (project) { sql += ' AND project = ?'; params.push(project); }
-            if (search) {
-                sql += ' AND (title LIKE ? OR notes LIKE ?)';
-                params.push(`%${search}%`, `%${search}%`);
+        // project column only exists in work_tasks and sideproject_tasks
+        const DOMAINS_WITH_PROJECT = ['work', 'sideproject'];
+
+        let allTasks;
+
+        if (domain === 'all') {
+            // When filtering by project, skip domains without the column
+            const effectiveDomains = project ? domains.filter(d => DOMAINS_WITH_PROJECT.includes(d)) : domains;
+
+            if (effectiveDomains.length === 0) {
+                allTasks = [];
+            } else {
+                const projectClause = project ? ' AND project = ?' : '';
+                const parts = effectiveDomains.map(d => {
+                    const table = DOMAIN_TABLES[d];
+                    return `SELECT ${DOMAIN_SELECT[d]}, '${d}' as domain FROM ${table} WHERE 1=1${whereClause}${projectClause}`;
+                });
+                const allParams = [];
+                for (const d of effectiveDomains) {
+                    allParams.push(...params);
+                    if (project) allParams.push(project);
+                }
+                allParams.push(parsedLimit);
+                const sql = `SELECT * FROM (${parts.join(' UNION ALL ')}) ${ORDER_CLAUSE} LIMIT ?`;
+                allTasks = conn.prepare(sql).all(...allParams);
             }
-
-            sql += ` ORDER BY 
-                CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
-                CASE status WHEN 'blocked' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'not_started' THEN 2 ELSE 9 END,
-                updated_at DESC
-                LIMIT ${Math.min(parseInt(limit) || 100, 500)}`;
-
-            const rows = conn.prepare(sql).all(...params);
-            allTasks = allTasks.concat(rows.map(r => ({
-                ...r,
-                tags: tryParseJson(r.tags, []),
-            })));
+        } else {
+            // Single domain — keep original simple query
+            const table = DOMAIN_TABLES[domain];
+            const singleParams = [...params];
+            let singleWhere = whereClause;
+            if (project && DOMAINS_WITH_PROJECT.includes(domain)) {
+                singleWhere += ' AND project = ?';
+                singleParams.push(project);
+            }
+            let sql = `SELECT *, '${domain}' as domain FROM ${table} WHERE 1=1${singleWhere}`;
+            sql += ` ${ORDER_CLAUSE} LIMIT ?`;
+            allTasks = conn.prepare(sql).all(...singleParams, parsedLimit);
         }
 
-        // Cross-domain sort: urgent/high first
-        allTasks.sort((a, b) => {
-            const priMap = { urgent: 0, high: 1, medium: 2, low: 3 };
-            const sMap = { blocked: 0, in_progress: 1, not_started: 2, draft: 3, done: 9, archived: 10, cancelled: 11 };
-            /* istanbul ignore next */
-            const pa = priMap[a.priority] ?? 4, pb = priMap[b.priority] ?? 4;
-            if (pa !== pb) return pa - pb;
-            /* istanbul ignore next */
-            const sa = sMap[a.status] ?? 5, sb = sMap[b.status] ?? 5;
-            if (sa !== sb) return sa - sb;
-            /* istanbul ignore next */
-            return (b.updated_at || '').localeCompare(a.updated_at || '');
-        });
+        allTasks = allTasks.map(r => ({ ...r, tags: tryParseJson(r.tags, []) }));
 
-        return sendOk(res, { tasks: allTasks.slice(0, parseInt(limit) || 100), total: allTasks.length });
+        return sendOk(res, { tasks: allTasks, total: allTasks.length });
     } catch (err) {
         logger.error('taskhub_get_tasks_error', { requestId: req.requestId, details: logger.toErrorFields(err) });
         return sendFail(res, 500, err.message);
