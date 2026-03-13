@@ -14,7 +14,28 @@ const agentWatcherService = require('./agentWatcherService');
 const alertEngine = require('./alertEngine');
 const { fetchModelCooldowns } = require('../utils/modelMonitor');
 
-const DASHBOARD_CACHE_TTL_MS = 3000;
+const cache = {
+    sys:       { data: null, ts: 0, ttl: 5000 },
+    agents:    { data: null, ts: 0, ttl: 10000 },
+    subagents: { data: null, ts: 0, ttl: 10000 },
+    cron:      { data: null, ts: 0, ttl: 30000 },
+    cooldowns: { data: null, ts: 0, ttl: 15000 },
+};
+
+function isFresh(entry) {
+    return entry.data !== null && Date.now() - entry.ts < entry.ttl;
+}
+
+function updateCache(entry, data) {
+    entry.data = data;
+    entry.ts = Date.now();
+}
+
+function invalidateCache(entry) {
+    entry.data = null;
+    entry.ts = 0;
+}
+
 const HOME_DIR = os.homedir();
 const OPENCLAW_ROOT = path.join(HOME_DIR, '.openclaw');
 const DEFAULT_OPENCLAW_BIN = path.join(OPENCLAW_ROOT, 'bin', 'openclaw');
@@ -52,7 +73,6 @@ const MODEL_PRICING = {
 };
 
 let RESOLVED_OPENCLAW_BIN = null;
-let dashboardCache = { ts: 0, payload: null };
 let exchangeRateCache = { rate: 32.0, lastFetch: 0 };
 let previousCpuInfo = null;
 const sseClients = new Set();
@@ -264,7 +284,7 @@ function parseAgentsList(text) {
     return agents;
 }
 
-function detectDetailedActivity(agentId) {
+async function detectDetailedActivity(agentId) {
     let detail = {
         status: 'inactive',
         cost: 0,
@@ -281,8 +301,9 @@ function detectDetailedActivity(agentId) {
         const agentDir = path.join(AGENTS_ROOT, agentId, 'sessions');
         const sessionJsonPath = path.join(agentDir, 'sessions.json');
 
-        if (fs.existsSync(sessionJsonPath)) {
-            const json = JSON.parse(fs.readFileSync(sessionJsonPath, 'utf8'));
+        const sessionJsonExists = await fs.promises.access(sessionJsonPath).then(() => true).catch(() => false);
+        if (sessionJsonExists) {
+            const json = JSON.parse(await fs.promises.readFile(sessionJsonPath, 'utf8'));
             let totalCost = 0;
             const modelUsage = {};
             let latestSessionTime = 0;
@@ -333,15 +354,21 @@ function detectDetailedActivity(agentId) {
             detail.modelUsage = modelUsage;
         }
 
-        if (fs.existsSync(agentDir)) {
-            const files = fs.readdirSync(agentDir)
-                .filter((f) => f.endsWith('.jsonl'))
-                .map((f) => ({ name: f, time: fs.statSync(path.join(agentDir, f)).mtimeMs }))
-                .sort((a, b) => b.time - a.time);
+        const agentDirExists = await fs.promises.access(agentDir).then(() => true).catch(() => false);
+        if (agentDirExists) {
+            const allFiles = await fs.promises.readdir(agentDir);
+            const jsonlFiles = allFiles.filter((f) => f.endsWith('.jsonl'));
+            const filesWithTime = await Promise.all(
+                jsonlFiles.map(async (f) => ({
+                    name: f,
+                    time: (await fs.promises.stat(path.join(agentDir, f))).mtimeMs,
+                }))
+            );
+            const files = filesWithTime.sort((a, b) => b.time - a.time);
 
             if (files.length > 0) {
                 const mtime = files[0].time;
-                const lines = fs.readFileSync(path.join(agentDir, files[0].name), 'utf8').trim().split('\n');
+                const lines = (await fs.promises.readFile(path.join(agentDir, files[0].name), 'utf8')).trim().split('\n');
                 const isExecuting = Date.now() - mtime < 300000;
                 let found = false;
                 for (const roleFilter of ['assistant', null]) {
@@ -382,16 +409,20 @@ function detectDetailedActivity(agentId) {
     }
 }
 
-function buildSubagentStatus() {
+async function buildSubagentStatus() {
     const subagents = [];
     try {
-        const agentDirs = fs.readdirSync(AGENTS_ROOT);
+        const agentDirs = await fs.promises.readdir(AGENTS_ROOT);
         for (const agentDirName of agentDirs) {
             const sessionsPath = path.join(AGENTS_ROOT, agentDirName, 'sessions', 'sessions.json');
-            if (!fs.existsSync(sessionsPath)) continue;
+            try {
+                await fs.promises.access(sessionsPath);
+            } catch {
+                continue;
+            }
             let sessions;
             try {
-                sessions = JSON.parse(fs.readFileSync(sessionsPath, 'utf8'));
+                sessions = JSON.parse(await fs.promises.readFile(sessionsPath, 'utf8'));
             } catch (e) {
                 logger.warn('subagent_sessions_parse_failed', { agentDirName, msg: e.message });
                 continue;
@@ -432,55 +463,87 @@ function buildSubagentStatus() {
 }
 
 async function buildDashboardPayload() {
-    const now = Date.now();
-    if (dashboardCache.payload && now - dashboardCache.ts < DASHBOARD_CACHE_TTL_MS) {
-        return dashboardCache.payload;
-    }
-
     const ocBin = await resolveOpenclawBin();
 
-    const [sys, agentsResult, cronResult, openclawVersionResult, exchangeRate] = await Promise.all([
-        getSystemResources(),
-        execFilePromise(ocBin, ['agents', 'list']).catch(() => ({ stdout: '' })),
-        execFilePromise(ocBin, ['cron', 'list', '--json']).catch(() => ({ stdout: '{"jobs":[]}' })),
+    const fetches = [];
+
+    if (!isFresh(cache.sys)) {
+        fetches.push(
+            getSystemResources().then(data => updateCache(cache.sys, data))
+        );
+    }
+
+    if (!isFresh(cache.agents)) {
+        fetches.push(
+            execFilePromise(ocBin, ['agents', 'list']).catch(() => ({ stdout: '' }))
+                .then(async (agentsResult) => {
+                    const agentList = parseAgentsList(agentsResult.stdout || '');
+                    const agents = await Promise.all(
+                        agentList.map(async (a) => {
+                            const activity = await detectDetailedActivity(a.id);
+                            return { ...a, ...activity, model: a.model || activity.activeModel, activeModel: activity.activeModel };
+                        })
+                    );
+                    updateCache(cache.agents, agents);
+                })
+        );
+    }
+
+    if (!isFresh(cache.subagents)) {
+        fetches.push(
+            buildSubagentStatus().then(data => updateCache(cache.subagents, data))
+        );
+    }
+
+    if (!isFresh(cache.cron)) {
+        fetches.push(
+            execFilePromise(ocBin, ['cron', 'list', '--json']).catch(() => ({ stdout: '{"jobs":[]}' }))
+                .then((cronResult) => {
+                    let cronJobs = [];
+                    try {
+                        const parsedCron = JSON.parse(cronResult.stdout || '{"jobs":[]}');
+                        cronJobs = Array.isArray(parsedCron.jobs) ? parsedCron.jobs : [];
+                    } catch (e) {
+                        logger.warn('cron_jobs_parse_failed', { msg: e.message });
+                    }
+                    const cron = cronJobs.map((j) => ({
+                        id: j.id, name: j.name, enabled: j.enabled !== false,
+                        next: j.state?.nextRunAtMs, status: j.state?.lastStatus || 'ok',
+                        lastRunAt: j.state?.lastRunAtMs, lastError: j.state?.lastError || '',
+                    }));
+                    updateCache(cache.cron, cron);
+                })
+        );
+    }
+
+    if (!isFresh(cache.cooldowns)) {
+        fetches.push(
+            fetchModelCooldowns().then(data => updateCache(cache.cooldowns, data))
+        );
+    }
+
+    // Version + exchange rate keep their existing caching
+    const [openclawVersionResult, exchangeRate] = await Promise.all([
         cachedOcVersion
             ? Promise.resolve({ stdout: cachedOcVersion, stderr: '' })
             : execFilePromise(ocBin, ['--version']).catch(() => ({ stdout: '' })),
         getExchangeRate(),
+        ...fetches,
     ]);
-
-    const agents = parseAgentsList(agentsResult.stdout || '').map((a) => {
-        const activity = detectDetailedActivity(a.id);
-        return { ...a, ...activity, model: a.model || activity.activeModel, activeModel: activity.activeModel };
-    });
-
-    let cronJobs = [];
-    try {
-        const parsedCron = JSON.parse(cronResult.stdout || '{"jobs":[]}');
-        cronJobs = Array.isArray(parsedCron.jobs) ? parsedCron.jobs : [];
-    } catch (e) {
-        logger.warn('cron_jobs_parse_failed', { msg: e.message });
-    }
-
-    const cron = cronJobs.map((j) => ({
-        id: j.id,
-        name: j.name,
-        enabled: j.enabled !== false,
-        next: j.state?.nextRunAtMs,
-        status: j.state?.lastStatus || 'ok',
-        lastRunAt: j.state?.lastRunAtMs,
-        lastError: j.state?.lastError || '',
-    }));
-
-    const subagents = buildSubagentStatus();
-    const cooldowns = await fetchModelCooldowns();
 
     const openclawVersion = parseOpenclawVersionOutput(openclawVersionResult.stdout, openclawVersionResult.stderr);
     if (openclawVersion && !cachedOcVersion) cachedOcVersion = openclawVersion;
 
-    const payload = { success: true, openclaw: { version: openclawVersion || null }, sys, agents, cron, subagents, cooldowns, exchangeRate };
-    dashboardCache = { ts: now, payload };
-    return payload;
+    return {
+        success: true,
+        openclaw: { version: openclawVersion || null },
+        sys: cache.sys.data || {},
+        agents: cache.agents.data || [],
+        cron: cache.cron.data || [],
+        subagents: cache.subagents.data || [],
+        cooldowns: cache.cooldowns.data || {},
+        exchangeRate,
+    };
 }
 
 function minimizeDashboardPayload(payload) {
@@ -546,6 +609,8 @@ function startGlobalPolling() {
     agentWatcherService.on('state_update', () => {
         clearTimeout(watcherDebounceTimer);
         watcherDebounceTimer = setTimeout(async () => {
+            invalidateCache(cache.agents);
+            invalidateCache(cache.subagents);
             await updateSharedData();
             doBroadcast().catch((e) => logger.error('poller_broadcast_error', { msg: e.message }));
         }, 300);
@@ -568,6 +633,7 @@ function removeSseClient(res) {
 function invalidateSharedPayload() {
     sharedPayload = null;
     lastUpdateTs = 0;
+    Object.values(cache).forEach(entry => invalidateCache(entry));
 }
 
 function getSharedPayload() {

@@ -13,12 +13,15 @@ const SCHEMA = `
         status TEXT DEFAULT 'not_started',
         priority TEXT DEFAULT 'medium',
         due_date TEXT,
-        notes TEXT,
-        project TEXT,
-        assignee TEXT,
-        tags TEXT,
-        notion_dirty INTEGER DEFAULT 0,
         completed_at TEXT,
+        assignee TEXT,
+        project TEXT,
+        parent_id TEXT,
+        tags TEXT,
+        notes TEXT,
+        notion_page_id TEXT,
+        notion_dirty INTEGER DEFAULT 0,
+        notion_synced_at TEXT,
         created_at TEXT,
         updated_at TEXT
     );
@@ -28,10 +31,13 @@ const SCHEMA = `
         status TEXT DEFAULT 'not_started',
         priority TEXT DEFAULT 'medium',
         due_date TEXT,
-        notes TEXT,
-        tags TEXT,
-        notion_dirty INTEGER DEFAULT 0,
         completed_at TEXT,
+        parent_id TEXT,
+        tags TEXT,
+        notes TEXT,
+        notion_page_id TEXT,
+        notion_dirty INTEGER DEFAULT 0,
+        notion_synced_at TEXT,
         created_at TEXT,
         updated_at TEXT
     );
@@ -41,16 +47,20 @@ const SCHEMA = `
         status TEXT DEFAULT 'not_started',
         priority TEXT DEFAULT 'medium',
         due_date TEXT,
-        notes TEXT,
+        completed_at TEXT,
         project TEXT,
+        parent_id TEXT,
         tags TEXT,
+        notes TEXT,
+        notion_page_id TEXT,
+        notion_dirty INTEGER DEFAULT 0,
+        notion_synced_at TEXT,
         github_repo TEXT,
         github_issue_id INTEGER,
         github_pr_id INTEGER,
         github_branch TEXT,
         dev_status TEXT,
-        notion_dirty INTEGER DEFAULT 0,
-        completed_at TEXT,
+        automation_level TEXT DEFAULT 'level_5',
         created_at TEXT,
         updated_at TEXT
     );
@@ -191,6 +201,17 @@ describe('getTasks', () => {
         data.tasks.forEach(t => expect(t.project).toBe('proj-a'));
     });
 
+    it('filters by project in domain=all without failing on personal_tasks', async () => {
+        const req = { query: { domain: 'all', project: 'proj-a' } };
+        const res = mockRes();
+        await taskHubController.getTasks(req, res);
+        const data = res.json.mock.calls[0][0];
+        expect(data.success).toBe(true);
+        // personal_tasks has no project column — should be excluded from results
+        data.tasks.forEach(t => expect(t.domain).not.toBe('personal'));
+        data.tasks.forEach(t => expect(t.project).toBe('proj-a'));
+    });
+
     it('returns 400 for invalid domain', async () => {
         const req = { query: { domain: 'invalid' } };
         const res = mockRes();
@@ -229,6 +250,36 @@ describe('getTasks', () => {
         const data = res.json.mock.calls[0][0];
         expect(data.success).toBe(true);
         expect(Array.isArray(data.tasks)).toBe(true);
+    });
+
+    it('returns tasks from all domains with correct domain labels via UNION ALL', async () => {
+        const req = { query: { domain: 'all' } };
+        const res = mockRes();
+        await taskHubController.getTasks(req, res);
+        const data = res.json.mock.calls[0][0];
+        expect(data.success).toBe(true);
+        const domains = [...new Set(data.tasks.map(t => t.domain))];
+        expect(domains).toEqual(expect.arrayContaining(['work', 'personal', 'sideproject']));
+        // Verify priority ordering is maintained
+        const priorities = data.tasks.map(t => t.priority);
+        const priMap = { urgent: 0, high: 1, medium: 2, low: 3 };
+        for (let i = 1; i < priorities.length; i++) {
+            expect(priMap[priorities[i]] ?? 4).toBeGreaterThanOrEqual(priMap[priorities[i-1]] ?? 4);
+        }
+    });
+
+    it('sorts draft tasks after not_started in domain=all UNION ALL path', async () => {
+        insertTask('work', { title: 'Draft task', priority: 'medium', status: 'draft' });
+        insertTask('personal', { title: 'Not started task', priority: 'medium', status: 'not_started' });
+        const req = { query: { domain: 'all' } };
+        const res = mockRes();
+        await taskHubController.getTasks(req, res);
+        const data = res.json.mock.calls[0][0];
+        const statuses = data.tasks.filter(t => ['draft', 'not_started'].includes(t.status)).map(t => t.status);
+        // not_started (mapped to 2) should come before draft (mapped to 9 via ELSE)
+        if (statuses.length >= 2) {
+            expect(statuses.indexOf('not_started')).toBeLessThan(statuses.indexOf('draft'));
+        }
     });
 
     it('handles unknown priority/status values in sort (uses ?? fallback)', async () => {
