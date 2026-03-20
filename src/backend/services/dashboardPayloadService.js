@@ -620,6 +620,8 @@ function startGlobalPolling() {
         await updateSharedData();
         doBroadcast().catch((e) => logger.error('poller_broadcast_error', { msg: e.message }));
     }, 15000).unref();
+
+    updateSharedData().catch((e) => logger.error('poller_update_failed', { msg: e.message }));
 }
 
 function addSseClient(res) {
