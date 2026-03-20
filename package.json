@@ -4,8 +4,8 @@
   "description": "OpenClaw Agent 監控系統 - 網頁版",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
+    "start": "node --env-file=.env server.js",
+    "dev": "nodemon --env-file=.env server.js",
     "test": "jest --forceExit --detectOpenHandles"
   },
   "dependencies": {

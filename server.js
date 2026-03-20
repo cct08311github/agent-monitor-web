@@ -4,8 +4,8 @@ const https = require('https');
 const fs = require('fs');
 const app = require('./src/backend/app');
 const { threatIntel, adaptiveSecurity, complianceSystem } = require('./src/backend/security');
-const dashboardPayloadService = require('./src/backend/services/dashboardPayloadService');
 const gatewayWatchdog = require('./src/backend/services/gatewayWatchdog');
+const dashboardPayloadService = require('./src/backend/services/dashboardPayloadService');
 const { getServerConfig } = require('./src/backend/config');
 const { validateStartup } = require('./src/backend/config/startup');
 
@@ -26,7 +26,7 @@ const sslOptions = {
 };
 
 // 改用 https.createServer
-https.createServer(sslOptions, app).listen(PORT, () => {
+https.createServer(sslOptions, app).listen(PORT, '127.0.0.1', () => {
   const securityStatus = adaptiveSecurity.getStatus();
   const complianceStatus = complianceSystem.getStatus();
 
