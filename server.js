@@ -4,6 +4,7 @@ const https = require('https');
 const fs = require('fs');
 const app = require('./src/backend/app');
 const { threatIntel, adaptiveSecurity, complianceSystem } = require('./src/backend/security');
+const dashboardPayloadService = require('./src/backend/services/dashboardPayloadService');
 const gatewayWatchdog = require('./src/backend/services/gatewayWatchdog');
 const { getServerConfig } = require('./src/backend/config');
 const { validateStartup } = require('./src/backend/config/startup');
@@ -47,6 +48,7 @@ https.createServer(sslOptions, app).listen(PORT, () => {
 
   // Start Gateway Watchdog (auto-healing)
   gatewayWatchdog.start();
+  dashboardPayloadService.startGlobalPolling();
   console.log(`🐕 Gateway Watchdog 已啟動 (每 ${gatewayWatchdog.CONFIG.checkIntervalMs / 1000}s 檢查 | 最多修復 ${gatewayWatchdog.CONFIG.maxRepairAttempts} 次)`);
 });
 
