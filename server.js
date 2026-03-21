@@ -26,7 +26,7 @@ const sslOptions = {
 };
 
 // 改用 https.createServer
-https.createServer(sslOptions, app).listen(PORT, '127.0.0.1', () => {
+https.createServer(sslOptions, app).listen(PORT, () => {
   const securityStatus = adaptiveSecurity.getStatus();
   const complianceStatus = complianceSystem.getStatus();
 
