@@ -528,7 +528,7 @@ describe('requireAuth', () => {
         expect(n).toHaveBeenCalled();
     });
 
-    it('returns 401 when no sid cookie', () => {
+    it('returns 401 when no sid cookie and no Bearer header', () => {
         process.env.AUTH_DISABLED = 'false';
         const req = mockReq({ cookies: {} });
         const res = mockRes();
@@ -536,6 +536,48 @@ describe('requireAuth', () => {
         auth.requireAuth(req, res, n);
         expect(res.status).toHaveBeenCalledWith(401);
         expect(n).not.toHaveBeenCalled();
+    });
+
+    it('accepts valid Bearer token in Authorization header', () => {
+        process.env.AUTH_DISABLED = 'false';
+        const token = sessionService.createSession('bob');
+        const req = mockReq({
+            cookies: {},
+            headers: { host: 'localhost', authorization: `Bearer ${token}` },
+        });
+        const res = mockRes();
+        const n = jest.fn();
+        auth.requireAuth(req, res, n);
+        expect(n).toHaveBeenCalled();
+        expect(req._authUser).toBe('bob');
+    });
+
+    it('returns 401 for invalid Bearer token', () => {
+        process.env.AUTH_DISABLED = 'false';
+        const req = mockReq({
+            cookies: {},
+            headers: { host: 'localhost', authorization: 'Bearer invalid.token.here' },
+        });
+        const res = mockRes();
+        const n = jest.fn();
+        auth.requireAuth(req, res, n);
+        expect(res.status).toHaveBeenCalledWith(401);
+        expect(n).not.toHaveBeenCalled();
+    });
+
+    it('prefers Bearer token over cookie when both present', () => {
+        process.env.AUTH_DISABLED = 'false';
+        const cookieToken = sessionService.createSession('cookie-user');
+        const bearerToken = sessionService.createSession('bearer-user');
+        const req = mockReq({
+            cookies: { sid: cookieToken },
+            headers: { host: 'localhost', authorization: `Bearer ${bearerToken}` },
+        });
+        const res = mockRes();
+        const n = jest.fn();
+        auth.requireAuth(req, res, n);
+        expect(n).toHaveBeenCalled();
+        expect(req._authUser).toBe('bearer-user');
     });
 
     it('returns 401 for invalid/tampered token', () => {

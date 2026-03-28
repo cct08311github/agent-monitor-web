@@ -30,4 +30,27 @@ function getClientCount() {
     return sseClients.size;
 }
 
-module.exports = { addClient, removeClient, broadcast, broadcastAlert, getClientCount };
+// Heartbeat: send comment every 20s to keep connections alive and let clients detect stale connections
+const HEARTBEAT_INTERVAL_MS = 20_000;
+let heartbeatTimer = null;
+
+function startHeartbeat() {
+    if (heartbeatTimer) return;
+    heartbeatTimer = setInterval(() => {
+        if (sseClients.size === 0) return;
+        const heartbeat = `: heartbeat ${Date.now()}\n\n`;
+        sseClients.forEach((res) => {
+            try { res.write(heartbeat); } catch (e) { sseClients.delete(res); }
+        });
+    }, HEARTBEAT_INTERVAL_MS);
+    heartbeatTimer.unref();
+}
+
+function stopHeartbeat() {
+    if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+    }
+}
+
+module.exports = { addClient, removeClient, broadcast, broadcastAlert, getClientCount, startHeartbeat, stopHeartbeat };
