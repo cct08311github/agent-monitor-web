@@ -16,10 +16,13 @@
     <link rel="stylesheet" href="css/theme.css">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/taskhub.css">
+    <link rel="stylesheet" href="css/a11y.css">
+    <link rel="stylesheet" href="css/ux-patterns.css">
     <script src="js/theme-manager.js?v=20260307"></script>
 </head>
 
 <body>
+    <a class="skip-link" href="#agentGrid">跳至主要內容</a>
     <div id="app">
         <!-- Error Banner -->
         <div id="errorBanner" class="error-banner" style="display:none">
@@ -45,26 +48,26 @@
             </div>
             <div class="header-center">
                 <!-- Desktop Top Tabs -->
-                <div class="desktop-tabs">
-                    <button class="desktop-tab active" data-dtab="monitor" onclick="switchDesktopTab('monitor')">🖥️
+                <div class="desktop-tabs" role="tablist" aria-label="主要導覽">
+                    <button class="desktop-tab active" data-dtab="monitor" onclick="switchDesktopTab('monitor')" role="tab" aria-selected="true">🖥️
                         監控</button>
-                    <button class="desktop-tab" data-dtab="system" onclick="switchDesktopTab('system')">📊
+                    <button class="desktop-tab" data-dtab="system" onclick="switchDesktopTab('system')" role="tab" aria-selected="false">📊
                         系統/費用</button>
-                    <button class="desktop-tab" data-dtab="logs" onclick="switchDesktopTab('logs')">⚙️ 日誌</button>
-                    <button class="desktop-tab" data-dtab="chat" onclick="switchDesktopTab('chat')">💬 聊天室</button>
+                    <button class="desktop-tab" data-dtab="logs" onclick="switchDesktopTab('logs')" role="tab" aria-selected="false">⚙️ 日誌</button>
+                    <button class="desktop-tab" data-dtab="chat" onclick="switchDesktopTab('chat')" role="tab" aria-selected="false">💬 聊天室</button>
                 </div>
             </div>
             <div class="header-right">
-                <button onclick="openAlertConfig()" class="alert-config-btn" title="警報設定 / 最近警報">
+                <button onclick="openAlertConfig()" class="alert-config-btn" title="警報設定 / 最近警報" aria-label="警報設定">
                     🔔 <span id="p0AlertBadge" class="alert-badge" style="display:none">0</span>
                 </button>
                 <button class="header-btn icon-only" id="themeToggleBtn" onclick="toggleTheme()"
-                    title="切換主題">🌓</button>
-                <button class="header-btn icon-only" onclick="update(true)" id="refreshBtn" title="重新整理">
+                    title="切換主題" aria-label="切換主題">🌓</button>
+                <button class="header-btn icon-only" onclick="update(true)" id="refreshBtn" title="重新整理" aria-label="重新整理">
                     🔄 <span id="connDot" class="conn-dot conn-dot-unknown" title="連線狀態"></span>
                 </button>
                 <span id="authUsername" style="font-size:12px;color:var(--text-muted);margin:0 4px"></span>
-                <button class="header-btn icon-only" onclick="logout()" title="登出" style="font-size:16px">⏻</button>
+                <button class="header-btn icon-only" onclick="logout()" title="登出" aria-label="登出" style="font-size:16px">⏻</button>
             </div>
         </header>
 
@@ -571,6 +574,7 @@
         </div>
     </div>
 
+    <script src="js/registry.js?v=20260328"></script>
     <script src="js/state.js?v=20260307"></script>
     <script src="js/stream-manager.js?v=20260307"></script>
     <script src="js/api-client.js?v=20260307"></script>
