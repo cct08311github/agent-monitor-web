@@ -1,0 +1,359 @@
+/* ========================================
+   UX Patterns — Shared component styles
+   Skeleton, loading, empty state, toast v2,
+   confirm dialog, form validation, log scroll
+   ======================================== */
+
+/* ── Skeleton Loader ── */
+@keyframes skeleton-shimmer {
+    0%   { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+}
+
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--bg-input) 25%,
+        var(--bg-hover) 50%,
+        var(--bg-input) 75%
+    );
+    background-size: 800px 100%;
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+    border-radius: var(--radius-sm);
+}
+
+.agent-card-skeleton {
+    height: 160px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+}
+
+.summary-card-skeleton {
+    height: 80px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+}
+
+.skeleton-line {
+    height: 12px;
+    margin-bottom: 8px;
+}
+
+.skeleton-line.short  { width: 40%; }
+.skeleton-line.medium { width: 70%; }
+.skeleton-line.full   { width: 100%; }
+
+/* ── Button Loading State ── */
+.btn-loading {
+    position: relative;
+    color: transparent !important;
+    pointer-events: none;
+}
+
+.btn-loading::after {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--text-secondary);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: btn-spin 0.6s linear infinite;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+@keyframes btn-spin {
+    to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* ── Empty State ── */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    text-align: center;
+    grid-column: 1 / -1;
+    color: var(--text-secondary);
+}
+
+.empty-state-icon {
+    width: 64px;
+    height: 64px;
+    background: var(--bg-input);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+}
+
+.empty-icon-inner { font-size: 28px; }
+
+.empty-state-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.empty-state-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+    max-width: 260px;
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+
+/* ── Toast V2 ── */
+#toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 9999;
+    pointer-events: none;
+}
+
+@media (max-width: 768px) {
+    #toast-container {
+        bottom: 90px;
+        right: 12px;
+        left: 12px;
+    }
+}
+
+.toast-v2 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-lg);
+    pointer-events: all;
+    max-width: 400px;
+    font-size: 13px;
+    font-weight: 500;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    transform: translateX(120%);
+    opacity: 0;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.toast-v2.toast-visible {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.toast-info    { border-left: 4px solid var(--accent); }
+.toast-success { border-left: 4px solid var(--green); }
+.toast-error   { border-left: 4px solid var(--red); background: var(--red-light); }
+.toast-warning { border-left: 4px solid var(--orange); }
+
+.toast-icon { font-size: 14px; flex-shrink: 0; }
+.toast-info    .toast-icon { color: var(--accent); }
+.toast-success .toast-icon { color: var(--green); }
+.toast-error   .toast-icon { color: var(--red); }
+.toast-warning .toast-icon { color: var(--orange); }
+
+.toast-msg  { flex: 1; }
+.toast-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+.toast-retry-btn {
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--accent);
+    background: none;
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.toast-retry-btn:hover {
+    background: var(--accent-light);
+}
+
+.toast-close-btn {
+    width: 20px;
+    height: 20px;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+}
+
+.toast-close-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+/* ── Confirmation Dialog ── */
+.confirm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.confirm-overlay.confirm-visible { opacity: 1; }
+
+.confirm-dialog {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    max-width: 380px;
+    width: 100%;
+    box-shadow: var(--shadow-lg);
+    transform: scale(0.95);
+    transition: transform 0.2s ease;
+}
+
+.confirm-overlay.confirm-visible .confirm-dialog { transform: scale(1); }
+
+.confirm-warning { border-top: 4px solid var(--orange); }
+.confirm-danger  { border-top: 4px solid var(--red); }
+
+.confirm-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.confirm-icon { font-size: 20px; }
+.confirm-warning .confirm-icon { color: var(--orange); }
+.confirm-danger  .confirm-icon { color: var(--red); }
+
+.confirm-title { font-size: 16px; font-weight: 700; margin: 0; }
+.confirm-message {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin: 0 0 20px;
+}
+
+.confirm-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.confirm-cancel-btn {
+    padding: 8px 18px;
+    border: 1px solid var(--border);
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.confirm-cancel-btn:hover { background: var(--bg-hover); }
+
+.confirm-ok-warning {
+    padding: 8px 18px;
+    background: var(--orange);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.confirm-ok-danger {
+    padding: 8px 18px;
+    background: var(--red);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+/* ── Form Validation ── */
+.input-error {
+    border-color: var(--red) !important;
+    background: var(--red-light);
+}
+
+.input-error:focus {
+    outline-color: var(--red);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+.field-error-msg {
+    display: block;
+    color: var(--red);
+    font-size: 11px;
+    font-weight: 500;
+    margin-top: 4px;
+}
+
+.field-error-msg::before {
+    content: '\25B2\00a0';
+    font-size: 9px;
+}
+
+/* ── Log Scroll-to-Bottom Button ── */
+.log-terminal-wrapper {
+    position: relative;
+}
+
+.log-scroll-bottom-btn {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    padding: 6px 14px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: none;
+    box-shadow: var(--shadow-md);
+    z-index: 10;
+}
+
+.log-scroll-bottom-btn.visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: all;
+}
+
+.log-scroll-bottom-btn.has-new {
+    background: var(--orange);
+    animation: pulse-scroll-btn 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-scroll-btn {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+    50%      { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
+}
