@@ -6,7 +6,7 @@
  */
 
 const path = require('path');
-const { getOpenClawConfig, getOptimizeConfig, getProjectRoot } = require('../config');
+const { getOpenClawConfig, getOptimizeConfig, getProjectRoot, getGatewayConfig, getWatchdogConfig } = require('../config');
 const logger = require('../utils/logger');
 
 const { createEventLogger, fmtTime } = require('./watchdog/watchdogEventLogger');
@@ -53,21 +53,23 @@ const loadedConfig = loadWatchdogConfig();
 const openclawConfig = loadedConfig.openclawConfig;
 const optimizeConfig = loadedConfig.optimizeConfig;
 const OPENCLAW_PATH = openclawConfig.binPath;
-const GATEWAY_PORT = 18789;
-const GATEWAY_HOST = '127.0.0.1';
+const gatewayConfig = getGatewayConfig();
+const GATEWAY_PORT = gatewayConfig.port;
+const GATEWAY_HOST = gatewayConfig.host;
 const OPENCLAW_CONFIG_PATH = openclawConfig.configPath;
 const OPENCLAW_LOG_DIR = path.join(openclawConfig.root, 'logs');
 
-// --- Configuration ---
+// --- Configuration (from centralized config module) ---
+const watchdogCfg = getWatchdogConfig();
 const CONFIG = {
-    checkIntervalMs: 30_000,
-    repairCooldownMs: 180_000,
-    maxRepairAttempts: 3,
-    healthCheckTimeoutMs: 8_000,
-    repairWaitMs: 20_000,
-    restartGracePeriodMs: 45_000,
-    telegramCooldownMs: 300_000,
-    geminiTimeoutMs: 180_000,
+    checkIntervalMs: watchdogCfg.checkIntervalMs,
+    repairCooldownMs: watchdogCfg.repairCooldownMs,
+    maxRepairAttempts: watchdogCfg.maxRepairAttempts,
+    healthCheckTimeoutMs: watchdogCfg.healthCheckTimeoutMs,
+    repairWaitMs: watchdogCfg.repairWaitMs,
+    restartGracePeriodMs: watchdogCfg.restartGracePeriodMs,
+    telegramCooldownMs: watchdogCfg.telegramCooldownMs,
+    geminiTimeoutMs: watchdogCfg.geminiTimeoutMs,
     logDir: path.join(getProjectRoot(), 'logs', 'watchdog'),
 };
 
