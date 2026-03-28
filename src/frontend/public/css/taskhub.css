@@ -100,11 +100,15 @@
 .th-s-done    { background: rgba(99,102,241,.15);  color: #6366f1; }
 .th-s-muted   { background: var(--bg-muted);       color: var(--text-muted); }
 
-/* Priority colours */
+/* Priority colours + shape prefixes (WCAG: not color-only) */
 .th-p-urgent { background: rgba(239,68,68,.15);   color: #ef4444; }
 .th-p-high   { background: rgba(249,115,22,.15);  color: #f97316; }
 .th-p-medium { background: rgba(234,179,8,.15);   color: #eab308; }
 .th-p-low    { background: rgba(34,197,94,.15);   color: #22c55e; }
+.th-p-urgent::before { content: '▲ '; }
+.th-p-high::before   { content: '● '; }
+.th-p-medium::before { content: '■ '; }
+.th-p-low::before    { content: '▽ '; }
 
 /* Meta */
 .th-project { background: var(--bg-muted); color: var(--text-muted); padding: 1px 6px; border-radius: 4px; font-size: 11px; }

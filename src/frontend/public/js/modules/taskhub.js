@@ -128,8 +128,25 @@ function renderTasks(tasks) {
     if (!grid) return;
 
     if (!tasks || tasks.length === 0) {
-        // NOTE: innerHTML usage here is pre-existing; static empty-state message only
-        grid.innerHTML = '<div class="th-empty">沒有符合的任務</div>';
+        grid.replaceChildren();
+        var empty = document.createElement('div');
+        empty.className = 'empty-state';
+        var iconWrap = document.createElement('div');
+        iconWrap.className = 'empty-state-icon';
+        var iconInner = document.createElement('span');
+        iconInner.className = 'empty-icon-inner';
+        iconInner.textContent = '📋';
+        iconWrap.appendChild(iconInner);
+        empty.appendChild(iconWrap);
+        var emptyTitle = document.createElement('div');
+        emptyTitle.className = 'empty-state-title';
+        emptyTitle.textContent = '沒有符合的任務';
+        empty.appendChild(emptyTitle);
+        var emptyDesc = document.createElement('div');
+        emptyDesc.className = 'empty-state-desc';
+        emptyDesc.textContent = '嘗試調整篩選條件，或新增一個任務';
+        empty.appendChild(emptyDesc);
+        grid.appendChild(empty);
         return;
     }
 
@@ -474,19 +491,31 @@ async function saveTaskEdit(domain, id) {
     }
 }
 
-async function confirmDeleteTask(domain, id, title) {
-    if (!confirm(`確認刪除任務「${title}」？\n此操作無法復原。`)) return;
-    showToast('刪除中...', 'info');
-    try {
-        const data = await window.apiClient.delete(`/api/taskhub/tasks/${domain}/${id}`);
-        if (!data.success) throw new Error(data.error);
-        showToast('任務已刪除', 'success');
-        thTasks = thTasks.filter(t => !(t.id === id && t.domain === domain));
-        closeTaskDetailModal();
-        renderTasks(thTasks);
-        fetchTaskhubStats();
-    } catch (e) {
-        showToast(`刪除失敗: ${e.message}`, 'error');
+function confirmDeleteTask(domain, id, title) {
+    function doDelete() {
+        showToast('刪除中...', 'info');
+        window.apiClient.delete(`/api/taskhub/tasks/${domain}/${id}`).then(function (data) {
+            if (!data.success) throw new Error(data.error);
+            showToast('任務已刪除', 'success');
+            thTasks = thTasks.filter(t => !(t.id === id && t.domain === domain));
+            closeTaskDetailModal();
+            renderTasks(thTasks);
+            fetchTaskhubStats();
+        }).catch(function (e) {
+            showToast(`刪除失敗: ${e.message}`, 'error');
+        });
+    }
+
+    if (window.ConfirmDialog) {
+        ConfirmDialog.show({
+            type: 'danger',
+            title: '刪除任務',
+            message: '確認刪除「' + title + '」？此操作無法復原。',
+            confirmLabel: '刪除',
+            onConfirm: doDelete
+        });
+    } else if (confirm('確認刪除任務「' + title + '」？\n此操作無法復原。')) {
+        doDelete();
     }
 }
 
@@ -498,15 +527,39 @@ function openAddTaskModal() {
     document.getElementById('addTaskNotes').value = '';
     document.getElementById('addTaskDueDate').value = '';
     document.getElementById('addTaskProject').value = '';
-    document.getElementById('addTaskModal').style.display = 'flex';
-    setTimeout(() => document.getElementById('addTaskTitle').focus(), 100);
+    var modal = document.getElementById('addTaskModal');
+    modal.style.display = 'flex';
+
+    if (window.FocusTrap) {
+        FocusTrap.activate(modal.querySelector('.modal-content') || modal, {
+            initialFocus: '#addTaskTitle',
+            onDeactivate: function () { closeAddTaskModal(); }
+        });
+    } else {
+        setTimeout(() => document.getElementById('addTaskTitle').focus(), 100);
+    }
+
+    if (window.FormValidator) {
+        FormValidator.attachRealtimeValidation([
+            { field: 'addTaskTitle', rules: ['required', FormValidator.RULES.maxLength(200)] }
+        ]);
+    }
 }
 
 function closeAddTaskModal() {
+    if (window.FocusTrap && FocusTrap.isActive()) FocusTrap.deactivate();
     document.getElementById('addTaskModal').style.display = 'none';
 }
 
 async function submitAddTask() {
+    if (window.FormValidator) {
+        var errors = FormValidator.validateForm([
+            { field: 'addTaskTitle', rules: ['required', FormValidator.RULES.maxLength(200)] },
+            { field: 'addTaskDomain', rules: ['nonemptySelect'] }
+        ]);
+        if (errors.length > 0) return;
+    }
+
     const domain = document.getElementById('addTaskDomain').value;
     const title = document.getElementById('addTaskTitle').value.trim();
     const priority = document.getElementById('addTaskPriority').value;
