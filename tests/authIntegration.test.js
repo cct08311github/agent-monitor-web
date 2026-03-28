@@ -202,6 +202,51 @@ describe('requireAuth — protected routes', () => {
     });
 });
 
+// ── Bearer token auth (iOS / API clients) ────────────────────────────────────
+describe('Bearer token auth', () => {
+    let token;
+    beforeEach(async () => {
+        const loginRes = await request(app).post('/api/auth/login').send({ username: 'admin', password: 'password123' });
+        token = loginRes.body.token;
+    });
+
+    it('login response includes token field', async () => {
+        const res = await request(app).post('/api/auth/login').send({ username: 'admin', password: 'password123' });
+        expect(res.body.token).toBeDefined();
+        expect(typeof res.body.token).toBe('string');
+        expect(res.body.token).toContain('.');
+    });
+
+    it('GET /api/alerts/config returns 200 with Bearer token', async () => {
+        const res = await request(app)
+            .get('/api/alerts/config')
+            .set('Authorization', `Bearer ${token}`);
+        expect(res.statusCode).toBe(200);
+    });
+
+    it('GET /api/alerts/config returns 401 with invalid Bearer token', async () => {
+        const res = await request(app)
+            .get('/api/alerts/config')
+            .set('Authorization', 'Bearer invalid.token.here');
+        expect(res.statusCode).toBe(401);
+    });
+
+    it('GET /api/auth/me returns username with Bearer token', async () => {
+        const res = await request(app)
+            .get('/api/auth/me')
+            .set('Authorization', `Bearer ${token}`);
+        expect(res.statusCode).toBe(200);
+        expect(res.body.username).toBe('admin');
+    });
+
+    it('GET /api/auth/me returns 401 with invalid Bearer token', async () => {
+        const res = await request(app)
+            .get('/api/auth/me')
+            .set('Authorization', 'Bearer bad.token');
+        expect(res.statusCode).toBe(401);
+    });
+});
+
 describe('loginRateLimit — HTTP level', () => {
     it('returns 429 after 5 failed login attempts from same IP', async () => {
         for (let i = 0; i < 5; i++) {

@@ -35,6 +35,7 @@ class DashboardReadController {
 
         dashboardPayloadService.addSseClient(res);
         dashboardPayloadService.startGlobalPolling();
+        dashboardPayloadService.startSseHeartbeat();
 
         /* istanbul ignore next */
         if (dashboardPayloadService.getSharedPayload()) {

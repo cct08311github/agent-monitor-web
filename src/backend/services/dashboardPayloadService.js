@@ -245,6 +245,10 @@ function removeSseClient(res) {
     sseManager.removeClient(res);
 }
 
+function startSseHeartbeat() {
+    sseManager.startHeartbeat();
+}
+
 function invalidateSharedPayload() {
     sharedPayload = null;
     lastUpdateTs = 0;
@@ -269,6 +273,7 @@ module.exports = {
     startGlobalPolling,
     addSseClient,
     removeSseClient,
+    startSseHeartbeat,
     invalidateSharedPayload,
     getSharedPayload,
     shouldRefreshSharedPayload,

@@ -44,7 +44,7 @@ async function login(req, res) {
 
     const token = sessionService.createSession(username);
     res.cookie(COOKIE_NAME, token, cookieOptions(authConfig.sessionTtlHours));
-    return res.json({ success: true, username });
+    return res.json({ success: true, username, token });
 }
 
 function logout(req, res) {
@@ -55,7 +55,14 @@ function logout(req, res) {
 }
 
 function me(req, res) {
-    const token = req.cookies?.[COOKIE_NAME];
+    // Support both cookie and Bearer token for /me endpoint
+    let token = req.cookies?.[COOKIE_NAME];
+    if (!token) {
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            token = authHeader.slice(7);
+        }
+    }
     if (!token) return res.status(401).json({ success: false, error: 'unauthenticated' });
     const session = sessionService.validateSession(token);
     if (!session) return res.status(401).json({ success: false, error: 'unauthenticated' });
