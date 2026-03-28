@@ -8,6 +8,32 @@ let logBuffer = [];
 let logFilterText = '';
 let logShowError = false;
 let logShowWarn = false;
+let userScrolledUp = false;
+const SCROLL_THRESHOLD = 50;
+
+function initLogScroll() {
+    const terminal = document.getElementById('ocLogTerminal');
+    if (!terminal) return;
+    terminal.addEventListener('scroll', function () {
+        var nearBottom = terminal.scrollHeight - terminal.scrollTop - terminal.clientHeight < SCROLL_THRESHOLD;
+        userScrolledUp = !nearBottom;
+        var scrollBtn = document.getElementById('logScrollBottomBtn');
+        if (scrollBtn) {
+            scrollBtn.classList.toggle('visible', userScrolledUp);
+        }
+    }, { passive: true });
+}
+
+function scrollLogToBottom() {
+    var terminal = document.getElementById('ocLogTerminal');
+    if (!terminal) return;
+    terminal.scrollTop = terminal.scrollHeight;
+    userScrolledUp = false;
+    var scrollBtn = document.getElementById('logScrollBottomBtn');
+    if (scrollBtn) {
+        scrollBtn.classList.remove('visible', 'has-new');
+    }
+}
 
 function toggleOcLog() {
     if (ocLogSource) {
@@ -89,8 +115,16 @@ function appendOcLogLine(terminal, line) {
         lines[0].remove();
     }
 
-    // Auto-scroll to bottom
-    terminal.scrollTop = terminal.scrollHeight;
+    // Smart auto-scroll: only when user hasn't scrolled up
+    if (!userScrolledUp) {
+        terminal.scrollTop = terminal.scrollHeight;
+    } else {
+        var scrollBtn = document.getElementById('logScrollBottomBtn');
+        if (scrollBtn) {
+            scrollBtn.classList.add('visible', 'has-new');
+            scrollBtn.textContent = '\u2193 \u65B0\u8A0A\u606F';
+        }
+    }
 }
 
 function detectLineLevel(line) {
@@ -159,10 +193,18 @@ function toggleWarnOnly() {
     applyLogFilter();
 }
 
+// Initialize smart scroll on DOM ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initLogScroll);
+} else {
+    initLogScroll();
+}
+
 // Expose cross-module and inline-handler symbols
 window.toggleOcLog = toggleOcLog;
 window.clearOcLog = clearOcLog;
 window.setLogFilter = setLogFilter;
 window.toggleErrorOnly = toggleErrorOnly;
 window.toggleWarnOnly = toggleWarnOnly;
+window.scrollLogToBottom = scrollLogToBottom;
 })();
