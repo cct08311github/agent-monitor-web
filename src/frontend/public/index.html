@@ -334,7 +334,10 @@
                             <button id="logFilterError" onclick="toggleErrorOnly()" class="log-filter-btn">ERROR</button>
                             <button id="logFilterWarn" onclick="toggleWarnOnly()" class="log-filter-btn">WARN</button>
                         </div>
-                        <div id="ocLogTerminal" class="log-terminal oc-log-terminal">等待開始監看...</div>
+                        <div class="log-terminal-wrapper">
+                            <div id="ocLogTerminal" class="log-terminal oc-log-terminal">等待開始監看...</div>
+                            <button id="logScrollBottomBtn" class="log-scroll-bottom-btn" onclick="scrollLogToBottom()">↓ 最新</button>
+                        </div>
                     </div>
                 </div>
             </div>

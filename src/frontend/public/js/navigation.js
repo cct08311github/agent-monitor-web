@@ -7,7 +7,11 @@
 
         const pageId = { monitor: 'dtabMonitor', system: 'dtabSystem', logs: 'dtabLogs', detail: 'dtabDetail' }[tab];
         if (pageId) document.getElementById(pageId).classList.add('active');
-        document.querySelectorAll('.desktop-tab').forEach(t => t.classList.toggle('active', t.dataset.dtab === tab));
+        document.querySelectorAll('.desktop-tab').forEach(t => {
+            var isActive = t.dataset.dtab === tab;
+            t.classList.toggle('active', isActive);
+            t.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        });
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.page === tab));
         if (tab === 'system') { setTimeout(updateCharts, 100); setTimeout(updateCostDisplay, 150); }
         if (tab === 'chat') initChatPage();

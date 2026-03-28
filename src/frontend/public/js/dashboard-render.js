@@ -56,9 +56,16 @@
         nameWrap.append(av, nameInfo);
         const statusEl = document.createElement('div');
         statusEl.className = 'agent-status ' + si.dotClass;
+        statusEl.setAttribute('role', 'status');
+        statusEl.setAttribute('aria-label', '狀態: ' + si.text);
+        const statusIcon = document.createElement('span');
+        statusIcon.className = 'status-icon';
+        statusIcon.textContent = si.icon || '●';
+        statusIcon.setAttribute('aria-hidden', 'true');
         const dot = document.createElement('span');
         dot.className = 'agent-status-dot';
-        statusEl.append(dot, document.createTextNode(si.text));
+        dot.setAttribute('aria-hidden', 'true');
+        statusEl.append(statusIcon, dot, document.createTextNode(' ' + si.text));
         hdr.append(nameWrap, statusEl);
 
         const body = document.createElement('div');
@@ -168,11 +175,28 @@
             return parseFloat(range === 'all' ? (a.costs?.total ?? a.cost ?? 0) : (a.costs?.[range] ?? a.cost ?? 0));
         }
 
+        // Clear skeletons if present
+        if (window.LoadingManager) LoadingManager.clearSkeletons('agentGrid');
+
         const frag = document.createDocumentFragment();
         if (filteredAgents.length === 0) {
             const empty = document.createElement('div');
-            empty.style.cssText = 'color:var(--text-muted);padding:20px;text-align:center;';
-            empty.textContent = q ? '找不到符合的 Agent' : '沒有 Agent';
+            empty.className = 'empty-state';
+            const iconWrap = document.createElement('div');
+            iconWrap.className = 'empty-state-icon';
+            const iconInner = document.createElement('span');
+            iconInner.className = 'empty-icon-inner';
+            iconInner.textContent = '��';
+            iconWrap.appendChild(iconInner);
+            empty.appendChild(iconWrap);
+            const emptyTitle = document.createElement('div');
+            emptyTitle.className = 'empty-state-title';
+            emptyTitle.textContent = q ? '找不到符合的 Agent' : '沒有 Agent';
+            empty.appendChild(emptyTitle);
+            const emptyDesc = document.createElement('div');
+            emptyDesc.className = 'empty-state-desc';
+            emptyDesc.textContent = q ? '請嘗試其他關鍵字' : '目前沒有已註冊的 Agent';
+            empty.appendChild(emptyDesc);
             frag.appendChild(empty);
         } else {
             if (activeAgents2.length > 0) {
