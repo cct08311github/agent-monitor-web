@@ -97,6 +97,13 @@ async function update(force = false) {
     }
 }
 
+function handleError(error, context) {
+    var msg = (error && error.message) || '未知錯誤';
+    var ctx = context || '';
+    pushLog('❌ ' + (ctx ? '[' + ctx + '] ' : '') + msg, 'err');
+    showToast('❌ ' + (ctx ? ctx + ': ' : '') + msg, 'error');
+}
+
 // --- Expose cross-module / inline-handler symbols ---
 window.onAgentSearch = onAgentSearch;
 window.esc = esc;
@@ -108,5 +115,6 @@ window.getAgentEmoji = getAgentEmoji;
 window.getStatusInfo = getStatusInfo;
 window.pushLog = pushLog;
 window.update = update;
+window.handleError = handleError;
 
 })();
