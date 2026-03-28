@@ -8,6 +8,7 @@ const { execFile } = require('child_process');
 
 const execFilePromise = util.promisify(execFile);
 const logger = require('../utils/logger');
+const { getDashboardPollingConfig } = require('../config');
 const tsdbService = require('./tsdbService');
 const agentWatcherService = require('./agentWatcherService');
 const alertEngine = require('./alertEngine');
@@ -32,7 +33,8 @@ const OPENCLAW_BIN_CANDIDATES = [
 ].filter(Boolean);
 const AGENTS_ROOT = path.join(OPENCLAW_ROOT, 'agents');
 const SENSITIVE_PATH_PREFIXES = [OPENCLAW_ROOT, HOME_DIR];
-const TSDB_SNAPSHOT_INTERVAL = 60000;
+const pollingConfig = getDashboardPollingConfig();
+const TSDB_SNAPSHOT_INTERVAL = pollingConfig.tsdbSnapshotIntervalMs;
 
 let RESOLVED_OPENCLAW_BIN = null;
 let isPolling = false;
@@ -42,7 +44,7 @@ let lastUpdateTs = 0;
 let pendingUpdate = null;
 let cachedOcVersion = null;
 
-const { cache, isFresh, update: updateCache, invalidate: invalidateCache, invalidateAll } = createCacheManager();
+const { cache, isFresh, update: updateCache, invalidate: invalidateCache, invalidateAll } = createCacheManager(pollingConfig);
 
 function parseOpenclawVersionOutput(stdout, stderr) {
     const raw = ((stdout || '') + (stderr || '')).trim();
@@ -230,7 +232,7 @@ function startGlobalPolling() {
     setInterval(async () => {
         await updateSharedData();
         doBroadcast().catch((e) => logger.error('poller_broadcast_error', { msg: e.message }));
-    }, 15000).unref();
+    }, pollingConfig.pollingIntervalMs).unref();
 
     updateSharedData().catch((e) => logger.error('poller_update_failed', { msg: e.message }));
 }

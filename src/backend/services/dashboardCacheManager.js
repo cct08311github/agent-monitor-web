@@ -6,13 +6,13 @@
  * when (Date.now() - ts) < ttl.
  */
 
-function createCacheManager() {
+function createCacheManager(pollingConfig = {}) {
     const cache = {
-        sys:       { data: null, ts: 0, ttl: 5000 },
-        agents:    { data: null, ts: 0, ttl: 10000 },
-        subagents: { data: null, ts: 0, ttl: 10000 },
-        cron:      { data: null, ts: 0, ttl: 30000 },
-        cooldowns: { data: null, ts: 0, ttl: 15000 },
+        sys:       { data: null, ts: 0, ttl: pollingConfig.cacheTtlSysMs || 5000 },
+        agents:    { data: null, ts: 0, ttl: pollingConfig.cacheTtlAgentsMs || 10000 },
+        subagents: { data: null, ts: 0, ttl: pollingConfig.cacheTtlAgentsMs || 10000 },
+        cron:      { data: null, ts: 0, ttl: pollingConfig.cacheTtlCronMs || 30000 },
+        cooldowns: { data: null, ts: 0, ttl: pollingConfig.cacheTtlCooldownsMs || 15000 },
     };
 
     function isFresh(entry) {
