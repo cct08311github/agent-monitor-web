@@ -45,5 +45,32 @@
         return request(url, { ...options, method: 'DELETE' });
     }
 
-    window.apiClient = { request, get, post, patch, delete: del };
+    async function withRetry(fn, maxAttempts, baseDelayMs) {
+        maxAttempts = maxAttempts || 3;
+        baseDelayMs = baseDelayMs || 1000;
+        var lastError;
+        for (var i = 0; i < maxAttempts; i++) {
+            try {
+                return await fn();
+            } catch (err) {
+                lastError = err;
+                // Don't retry auth errors
+                if (err.status === 401) throw err;
+                if (i >= maxAttempts - 1) throw err;
+                // Respect Retry-After header
+                var delay = baseDelayMs * Math.pow(2, i);
+                if (err.payload && err.payload.retryAfter) {
+                    delay = Math.max(delay, Number(err.payload.retryAfter) * 1000);
+                }
+                await new Promise(function (resolve) { setTimeout(resolve, delay); });
+            }
+        }
+        throw lastError;
+    }
+
+    var api = { request: request, get: get, post: post, patch: patch, delete: del, withRetry: withRetry };
+    if (window.App && window.App.register) {
+        App.register('ApiClient', api);
+    }
+    window.apiClient = api;
 })();
