@@ -67,10 +67,10 @@ function getAgentEmoji(id) {
 
 function getStatusInfo(status) {
     switch (status) {
-        case 'active_executing': return { class: 'running', text: '執行中', dotClass: 'online' };
-        case 'active_recent': return { class: 'active', text: '活動中', dotClass: 'online' };
-        case 'dormant': return { class: 'dormant', text: '休眠中', dotClass: 'idle' };
-        default: return { class: '', text: '離線', dotClass: 'offline' };
+        case 'active_executing': return { class: 'running', text: '執行中', dotClass: 'online', icon: '▶' };
+        case 'active_recent': return { class: 'active', text: '活動中', dotClass: 'online', icon: '●' };
+        case 'dormant': return { class: 'dormant', text: '休眠中', dotClass: 'idle', icon: '◐' };
+        default: return { class: '', text: '離線', dotClass: 'offline', icon: '○' };
     }
 }
 

@@ -1,16 +1,46 @@
 (function () {
-    async function runCmd(cmd) {
+    function confirmAndRun(cmd) {
         if (commandRunning) { showToast('⏳ 上一個指令還在執行中', 'info'); return; }
-        if (cmd === 'restart' && !confirm('⚠️ 確認重啟 Gateway？所有 Agent 連線會暫時中斷。')) return;
-        if (cmd === 'update') {
-            if (!confirm('⚠️ 確認更新 OpenClaw？服務會暫停。')) return;
-            if (!confirm('⚠️ 再次確認：執行系統更新？')) return;
+
+        if (cmd === 'restart') {
+            if (window.ConfirmDialog) {
+                ConfirmDialog.show({
+                    type: 'warning',
+                    title: '重啟 Gateway',
+                    message: '所有 Agent 連線會暫時中斷，確認重啟？',
+                    confirmLabel: '重啟',
+                    onConfirm: function () { executeCmd(cmd); }
+                });
+            } else if (confirm('⚠️ 確認重啟 Gateway？所有 Agent 連線會暫時中斷。')) {
+                executeCmd(cmd);
+            }
+            return;
         }
 
+        if (cmd === 'update') {
+            if (window.ConfirmDialog) {
+                ConfirmDialog.show({
+                    type: 'danger',
+                    title: '系統更新',
+                    message: '執行系統更新將暫停所有服務，確認執行？',
+                    confirmLabel: '更新',
+                    onConfirm: function () { executeCmd(cmd); }
+                });
+            } else if (confirm('⚠️ 確認更新 OpenClaw？服務會暫停。')) {
+                executeCmd(cmd);
+            }
+            return;
+        }
+
+        executeCmd(cmd);
+    }
+
+    async function executeCmd(cmd) {
         commandRunning = true;
         pushLog(`▶ 執行: ${cmd}`, 'info');
         showToast(`正在執行 ${cmd}...`, 'info');
-        document.querySelectorAll('.cmd-btn').forEach((button) => { button.disabled = true; });
+        var cmdBtns = document.querySelectorAll('.cmd-btn');
+        cmdBtns.forEach(function (button) { button.disabled = true; });
 
         try {
             let request;
@@ -29,11 +59,15 @@
         } catch (error) {
             const message = getApiErrorMessage(error);
             pushLog(`❌ ${cmd} 失敗: ${message}`, 'err');
-            showToast(`❌ ${message}`, 'error');
+            showToast(`❌ ${message}`, 'error', { retryFn: function () { confirmAndRun(cmd); } });
         } finally {
             commandRunning = false;
-            document.querySelectorAll('.cmd-btn').forEach((button) => { button.disabled = false; });
+            cmdBtns.forEach(function (button) { button.disabled = false; });
         }
+    }
+
+    async function runCmd(cmd) {
+        confirmAndRun(cmd);
     }
 
     function showCmdOutput(title, content) {
