@@ -1,0 +1,64 @@
+/* ========================================
+   Accessibility Foundation
+   Focus ring, skip link, forced-colors
+   ======================================== */
+
+/* Keyboard focus indicator — WCAG 2.4.7 Focus Visible (Level AA) */
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* Mouse users: suppress browser default outline */
+:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* Skip to main content link — WCAG 2.4.1 Bypass Blocks */
+.skip-link {
+    position: absolute;
+    top: -100%;
+    left: 8px;
+    padding: 8px 16px;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    border-radius: var(--radius-sm);
+    z-index: 9999;
+    text-decoration: none;
+    transition: top 0.15s ease;
+}
+
+.skip-link:focus {
+    top: 8px;
+}
+
+/* High-contrast mode support — Windows, forced-colors */
+@media (forced-colors: active) {
+    .agent-status .status-dot {
+        forced-color-adjust: none;
+        outline: 2px solid ButtonText;
+    }
+
+    .status-icon {
+        forced-color-adjust: auto;
+    }
+
+    .btn-loading::after {
+        border-color: ButtonText;
+        border-top-color: transparent;
+    }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
