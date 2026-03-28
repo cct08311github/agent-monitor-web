@@ -9,17 +9,19 @@ const fetch = require('node-fetch');
 
 const execFilePromise = util.promisify(execFile);
 const logger = require('../utils/logger');
+const { getDashboardPollingConfig } = require('../config');
 const tsdbService = require('./tsdbService');
 const agentWatcherService = require('./agentWatcherService');
 const alertEngine = require('./alertEngine');
 const { fetchModelCooldowns } = require('../utils/modelMonitor');
 
+const pollingConfig = getDashboardPollingConfig();
 const cache = {
-    sys:       { data: null, ts: 0, ttl: 5000 },
-    agents:    { data: null, ts: 0, ttl: 10000 },
-    subagents: { data: null, ts: 0, ttl: 10000 },
-    cron:      { data: null, ts: 0, ttl: 30000 },
-    cooldowns: { data: null, ts: 0, ttl: 15000 },
+    sys:       { data: null, ts: 0, ttl: pollingConfig.cacheTtlSysMs },
+    agents:    { data: null, ts: 0, ttl: pollingConfig.cacheTtlAgentsMs },
+    subagents: { data: null, ts: 0, ttl: pollingConfig.cacheTtlAgentsMs },
+    cron:      { data: null, ts: 0, ttl: pollingConfig.cacheTtlCronMs },
+    cooldowns: { data: null, ts: 0, ttl: pollingConfig.cacheTtlCooldownsMs },
 };
 
 function isFresh(entry) {
@@ -49,7 +51,7 @@ const OPENCLAW_BIN_CANDIDATES = [
 ].filter(Boolean);
 const AGENTS_ROOT = path.join(OPENCLAW_ROOT, 'agents');
 const SENSITIVE_PATH_PREFIXES = [OPENCLAW_ROOT, HOME_DIR];
-const TSDB_SNAPSHOT_INTERVAL = 60000;
+const TSDB_SNAPSHOT_INTERVAL = pollingConfig.tsdbSnapshotIntervalMs;
 
 const MODEL_PRICING = {
     'gpt-5.3-codex': { input: 15, output: 60 },
@@ -619,7 +621,7 @@ function startGlobalPolling() {
     setInterval(async () => {
         await updateSharedData();
         doBroadcast().catch((e) => logger.error('poller_broadcast_error', { msg: e.message }));
-    }, 15000).unref();
+    }, pollingConfig.pollingIntervalMs).unref();
 
     updateSharedData().catch((e) => logger.error('poller_update_failed', { msg: e.message }));
 }
