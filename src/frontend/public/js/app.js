@@ -39,7 +39,12 @@ function fmtTime(d = new Date()) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
 }
 
-function showToast(msg, type = 'info') {
+function showToast(msg, type = 'info', opts) {
+    if (window.ToastManager) {
+        ToastManager.show(msg, type, opts);
+        return;
+    }
+    // Fallback to legacy toast
     const toast = document.getElementById('toast');
     toast.textContent = msg;
     toast.className = `toast show ${type}`;
