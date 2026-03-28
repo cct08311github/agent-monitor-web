@@ -29,8 +29,22 @@ function renderCronJobs() {
 
     if (cronJobs.length === 0) {
         const empty = document.createElement('div');
-        empty.style.cssText = 'color:var(--text-muted);padding:20px;text-align:center;grid-column:1/-1;';
-        empty.textContent = '沒有 Cron 任務';
+        empty.className = 'empty-state';
+        const iconWrap = document.createElement('div');
+        iconWrap.className = 'empty-state-icon';
+        const iconInner = document.createElement('span');
+        iconInner.className = 'empty-icon-inner';
+        iconInner.textContent = '⏰';
+        iconWrap.appendChild(iconInner);
+        empty.appendChild(iconWrap);
+        const emptyTitle = document.createElement('div');
+        emptyTitle.className = 'empty-state-title';
+        emptyTitle.textContent = '沒有 Cron 任務';
+        empty.appendChild(emptyTitle);
+        const emptyDesc = document.createElement('div');
+        emptyDesc.className = 'empty-state-desc';
+        emptyDesc.textContent = '目前沒有已排程的定時任務';
+        empty.appendChild(emptyDesc);
         grid.replaceChildren(empty);
         return;
     }
