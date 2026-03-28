@@ -90,6 +90,37 @@ function getTaskHubConfig() {
     return { dbPath };
 }
 
+function getGatewayConfig() {
+    return {
+        port: readNumber(process.env.GATEWAY_PORT, 18789),
+        host: readTrimmedEnv('GATEWAY_HOST', '127.0.0.1'),
+    };
+}
+
+function getDashboardPollingConfig() {
+    return {
+        cacheTtlSysMs: readNumber(process.env.DASHBOARD_CACHE_TTL_SYS_MS, 5000),
+        cacheTtlAgentsMs: readNumber(process.env.DASHBOARD_CACHE_TTL_AGENTS_MS, 10000),
+        cacheTtlCronMs: readNumber(process.env.DASHBOARD_CACHE_TTL_CRON_MS, 30000),
+        cacheTtlCooldownsMs: readNumber(process.env.DASHBOARD_CACHE_TTL_COOLDOWNS_MS, 15000),
+        pollingIntervalMs: readNumber(process.env.DASHBOARD_POLLING_INTERVAL_MS, 15000),
+        tsdbSnapshotIntervalMs: readNumber(process.env.TSDB_SNAPSHOT_INTERVAL_MS, 60000),
+    };
+}
+
+function getWatchdogConfig() {
+    return {
+        checkIntervalMs: readNumber(process.env.WATCHDOG_CHECK_INTERVAL_MS, 30000),
+        repairCooldownMs: readNumber(process.env.WATCHDOG_REPAIR_COOLDOWN_MS, 180000),
+        maxRepairAttempts: readNumber(process.env.WATCHDOG_MAX_REPAIR_ATTEMPTS, 3),
+        healthCheckTimeoutMs: readNumber(process.env.WATCHDOG_HEALTH_CHECK_TIMEOUT_MS, 8000),
+        repairWaitMs: readNumber(process.env.WATCHDOG_REPAIR_WAIT_MS, 20000),
+        restartGracePeriodMs: readNumber(process.env.WATCHDOG_RESTART_GRACE_PERIOD_MS, 45000),
+        telegramCooldownMs: readNumber(process.env.WATCHDOG_TELEGRAM_COOLDOWN_MS, 300000),
+        geminiTimeoutMs: readNumber(process.env.WATCHDOG_GEMINI_TIMEOUT_MS, 180000),
+    };
+}
+
 module.exports = {
     getProjectRoot,
     getServerConfig,
@@ -97,4 +128,7 @@ module.exports = {
     getAuthConfig,
     getOptimizeConfig,
     getTaskHubConfig,
+    getGatewayConfig,
+    getDashboardPollingConfig,
+    getWatchdogConfig,
 };
