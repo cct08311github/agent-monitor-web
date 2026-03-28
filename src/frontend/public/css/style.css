@@ -1328,7 +1328,7 @@ body {
 /* main-content has padding + overflow-y:auto which breaks height
    calculations. On mobile we use position:fixed to paint over
    everything between the header and bottom nav.               */
-@media (max-width: 768px) {
+@media (max-width: 599px) {
     .chat-tab-page {
         position: fixed;
         top: var(--header-height);
@@ -1912,8 +1912,46 @@ input:checked+.toggle-slider:before {
     font-weight: 600;
 }
 
-/* ========== Mobile ========== */
-@media (max-width: 768px) {
+/* ========== Tablet (600–1023px) ========== */
+@media (max-width: 1023px) and (min-width: 600px) {
+    .agent-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .agent-grid-inner {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .summary-section {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .desktop-tabs {
+        gap: 2px;
+    }
+
+    .desktop-tab {
+        padding: 6px 10px;
+        font-size: 12px;
+    }
+
+    .system-layout {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .logs-layout {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .main-content {
+        padding: 4px 16px 20px;
+    }
+}
+
+/* ========== Mobile (≤599px) ========== */
+@media (max-width: 599px) {
     .desktop-tabs {
         display: none;
     }
