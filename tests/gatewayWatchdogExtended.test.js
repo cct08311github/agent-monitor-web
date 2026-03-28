@@ -451,6 +451,12 @@ describe('module config fallback', () => {
                 getOpenClawConfig: jest.fn(() => { throw new Error('broken config'); }),
                 getOptimizeConfig: jest.fn(() => { throw new Error('broken config'); }),
                 getProjectRoot: jest.fn(() => '/tmp/project'),
+                getGatewayConfig: jest.fn(() => ({ port: 18789, host: '127.0.0.1' })),
+                getWatchdogConfig: jest.fn(() => ({
+                    checkIntervalMs: 30000, repairCooldownMs: 180000, maxRepairAttempts: 3,
+                    healthCheckTimeoutMs: 8000, repairWaitMs: 20000, restartGracePeriodMs: 45000,
+                    telegramCooldownMs: 300000, geminiTimeoutMs: 180000,
+                })),
             }));
 
             const fallbackWatchdog = require('../src/backend/services/gatewayWatchdog');
