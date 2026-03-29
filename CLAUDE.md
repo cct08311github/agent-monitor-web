@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Backend**: Express 4.18 + better-sqlite3
 - **Frontend**: Vanilla HTML/CSS/JS (no framework) + SSE for real-time
-- **Testing**: Jest (440+ tests, 35 suites)
+- **Testing**: Jest (460+ tests, 36 suites) + Playwright E2E
 
 ## Commands
 
@@ -14,6 +14,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm start     # HTTPS → https://localhost:3001 (requires mkcert certs in ./cert/)
 npm run dev   # nodemon auto-reload
 npm test      # jest --forceExit --detectOpenHandles
+npm run test:e2e        # Playwright E2E tests (headless)
+npm run test:e2e:ui     # Playwright E2E with UI
+npm run test:e2e:headed # Playwright E2E headed (see browser)
 ```
 
 重啟服務：`pkill -f "node server.js" && npm start &`
@@ -63,6 +66,12 @@ Browser → HTTPS (3001) → Express → controllers → services → openclaw C
 
 Jest suites mirror `src/backend/` 結構。Commit format: `feat(sN): <description>` (N = sprint 編號)。
 
+### E2E Tests (Playwright)
+- `tests/e2e/api.spec.js` — API endpoint tests (auth, agents, sessions, cron, alerts, etc.)
+- `tests/e2e/dashboard.spec.js` — UI tests (login, dashboard, navigation, responsive, a11y)
+- E2E tests excluded from Jest (`testPathIgnorePatterns`)，需單獨執行 `npm run test:e2e`
+- 需要設定 `E2E_USERNAME` / `E2E_PASSWORD` 環境變數才能執行
+
 ## Environment Variables
 
 | Variable | Purpose |
@@ -72,3 +81,6 @@ Jest suites mirror `src/backend/` 結構。Commit format: `feat(sN): <descriptio
 | `HUD_CONTROL_TOKEN` | Control endpoint bearer token |
 | `GEMINI_API_KEY` | 自主優化 pipeline |
 | `AUTH_DISABLED` | 停用登入（測試用）|
+| `E2E_USERNAME` | E2E 測試登入用戶名 |
+| `E2E_PASSWORD` | E2E 測試登入密碼 |
+| `BASE_URL` | E2E 測試目標 URL（預設 https://localhost:3001）|
