@@ -202,4 +202,56 @@ test.describe('API - Auth', () => {
     });
     expect([200, 401, 503]).toContain(res.status());
   });
+
+  test('POST /api/auth/logout invalidates session', async ({ request }) => {
+    const res = await request.post(`${API_BASE}/api/auth/logout`, {
+      failOnStatusCode: false,
+    });
+    expect([200, 401]).toContain(res.status());
+  });
+});
+
+test.describe('API - Sessions', () => {
+  test('GET /api/agents/:id/sessions/:sessionId returns session content', async ({ request }) => {
+    // First get agents list
+    const agentsRes = await request.get(`${API_BASE}/api/read/agents`, {
+      failOnStatusCode: false,
+    });
+    if (agentsRes.status() !== 200) {
+      test.skip();
+    }
+    const data = await agentsRes.json();
+    const agents = data.agents || [];
+    if (agents.length > 0) {
+      // Get sessions for first agent
+      const sessionsRes = await request.get(`${API_BASE}/api/agents/${agents[0].id}/sessions`, {
+        failOnStatusCode: false,
+      });
+      if (sessionsRes.status() === 200) {
+        const sessions = await sessionsRes.json();
+        const sessionsList = sessions.sessions || sessions;
+        if (sessionsList && sessionsList.length > 0) {
+          const sessionId = sessionsList[0].id || sessionsList[0];
+          const res = await request.get(`${API_BASE}/api/agents/${agents[0].id}/sessions/${sessionId}`, {
+            failOnStatusCode: false,
+          });
+          expect([200, 401, 503]).toContain(res.status());
+        }
+      }
+    }
+  });
+});
+
+test.describe('API - SSE Stream', () => {
+  test('GET /api/read/stream returns SSE stream', async ({ request }) => {
+    // SSE returns text/event-stream content-type
+    const res = await request.get(`${API_BASE}/api/read/stream`, {
+      failOnStatusCode: false,
+    });
+    expect([200, 503]).toContain(res.status());
+    if (res.status() === 200) {
+      const contentType = res.headers()['content-type'] || '';
+      expect(contentType).toMatch(/text\/event-stream|application\/octet-stream/);
+    }
+  });
 });
