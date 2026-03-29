@@ -12,15 +12,22 @@ test.describe('API - Dashboard & Monitoring', () => {
 
   test.beforeAll(async ({ request }) => {
     // Attempt to login and get session cookies
+    const username = process.env.E2E_USERNAME;
+    const password = process.env.E2E_PASSWORD;
+
+    // Fail fast if credentials are not configured
+    if (!username || !password) {
+      throw new Error('E2E_USERNAME and E2E_PASSWORD environment variables must be set');
+    }
+
     const loginRes = await request.post(`${API_BASE}/api/auth/login`, {
-      data: {
-        username: process.env.E2E_USERNAME || 'admin',
-        password: process.env.E2E_PASSWORD || 'admin',
-      },
+      data: { username, password },
       failOnStatusCode: false,
     });
     if (loginRes.ok()) {
-      authCookies = loginRes.cookies();
+      // cookies() returns an array of cookie objects
+      const cookies = loginRes.cookies();
+      authCookies = Array.isArray(cookies) ? cookies : Object.values(cookies);
     }
   });
 
@@ -166,11 +173,14 @@ test.describe('API - Alerts', () => {
 
 test.describe('API - Auth', () => {
   test('POST /api/auth/login with valid credentials', async ({ request }) => {
+    const username = process.env.E2E_USERNAME;
+    const password = process.env.E2E_PASSWORD;
+    if (!username || !password) {
+      test.skip();
+      return;
+    }
     const res = await request.post(`${API_BASE}/api/auth/login`, {
-      data: {
-        username: process.env.E2E_USERNAME || 'admin',
-        password: process.env.E2E_PASSWORD || 'admin',
-      },
+      data: { username, password },
       failOnStatusCode: false,
     });
     expect([200, 401]).toContain(res.status());

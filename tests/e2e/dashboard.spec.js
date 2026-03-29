@@ -13,6 +13,15 @@ test.describe('Authentication', () => {
   });
 
   test('can login with valid credentials', async ({ page }) => {
+    const username = process.env.E2E_USERNAME;
+    const password = process.env.E2E_PASSWORD;
+
+    // Skip if credentials are not configured
+    if (!username || !password) {
+      test.skip();
+      return;
+    }
+
     // Skip if AUTH_DISABLED is set in env
     const response = await page.request.get(page.url());
     if (response.status() === 200 && await page.locator('body').textContent().then(t => t.includes('dashboard') || t.includes('monitor'))) {
@@ -24,8 +33,8 @@ test.describe('Authentication', () => {
     const passwordInput = page.locator('input[type="password"]').first();
 
     if (await usernameInput.isVisible()) {
-      await usernameInput.fill(process.env.E2E_USERNAME || 'admin');
-      await passwordInput.fill(process.env.E2E_PASSWORD || 'admin');
+      await usernameInput.fill(username);
+      await passwordInput.fill(password);
       await page.locator('button[type="submit"]').click();
       await page.waitForURL(/\/(index\.html|)$/, { timeout: 10000 });
     }
@@ -55,9 +64,8 @@ test.describe('Dashboard Monitoring', () => {
   test('SSE connection indicator shows status', async ({ page }) => {
     await expect(page.locator('#connDot, .conn-dot')).toBeVisible();
     const connDot = page.locator('#connDot, .conn-dot').first();
-    await page.waitForTimeout(2000); // Wait for SSE to connect
-    const className = await connDot.getAttribute('class');
-    expect(className).toMatch(/conn-dot-(connected|active|working)/);
+    // Wait for SSE to connect with proper polling instead of arbitrary timeout
+    await expect(connDot).toHaveClass(/conn-dot-(connected|active|working)/, { timeout: 5000 });
   });
 
   test('summary cards display agent counts', async ({ page }) => {
@@ -102,7 +110,8 @@ test.describe('Tab Navigation', () => {
     if (await themeToggle.isVisible()) {
       const initialTheme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
       await themeToggle.click();
-      await page.waitForTimeout(500);
+      // Wait for theme to change rather than arbitrary timeout
+      await expect(page.locator('html')).toHaveAttribute('data-theme', initialTheme === 'dark' ? 'light' : 'dark', { timeout: 2000 });
       const newTheme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
       expect(newTheme).not.toBe(initialTheme);
     }
