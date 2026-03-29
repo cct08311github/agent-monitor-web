@@ -11,3 +11,6 @@ cert/
 nginx/ssl/
 *.py
 *.pyc
+playwright-report/
+test-results/
+playwright/.cache/

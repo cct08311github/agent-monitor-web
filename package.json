@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node --env-file=.env server.js",
     "dev": "nodemon --env-file=.env server.js",
-    "test": "jest --forceExit --detectOpenHandles"
+    "test": "jest --forceExit --detectOpenHandles",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
@@ -19,6 +22,7 @@
     "node-fetch": "^2.6.9"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "jest": "^30.2.0",
     "nodemon": "^3.0.1",
     "supertest": "^7.2.2"
@@ -33,7 +37,9 @@
   "license": "MIT",
   "jest": {
     "testEnvironment": "node",
-    "setupFiles": ["./tests/setup.js"],
+    "setupFiles": [
+      "./tests/setup.js"
+    ],
     "transformIgnorePatterns": [
       "node_modules/(?!chokidar)"
     ],
