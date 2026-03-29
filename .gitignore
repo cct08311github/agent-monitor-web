@@ -9,3 +9,5 @@ data/
 coverage/
 cert/
 nginx/ssl/
+*.py
+*.pyc
