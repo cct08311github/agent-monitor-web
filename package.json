@@ -40,6 +40,10 @@
     "setupFiles": [
       "./tests/setup.js"
     ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/tests/e2e/"
+    ],
     "transformIgnorePatterns": [
       "node_modules/(?!chokidar)"
     ],
