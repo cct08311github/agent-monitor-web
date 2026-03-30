@@ -25,7 +25,6 @@
      */
     function register(shortcut) {
         if (!shortcut || !shortcut.key || typeof shortcut.handler !== 'function') {
-            console.warn('[KeyboardShortcuts] Invalid shortcut registration:', shortcut);
             return;
         }
         shortcuts.push(shortcut);
@@ -71,7 +70,7 @@
             try {
                 shortcut.handler(event, shortcut);
             } catch (err) {
-                console.error('[KeyboardShortcuts] Handler error:', err);
+                // Silent fail - don't disrupt user experience
             }
 
             return; // Only first matching shortcut fires

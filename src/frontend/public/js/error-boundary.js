@@ -33,9 +33,6 @@
             userAgent: navigator.userAgent,
         };
 
-        // Log to console for debugging
-        console.error('[ErrorBoundary]', errorInfo);
-
         // Show user-friendly toast
         var displayMsg = msg || 'An unexpected error occurred';
         if (displayMsg.length > 100) {
@@ -66,7 +63,6 @@
 
         if (reason instanceof Error) {
             message = reason.message || message;
-            console.error('[ErrorBoundary] Unhandled Promise Rejection:', reason);
         } else if (typeof reason === 'string') {
             message = reason;
         } else if (reason && reason.message) {
