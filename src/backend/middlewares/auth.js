@@ -5,4 +5,5 @@ module.exports = {
     ...require('./controlAudit'),
     ...require('./loginRateLimit'),
     ...require('./sessionAuth'),
+    ...require('./rateLimiter'),
 };

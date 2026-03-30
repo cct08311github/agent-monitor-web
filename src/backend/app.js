@@ -5,8 +5,16 @@ const apiRoutes = require('./routes/api');
 const errorHandler = require('./middlewares/errorHandler');
 const requestContext = require('./middlewares/requestContext');
 const requestLogger = require('./middlewares/requestLogger');
+const { securityHeaders } = require('./middlewares/securityHeaders');
+const { apiLimiter } = require('./middlewares/rateLimiter');
 
 const app = express();
+
+// Security headers (helmet)
+app.use(securityHeaders);
+
+// Rate limiting for all API routes
+app.use('/api', apiLimiter);
 
 // Middlewares
 /* istanbul ignore next */
@@ -17,7 +25,7 @@ app.use(express.static(path.join(__dirname, '../frontend/public'), {
         res.set('Expires', '0');
     }
 }));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' })); // Prevent DoS via large payloads
 app.use(cookieParser());
 app.use(requestContext);
 app.use(requestLogger);

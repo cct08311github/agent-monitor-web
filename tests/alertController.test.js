@@ -28,14 +28,16 @@ describe('Alert API', () => {
     });
 
     it('PATCH /api/alerts/config returns 400 when updateConfig throws', async () => {
-        // Cause updateConfig to throw by passing non-iterable rules
-        const origEntries = Object.entries;
-        jest.spyOn(Object, 'entries').mockImplementationOnce(() => { throw new Error('entries failed'); });
+        // Mock alertEngine.updateConfig to throw an error
+        const origUpdateConfig = alertEngine.updateConfig;
+        alertEngine.updateConfig = jest.fn().mockImplementationOnce(() => {
+            throw new Error('entries failed');
+        });
         const res = await request(app)
             .patch('/api/alerts/config')
             .send({ rules: { cpu_high: { threshold: 99 } } });
         expect(res.statusCode).toBe(400);
         expect(res.body.success).toBe(false);
-        Object.entries = origEntries;
+        alertEngine.updateConfig = origUpdateConfig;
     });
 });
