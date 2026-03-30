@@ -16,8 +16,6 @@ const apiLimiter = rateLimit({
     standardHeaders: true, // Return rate limit info in headers
     legacyHeaders: false,
     message: { success: false, error: 'rate_limited', message: 'Too many requests' },
-    // Use default keyGenerator (req.ip) - express-rate-limit handles IPv6 properly
-    validate: { ipKeyGenerator: false },
 });
 
 /**
@@ -30,7 +28,6 @@ const authLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     message: { success: false, error: 'rate_limited', message: 'Too many authentication attempts' },
-    validate: { ipKeyGenerator: false },
 });
 
 /**
@@ -43,7 +40,6 @@ const controlLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     message: { success: false, error: 'rate_limited', message: 'Too many control requests' },
-    validate: { ipKeyGenerator: false },
 });
 
 module.exports = {
