@@ -14,3 +14,4 @@ nginx/ssl/
 playwright-report/
 test-results/
 playwright/.cache/
+ecosystem.config.js
