@@ -1,0 +1,758 @@
+openapi: 3.0.3
+info:
+  title: Agent Monitor Web API
+  description: |
+    REST API for the Agent Monitor Web dashboard.
+    Provides real-time monitoring, command execution, and system management.
+  version: 1.0.0
+  contact:
+    name: OpenClaw Support
+
+servers:
+  - url: https://localhost:3001
+    description: Local development server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session_id
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+        message:
+          type: string
+
+    Agent:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [active, idle, error, offline]
+        model:
+          type: string
+        lastSeen:
+          type: string
+          format: date-time
+
+    Dashboard:
+      type: object
+      properties:
+        agents:
+          type: array
+          items:
+            $ref: '#/components/schemas/Agent'
+        totalAgents:
+          type: integer
+        activeAgents:
+          type: integer
+        systemHealth:
+          type: object
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+        agentId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        messageCount:
+          type: integer
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+        domain:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        createdAt:
+          type: string
+          format: date-time
+
+    CronJob:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        schedule:
+          type: string
+        enabled:
+          type: boolean
+        lastRun:
+          type: string
+          format: date-time
+        nextRun:
+          type: string
+          format: date-time
+
+    Plugin:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        enabled:
+          type: boolean
+        priority:
+          type: integer
+        description:
+          type: string
+
+    FeatureFlag:
+      type: object
+      properties:
+        name:
+          type: string
+        enabled:
+          type: boolean
+        description:
+          type: string
+
+security:
+  - cookieAuth: []
+
+paths:
+  /api/read/health:
+    get:
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      ts:
+                        type: string
+                        format: date-time
+
+  /api/read/liveness:
+    get:
+      summary: Liveness probe
+      security: []
+      responses:
+        '200':
+          description: OK
+
+  /api/read/readiness:
+    get:
+      summary: Readiness probe
+      security: []
+      responses:
+        '200':
+          description: OK
+
+  /api/read/dependencies:
+    get:
+      summary: Service dependencies status
+      responses:
+        '200':
+          description: OK
+
+  /api/auth/login:
+    post:
+      summary: User login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+          headers:
+            Set-Cookie:
+              description: Session cookie
+              schema:
+                type: string
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/logout:
+    post:
+      summary: User logout
+      responses:
+        '200':
+          description: Logout successful
+
+  /api/auth/me:
+    get:
+      summary: Get current user
+      responses:
+        '200':
+          description: Current user info
+
+  /api/read/dashboard:
+    get:
+      summary: Get dashboard data
+      responses:
+        '200':
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Dashboard'
+
+  /api/read/stream:
+    get:
+      summary: SSE stream for real-time dashboard updates
+      responses:
+        '200':
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  /api/read/history:
+    get:
+      summary: Get historical data
+      parameters:
+        - name: agentId
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Historical data
+
+  /api/read/status:
+    get:
+      summary: Get system status
+      responses:
+        '200':
+          description: System status
+
+  /api/read/models:
+    get:
+      summary: Get available models
+      responses:
+        '200':
+          description: List of models
+
+  /api/read/agents:
+    get:
+      summary: Get all agents
+      responses:
+        '200':
+          description: List of agents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Agent'
+
+  /api/agents/{agentId}/sessions:
+    get:
+      summary: Get agent sessions
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Sessions list
+
+  /api/agents/{agentId}/sessions/{sessionId}:
+    get:
+      summary: Get session content
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session content
+
+  /api/agents:
+    get:
+      summary: Get all agents
+      responses:
+        '200':
+          description: Agent list
+
+  /api/command:
+    post:
+      summary: Execute command
+      parameters:
+        - name: X-Control-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                command:
+                  type: string
+                agentId:
+                  type: string
+      responses:
+        '200':
+          description: Command result
+
+  /api/taskhub/stats:
+    get:
+      summary: Get TaskHub statistics
+      responses:
+        '200':
+          description: TaskHub stats
+
+  /api/taskhub/tasks:
+    get:
+      summary: Get all tasks
+      responses:
+        '200':
+          description: Task list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Task'
+    post:
+      summary: Create task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                domain:
+                  type: string
+                title:
+                  type: string
+      responses:
+        '200':
+          description: Task created
+
+  /api/taskhub/tasks/{domain}/{id}:
+    patch:
+      summary: Update task
+      parameters:
+        - name: domain
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Task updated
+    delete:
+      summary: Delete task
+      parameters:
+        - name: domain
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Task deleted
+
+  /api/cron/jobs:
+    get:
+      summary: Get cron jobs
+      responses:
+        '200':
+          description: Cron job list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CronJob'
+
+  /api/cron/jobs/{id}/toggle:
+    post:
+      summary: Toggle cron job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job toggled
+
+  /api/cron/jobs/{id}/run:
+    post:
+      summary: Run cron job immediately
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job executed
+
+  /api/cron/jobs/{id}:
+    delete:
+      summary: Delete cron job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job deleted
+
+  /api/alerts/config:
+    get:
+      summary: Get alert configuration
+      responses:
+        '200':
+          description: Alert config
+    patch:
+      summary: Update alert configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Config updated
+
+  /api/alerts/recent:
+    get:
+      summary: Get recent alerts
+      responses:
+        '200':
+          description: Recent alerts
+
+  /api/optimize/run:
+    post:
+      summary: Run optimization
+      responses:
+        '200':
+          description: Optimization started
+
+  /api/threats/analyze:
+    post:
+      summary: Analyze threats
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: string
+      responses:
+        '200':
+          description: Analysis result
+
+  /api/security/analyze:
+    post:
+      summary: Analyze security
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: string
+      responses:
+        '200':
+          description: Analysis result
+
+  /api/learn/search:
+    get:
+      summary: Search and learn
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Search results
+
+  /api/compliance/analyze:
+    post:
+      summary: Analyze compliance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Analysis result
+
+  /api/compliance/status:
+    get:
+      summary: Get compliance status
+      responses:
+        '200':
+          description: Compliance status
+
+  /api/system/comprehensive:
+    get:
+      summary: Get comprehensive system status
+      responses:
+        '200':
+          description: System status
+
+  /api/health:
+    get:
+      summary: Get health status
+      responses:
+        '200':
+          description: Health status
+
+  /api/watchdog/status:
+    get:
+      summary: Get watchdog status
+      responses:
+        '200':
+          description: Watchdog status
+
+  /api/watchdog/repair:
+    post:
+      summary: Trigger watchdog repair
+      responses:
+        '200':
+          description: Repair triggered
+
+  /api/watchdog/toggle:
+    post:
+      summary: Toggle watchdog
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: Watchdog toggled
+
+  /api/flags:
+    get:
+      summary: Get all feature flags
+      responses:
+        '200':
+          description: Feature flags
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      enabled:
+                        type: integer
+                      disabled:
+                        type: integer
+                      flags:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/FeatureFlag'
+
+  /api/flags/{name}:
+    patch:
+      summary: Update feature flag
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                description:
+                  type: string
+      responses:
+        '200':
+          description: Flag updated
+        '404':
+          description: Flag not found
+
+  /api/plugins:
+    get:
+      summary: Get plugin registry stats
+      responses:
+        '200':
+          description: Plugin stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      enabled:
+                        type: integer
+                      disabled:
+                        type: integer
+                      plugins:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Plugin'
+
+  /api/plugins/{name}/toggle:
+    post:
+      summary: Toggle plugin
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Plugin toggled
+        '404':
+          description: Plugin not found
+
+  /api/logs/stream:
+    get:
+      summary: SSE stream for live logs
+      responses:
+        '200':
+          description: SSE log stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
