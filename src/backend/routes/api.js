@@ -120,6 +120,46 @@ router.post('/watchdog/toggle', auth.localhostOnlyControl, auth.rateLimit, (req,
     return sendOk(res, { watchdog: gatewayWatchdog.getStatus() });
 });
 
+// Feature Flags (localhost-only for security)
+router.get('/flags', auth.localhostOnlyControl, (req, res) => {
+    return sendOk(res, auth.getStats());
+});
+
+router.patch('/flags/:name', auth.localhostOnlyControl, auth.rateLimit, (req, res) => {
+    const { name } = req.params;
+    const { enabled, description } = req.body || {};
+    if (typeof enabled !== 'boolean') {
+        throw new AppError(400, 'invalid_flag_update', 'enabled must be boolean');
+    }
+    const updated = auth.updateFlag(name, { enabled, description });
+    if (!updated) {
+        throw new AppError(404, 'flag_not_found', `Feature flag '${name}' not found`);
+    }
+    return sendOk(res, { flag: auth.getFlag(name) });
+});
+
+// Plugin Registry (localhost-only for security)
+router.get('/plugins', auth.localhostOnlyControl, (req, res) => {
+    const pluginRegistry = require('../services/pluginRegistry');
+    return sendOk(res, pluginRegistry.getStats());
+});
+
+router.post('/plugins/:name/toggle', auth.localhostOnlyControl, auth.rateLimit, (req, res) => {
+    const { name } = req.params;
+    const pluginRegistry = require('../services/pluginRegistry');
+    const plugin = pluginRegistry.getPlugin(name);
+    if (!plugin) {
+        throw new AppError(404, 'plugin_not_found', `Plugin '${name}' not found`);
+    }
+    const enabled = plugin.enabled;
+    if (enabled) {
+        pluginRegistry.disablePlugin(name);
+    } else {
+        pluginRegistry.enablePlugin(name);
+    }
+    return sendOk(res, { plugin: pluginRegistry.getPlugin(name) });
+});
+
 // OpenClaw Logs Streaming (SSE)
 // Streams `openclaw logs --follow` output as Server-Sent Events
 /* istanbul ignore next */

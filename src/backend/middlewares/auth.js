@@ -7,4 +7,5 @@ module.exports = {
     ...require('./sessionAuth'),
     ...require('./rateLimiter'),
     ...require('./asyncHandler'),
+    ...require('./featureFlags'),
 };
