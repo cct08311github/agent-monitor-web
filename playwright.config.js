@@ -15,6 +15,7 @@ module.exports = defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
+    ignoreHTTPSErrors: true, // Local dev uses mkcert self-signed certs
   },
   projects: [
     {

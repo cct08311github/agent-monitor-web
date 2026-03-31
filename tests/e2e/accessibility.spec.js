@@ -5,7 +5,14 @@ const { test, expect } = require('@playwright/test');
  * Tests keyboard navigation and accessibility features
  */
 
+const hasCredentials = !!(process.env.E2E_USERNAME && process.env.E2E_PASSWORD);
+
 test.describe('Keyboard Shortcuts', () => {
+  test.beforeAll(async () => {
+    if (!hasCredentials) {
+      test.skip();
+    }
+  });
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
@@ -60,6 +67,11 @@ test.describe('Keyboard Shortcuts', () => {
 });
 
 test.describe('Accessibility', () => {
+  test.beforeAll(async () => {
+    if (!hasCredentials) {
+      test.skip();
+    }
+  });
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
@@ -103,12 +115,17 @@ test.describe('Accessibility', () => {
   });
 
   test('skip link exists for keyboard users', async ({ page }) => {
-    await page.goto('/');
+    // Uses beforeEach navigation
     await expect(page.locator('.skip-link, [href="#main"], [href="#content"]').first()).toBeAttached();
   });
 });
 
 test.describe('Error Handling UI', () => {
+  test.beforeAll(async () => {
+    if (!hasCredentials) {
+      test.skip();
+    }
+  });
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
