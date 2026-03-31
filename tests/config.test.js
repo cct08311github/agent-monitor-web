@@ -32,6 +32,8 @@ describe('backend config', () => {
             savedEnv[key] = process.env[key];
             delete process.env[key];
         }
+        // Set AUTH_DISABLED for tests that test fallback behavior
+        process.env.AUTH_DISABLED = 'true';
     });
 
     afterEach(() => {
@@ -57,6 +59,7 @@ describe('backend config', () => {
 
     it('reads overrides from environment', () => {
         process.env.PORT = '9443';
+        process.env.AUTH_SESSION_SECRET = 'test-secret';
         process.env.AUTH_SESSION_TTL_HOURS = '12';
         process.env.HUD_CONTROL_TOKEN = 'secret-token';
         process.env.GEMINI_API_KEY = 'gemini-key';
@@ -71,6 +74,7 @@ describe('backend config', () => {
         const optimize = config.getOptimizeConfig();
 
         expect(server.port).toBe(9443);
+        expect(auth.sessionSecret).toBe('test-secret');
         expect(auth.sessionTtlHours).toBe(12);
         expect(auth.controlToken).toBe('secret-token');
         expect(optimize.geminiApiKey).toBe('gemini-key');
@@ -78,5 +82,15 @@ describe('backend config', () => {
         expect(optimize.telegramTarget).toBe('ops-room');
         expect(optimize.projectPath).toBe('/tmp/project');
         expect(optimize.plansDir).toBe('/tmp/project/docs/plans');
+    });
+
+    it('throws when AUTH_SESSION_SECRET missing in production mode', () => {
+        // Ensure AUTH_DISABLED is NOT set (production mode)
+        delete process.env.AUTH_DISABLED;
+        delete process.env.AUTH_SESSION_SECRET;
+        jest.resetModules();
+
+        const config = require('../src/backend/config');
+        expect(() => config.getAuthConfig()).toThrow('AUTH_SESSION_SECRET environment variable is required in production');
     });
 });

@@ -95,7 +95,9 @@ async function createTask(req, res) {
     }
 
     try {
-        const created = repo.insertTask(domain, req.body);
+        // Extract only the task fields (not domain which is a path parameter)
+        const { domain: _domain, ...taskFields } = req.body;
+        const created = repo.insertTask(domain, taskFields);
         return sendOk(res, { task: withParsedTags(created) }, 201);
     } catch (err) {
         logger.error('taskhub_create_task_error', { requestId: req.requestId, details: logger.toErrorFields(err) });

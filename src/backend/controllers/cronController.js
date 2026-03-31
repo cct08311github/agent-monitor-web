@@ -11,6 +11,18 @@ function getPaths() {
     };
 }
 
+/**
+ * Validate job ID format - alphanumeric with hyphens/underscores only
+ * Prevents path traversal and injection attacks
+ */
+const JOB_ID_REGEX = /^[a-zA-Z0-9_-]+$/;
+
+function validateJobId(id) {
+    if (!id || typeof id !== 'string') return false;
+    if (id.length > 128) return false; // Reasonable length limit
+    return JOB_ID_REGEX.test(id);
+}
+
 class CronController {
     /**
      * 獲取所有 Cron 任務
@@ -38,6 +50,11 @@ class CronController {
     async toggleJob(req, res) {
         const { id } = req.params;
         const { enabled } = req.body;
+
+        if (!validateJobId(id)) {
+            logger.warn('cron_job_invalid_id', { requestId: req.requestId, id });
+            return sendFail(res, 400, 'Invalid job ID format');
+        }
 
         try {
             const { jobsFile } = getPaths();
@@ -71,6 +88,12 @@ class CronController {
      */
     async deleteJob(req, res) {
         const { id } = req.params;
+
+        if (!validateJobId(id)) {
+            logger.warn('cron_job_invalid_id', { requestId: req.requestId, id });
+            return sendFail(res, 400, 'Invalid job ID format');
+        }
+
         try {
             const { jobsFile } = getPaths();
             if (!fs.existsSync(jobsFile)) {
@@ -96,6 +119,12 @@ class CronController {
      */
     async runJob(req, res) {
         const { id } = req.params;
+
+        if (!validateJobId(id)) {
+            logger.warn('cron_job_invalid_id', { requestId: req.requestId, id });
+            return sendFail(res, 400, 'Invalid job ID format');
+        }
+
         logger.info('cron_job_run_requested', { requestId: req.requestId, id });
 
         try {
@@ -130,3 +159,4 @@ class CronController {
 }
 
 module.exports = new CronController();
+module.exports.validateJobId = validateJobId;

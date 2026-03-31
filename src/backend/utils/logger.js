@@ -2,10 +2,11 @@
 
 function toErrorFields(err) {
     if (!err) return undefined;
+    const isProduction = process.env.NODE_ENV === 'production';
     return {
         message: err.message,
         name: err.name,
-        stack: process.env.NODE_ENV === 'test' ? undefined : err.stack,
+        stack: isProduction ? undefined : err.stack,
     };
 }
 

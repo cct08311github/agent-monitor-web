@@ -11,6 +11,16 @@ const DOMAIN_TABLES = {
 
 const COMMON_COLS = 'id, title, status, priority, due_date, completed_at, parent_id, tags, notes, notion_page_id, notion_dirty, notion_synced_at, created_at, updated_at';
 
+// Whitelist of allowed fields for insert/update operations
+const ALLOWED_FIELDS = new Set([
+    'title', 'status', 'priority', 'due_date', 'notes', 'tags',
+    'project', 'assignee',
+    'github_repo', 'github_issue_id', 'github_pr_id', 'github_branch', 'dev_status',
+]);
+
+const VALID_STATUSES = ['draft', 'not_started', 'in_progress', 'done', 'archived', 'blocked', 'cancelled'];
+const VALID_PRIORITIES = ['low', 'medium', 'high', 'urgent'];
+
 const DOMAIN_SELECT = {
     work:        `${COMMON_COLS}, assignee, project, NULL as github_repo, NULL as github_issue_id, NULL as github_pr_id, NULL as github_branch, NULL as dev_status, NULL as automation_level`,
     personal:    `${COMMON_COLS}, NULL as assignee, NULL as project, NULL as github_repo, NULL as github_issue_id, NULL as github_pr_id, NULL as github_branch, NULL as dev_status, NULL as automation_level`,
@@ -90,8 +100,10 @@ function findTasks({ domain = 'all', status, priority, search, limit = 100, proj
     if (status) { conditions.push('status = ?'); params.push(status); }
     if (priority) { conditions.push('priority = ?'); params.push(priority); }
     if (search) {
-        conditions.push('(title LIKE ? OR notes LIKE ?)');
-        params.push(`%${search}%`, `%${search}%`);
+        // Escape SQL LIKE wildcards to prevent unexpected query results
+        const escaped = search.replace(/[%_]/g, (c) => (c === '%' ? '\\%' : '\\_'));
+        conditions.push("(title LIKE ? ESCAPE '\\' OR notes LIKE ? ESCAPE '\\')");
+        params.push(`%${escaped}%`, `%${escaped}%`);
     }
     const whereClause = conditions.length > 0 ? ' AND ' + conditions.join(' AND ') : '';
 
@@ -131,6 +143,23 @@ function findTasks({ domain = 'all', status, priority, search, limit = 100, proj
 function updateTask(domain, id, fields) {
     const conn = getDb();
     const table = DOMAIN_TABLES[domain];
+
+    // Validate field names - reject any unexpected columns
+    const providedFields = Object.keys(fields);
+    const invalidFields = providedFields.filter(f => !ALLOWED_FIELDS.has(f));
+    if (invalidFields.length > 0) {
+        throw new Error(`Invalid field(s): ${invalidFields.join(', ')}`);
+    }
+
+    // Validate status value
+    if (fields.status !== undefined && !VALID_STATUSES.includes(fields.status)) {
+        throw new Error(`Invalid status: ${fields.status}. Must be one of: ${VALID_STATUSES.join(', ')}`);
+    }
+
+    // Validate priority value
+    if (fields.priority !== undefined && !VALID_PRIORITIES.includes(fields.priority)) {
+        throw new Error(`Invalid priority: ${fields.priority}. Must be one of: ${VALID_PRIORITIES.join(', ')}`);
+    }
 
     const updates = [];
     const values = [];
@@ -189,6 +218,29 @@ function deleteTask(domain, id) {
 function insertTask(domain, fields) {
     const conn = getDb();
     const table = DOMAIN_TABLES[domain];
+
+    // Validate required fields
+    if (!fields.title || typeof fields.title !== 'string' || fields.title.trim() === '') {
+        throw new Error('Title is required');
+    }
+
+    // Validate field names - reject any unexpected columns
+    const providedFields = Object.keys(fields);
+    const invalidFields = providedFields.filter(f => !ALLOWED_FIELDS.has(f));
+    if (invalidFields.length > 0) {
+        throw new Error(`Invalid field(s): ${invalidFields.join(', ')}`);
+    }
+
+    // Validate status value
+    if (fields.status !== undefined && !VALID_STATUSES.includes(fields.status)) {
+        throw new Error(`Invalid status: ${fields.status}. Must be one of: ${VALID_STATUSES.join(', ')}`);
+    }
+
+    // Validate priority value
+    if (fields.priority !== undefined && !VALID_PRIORITIES.includes(fields.priority)) {
+        throw new Error(`Invalid priority: ${fields.priority}. Must be one of: ${VALID_PRIORITIES.join(', ')}`);
+    }
+
     const id = require('crypto').randomUUID();
     const now = new Date().toISOString().split('.')[0] + 'Z';
 
@@ -215,8 +267,9 @@ function insertTask(domain, fields) {
 
 module.exports = {
     DOMAIN_TABLES,
-    VALID_STATUSES: ['draft', 'not_started', 'in_progress', 'done', 'archived', 'blocked', 'cancelled'],
-    VALID_PRIORITIES: ['low', 'medium', 'high', 'urgent'],
+    VALID_STATUSES,
+    VALID_PRIORITIES,
+    ALLOWED_FIELDS,
     isValidDomain,
     getTableName,
     getAllDomains,

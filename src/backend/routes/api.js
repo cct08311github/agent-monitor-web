@@ -17,6 +17,7 @@ const controlController = require('../controllers/controlController');
 const auth = require('../middlewares/auth');
 const alertController = require('../controllers/alertController');
 const authController = require('../controllers/authController');
+const { csrfTokenGenerator, csrfVerifier } = require('../middlewares/csrfProtection');
 
 // ── Public Endpoints (no auth required) ───────────────────────────────────────
 router.get('/read/health', (req, res) => sendOk(res, { ts: new Date().toISOString() }));
@@ -42,9 +43,12 @@ router.use('/control', controlRouter);
 // ── Session Auth (protects all routes below) ──────────────────────────────────
 router.use(auth.requireAuth);
 
+// Generate CSRF token for authenticated sessions
+router.use(csrfTokenGenerator);
+
 // Alerts
 router.get('/alerts/config', alertController.getConfig);
-router.patch('/alerts/config', auth.localhostOnlyControl, auth.rateLimit, alertController.updateConfig);
+router.patch('/alerts/config', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, alertController.updateConfig);
 router.get('/alerts/recent', alertController.getRecent);
 router.get('/read/dashboard', dashboardReadController.getDashboard);
 router.get('/read/stream', dashboardReadController.streamDashboard);
@@ -62,29 +66,29 @@ router.get('/optimize/run', auth.localhostOnlyControl, auth.rateLimit, optimizeC
 // TaskHub
 router.get('/taskhub/stats', taskHubController.getStats);
 router.get('/taskhub/tasks', taskHubController.getTasks);
-router.post('/taskhub/tasks', auth.localhostOnlyControl, auth.rateLimit, taskHubController.createTask);
-router.patch('/taskhub/tasks/:domain/:id', auth.localhostOnlyControl, auth.rateLimit, taskHubController.updateTask);
-router.delete('/taskhub/tasks/:domain/:id', auth.localhostOnlyControl, auth.rateLimit, taskHubController.deleteTask);
+router.post('/taskhub/tasks', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, taskHubController.createTask);
+router.patch('/taskhub/tasks/:domain/:id', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, taskHubController.updateTask);
+router.delete('/taskhub/tasks/:domain/:id', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, taskHubController.deleteTask);
 
 // Cron Jobs
 router.get('/cron/jobs', cronController.getJobs);
-router.post('/cron/jobs/:id/toggle', auth.localhostOnlyControl, auth.rateLimit, cronController.toggleJob);
-router.post('/cron/jobs/:id/run', auth.localhostOnlyControl, auth.rateLimit, cronController.runJob);
-router.delete('/cron/jobs/:id', auth.localhostOnlyControl, auth.rateLimit, cronController.deleteJob);
+router.post('/cron/jobs/:id/toggle', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, cronController.toggleJob);
+router.post('/cron/jobs/:id/run', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, cronController.runJob);
+router.delete('/cron/jobs/:id', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, cronController.deleteJob);
 
 // Dashboard UI command endpoint — localhost-only, session-auth protected
-router.post('/command', auth.localhostOnlyControl, auth.rateLimit, controlController.runCommand);
+router.post('/command', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, controlController.runCommand);
 
 // Agents
 router.get('/agents', agentController.getAgents);
 
 // Security & Threats
-router.post('/threats/analyze', securityController.analyzeThreats);
-router.post('/security/analyze', securityController.analyzeSecurity);
+router.post('/threats/analyze', csrfVerifier, securityController.analyzeThreats);
+router.post('/security/analyze', csrfVerifier, securityController.analyzeSecurity);
 router.get('/learn/search', securityController.searchAndLearn);
 
 // Compliance
-router.post('/compliance/analyze', complianceController.analyzeCompliance);
+router.post('/compliance/analyze', csrfVerifier, complianceController.analyzeCompliance);
 router.get('/compliance/status', complianceController.getComplianceStatus);
 
 // System Health
@@ -98,7 +102,7 @@ router.get('/watchdog/status', (req, res) => {
     return sendOk(res, { watchdog: gatewayWatchdog.getStatus() });
 });
 
-router.post('/watchdog/repair', auth.localhostOnlyControl, auth.rateLimit, async (req, res, next) => {
+router.post('/watchdog/repair', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, async (req, res, next) => {
     try {
         const result = await gatewayWatchdog.triggerRepair();
         return sendOk(res, { repaired: result });
@@ -107,7 +111,7 @@ router.post('/watchdog/repair', auth.localhostOnlyControl, auth.rateLimit, async
     }
 });
 
-router.post('/watchdog/toggle', auth.localhostOnlyControl, auth.rateLimit, (req, res) => {
+router.post('/watchdog/toggle', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, (req, res) => {
     const enabled = req.body?.enabled;
     if (typeof enabled !== 'boolean') {
         throw new AppError(400, 'invalid_enabled', 'enabled must be boolean');
@@ -125,7 +129,7 @@ router.get('/flags', auth.localhostOnlyControl, (req, res) => {
     return sendOk(res, auth.getStats());
 });
 
-router.patch('/flags/:name', auth.localhostOnlyControl, auth.rateLimit, (req, res) => {
+router.patch('/flags/:name', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, (req, res) => {
     const { name } = req.params;
     const { enabled, description } = req.body || {};
     if (typeof enabled !== 'boolean') {
@@ -144,7 +148,7 @@ router.get('/plugins', auth.localhostOnlyControl, (req, res) => {
     return sendOk(res, pluginRegistry.getStats());
 });
 
-router.post('/plugins/:name/toggle', auth.localhostOnlyControl, auth.rateLimit, (req, res) => {
+router.post('/plugins/:name/toggle', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, (req, res) => {
     const { name } = req.params;
     const pluginRegistry = require('../services/pluginRegistry');
     const plugin = pluginRegistry.getPlugin(name);

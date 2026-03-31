@@ -45,11 +45,31 @@ function getOpenClawConfig() {
 }
 
 function getAuthConfig() {
+    const authDisabled = process.env.AUTH_DISABLED === 'true';
+    const sessionSecret = process.env.AUTH_SESSION_SECRET;
+
+    // Require secure session secret when auth is enabled (production mode)
+    // When AUTH_DISABLED='true', allow fallback secret for testing convenience
+    if (!authDisabled) {
+        if (!sessionSecret || !sessionSecret.trim()) {
+            throw new Error('AUTH_SESSION_SECRET environment variable is required in production');
+        }
+        return {
+            authDisabled: false,
+            username: readTrimmedEnv('AUTH_USERNAME', 'admin'),
+            passwordHash: readTrimmedEnv('AUTH_PASSWORD_HASH', ''),
+            sessionSecret: sessionSecret.trim(),
+            sessionTtlHours: readNumber(process.env.AUTH_SESSION_TTL_HOURS, 8),
+            controlToken: readTrimmedEnv('HUD_CONTROL_TOKEN', readTrimmedEnv('OPENCLAW_HUD_CONTROL_TOKEN', '')),
+        };
+    }
+
+    // AUTH_DISABLED=true: allow fallback for test/dev convenience
     return {
-        authDisabled: process.env.AUTH_DISABLED === 'true',
+        authDisabled: true,
         username: readTrimmedEnv('AUTH_USERNAME', 'admin'),
         passwordHash: readTrimmedEnv('AUTH_PASSWORD_HASH', ''),
-        sessionSecret: readTrimmedEnv('AUTH_SESSION_SECRET', 'dev-secret-change-in-production'),
+        sessionSecret: sessionSecret?.trim() || 'dev-secret-change-in-production',
         sessionTtlHours: readNumber(process.env.AUTH_SESSION_TTL_HOURS, 8),
         controlToken: readTrimmedEnv('HUD_CONTROL_TOKEN', readTrimmedEnv('OPENCLAW_HUD_CONTROL_TOKEN', '')),
     };
