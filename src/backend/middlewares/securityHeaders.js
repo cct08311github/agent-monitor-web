@@ -6,16 +6,20 @@ const helmet = require('helmet');
  * Security headers middleware using helmet
  * Provides comprehensive protection against common web vulnerabilities
  *
- * CSP: Using hash-based inline style allowlist instead of unsafe-inline
- * Hash is computed for the actual inline styles used in the app
+ * CSP notes:
+ * - script-src: 'unsafe-inline' required because the frontend uses onclick= attributes
+ *   extensively (60+ handlers). Mitigated by: internal tailnet-only access, HttpOnly cookies,
+ *   strict input validation on all API endpoints.
+ * - style-src: 'unsafe-inline' required because JS modules set element.style dynamically
+ *   for show/hide, progress bars, charts, etc. Inline style XSS risk is minimal.
  */
 const cspDirectives = {
     defaultSrc: ["'self'"],
-    scriptSrc: ["'self'"],
-    // Hash for: body{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem}
-    styleSrc: ["'self'", "'sha256-nK8z4X0b6xOIL+lxL4gU2kVJ8FZ9QXqUq9o+9gR1Zbk='"],
+    scriptSrc: ["'self'", "'unsafe-inline'"],
+    scriptSrcAttr: ["'unsafe-inline'"],  // Required for onclick= handlers
+    styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
     imgSrc: ["'self'", 'data:', 'https:'],
-    fontSrc: ["'self'"],
+    fontSrc: ["'self'", 'https://fonts.gstatic.com'],
     objectSrc: ["'none'"],
     upgradeInsecureRequests: [],
 };
