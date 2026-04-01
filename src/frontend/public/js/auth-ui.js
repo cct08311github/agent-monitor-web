@@ -1,7 +1,8 @@
 (function () {
     function redirectToLogin() {
         if (!location.pathname.endsWith('/login.html')) {
-            location.href = '/login.html';
+            var base = window.__BASE_PATH || '';
+            location.href = base + '/login.html';
         }
     }
 
@@ -29,7 +30,8 @@
     const origFetch = window.fetch.bind(window);
     window.fetch = async function (url, opts) {
         const res = await origFetch(url, opts);
-        if (res.status === 401 && typeof url === 'string' && url.startsWith('/api/')) {
+        var base = window.__BASE_PATH || '';
+        if (res.status === 401 && typeof url === 'string' && (url.startsWith('/api/') || url.startsWith(base + '/api/'))) {
             redirectToLogin();
         }
         return res;

@@ -142,10 +142,12 @@
         </form>
     </div>
 
+    <script src="js/base-path.js"></script>
     <script>
+        const __base = window.__BASE_PATH || '';
         // If already authenticated, redirect to main app
-        fetch('/api/auth/me', { credentials: 'include' })
-            .then(r => r.ok ? (location.href = '/') : null)
+        fetch(__base + '/api/auth/me', { credentials: 'include' })
+            .then(r => r.ok ? (location.href = __base + '/') : null)
             .catch(() => null);
 
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
@@ -160,7 +162,7 @@
             errEl.style.display = 'none';
 
             try {
-                const res = await fetch('/api/auth/login', {
+                const res = await fetch(__base + '/api/auth/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
@@ -168,7 +170,7 @@
                 });
                 const data = await res.json();
                 if (res.ok && data.success) {
-                    location.href = '/';
+                    location.href = __base + '/';
                 } else {
                     const msgs = {
                         invalid_credentials: '使用者名稱或密碼錯誤',

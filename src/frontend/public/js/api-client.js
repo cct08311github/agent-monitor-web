@@ -1,6 +1,14 @@
 (function () {
+    function prefixUrl(url) {
+        var base = window.__BASE_PATH || '';
+        if (base && typeof url === 'string' && url.startsWith('/')) {
+            return base + url;
+        }
+        return url;
+    }
+
     async function request(url, options) {
-        const response = await fetch(url, options);
+        const response = await fetch(prefixUrl(url), options);
         let data;
 
         try {

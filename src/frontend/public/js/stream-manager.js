@@ -37,7 +37,9 @@
 
         function start() {
             if (closed) return;
-            source = new EventSource(url);
+            var base = window.__BASE_PATH || '';
+            var fullUrl = (base && url.startsWith('/')) ? base + url : url;
+            source = new EventSource(fullUrl);
 
             if (typeof settings.onOpen === 'function') {
                 source.onopen = function () {
