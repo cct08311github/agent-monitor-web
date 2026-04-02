@@ -59,7 +59,9 @@ Browser → HTTPS (3001) → Express → controllers → services → openclaw C
 - `openclawService` 無 `listAgents()`，用 `getOpenClawData('openclaw agents list')`
 - Session JSONL 格式：每行 `{type, message: {role, content[]}}`，`type=message` 才是對話
 - 不把 cron job JSON dump 輸出到 log stream
-- CSS `grid-column: 1/-1` 用於 `agent-group-header`/`agent-grid-inner`/`agent-group-details`
+- 前端排版用 Focus + Periphery 佈局（`dashboard-render.js`），active agents 在 `#agentFocus`，idle 在 `#agentPeriphery`，`#agentGrid` 保留但 hidden
+- CSS 設計系統在 `css/theme.css`（變數）+ `css/overhaul.css`（元件覆蓋），`css/style.css` 是基礎佈局
+- `BASE_PATH` 環境變數控制 sub-path 掛載（`app.js` 用 `express.Router`），前端用 `js/base-path.js` 自動偵測
 - 安全/合規模組在 `src/backend/security/`，修改前確認影響範圍
 
 ## Testing
@@ -81,6 +83,7 @@ Jest suites mirror `src/backend/` 結構。Commit format: `feat(sN): <descriptio
 | `HUD_CONTROL_TOKEN` | Control endpoint bearer token |
 | `GEMINI_API_KEY` | 自主優化 pipeline |
 | `AUTH_DISABLED` | 停用登入（測試用）|
+| `BASE_PATH` | Tailscale serve sub-path 前綴（如 `/agent-monitor`）|
 | `E2E_USERNAME` | E2E 測試登入用戶名 |
 | `E2E_PASSWORD` | E2E 測試登入密碼 |
 | `BASE_URL` | E2E 測試目標 URL（預設 https://localhost:3001）|
