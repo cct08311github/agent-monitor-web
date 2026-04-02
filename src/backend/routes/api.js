@@ -18,6 +18,7 @@ const auth = require('../middlewares/auth');
 const alertController = require('../controllers/alertController');
 const authController = require('../controllers/authController');
 const { csrfTokenGenerator, csrfVerifier } = require('../middlewares/csrfProtection');
+const { validateAgentId, validateSessionId, validateDomain } = require('../middlewares/inputValidation');
 
 // ── Public Endpoints (no auth required) ───────────────────────────────────────
 router.get('/read/health', (req, res) => sendOk(res, { ts: new Date().toISOString() }));
@@ -56,8 +57,8 @@ router.get('/read/history', dashboardReadController.getHistory);
 router.get('/read/status', dashboardReadController.getStatus);
 router.get('/read/models', dashboardReadController.getModels);
 router.get('/read/agents', dashboardReadController.getAgents);
-router.get('/agents/:agentId/sessions', dashboardReadController.getSessions);
-router.get('/agents/:agentId/sessions/:sessionId', dashboardReadController.getSessionContent);
+router.get('/agents/:agentId/sessions', validateAgentId, dashboardReadController.getSessions);
+router.get('/agents/:agentId/sessions/:sessionId', validateAgentId, validateSessionId, dashboardReadController.getSessionContent);
 router.get('/dashboard', dashboardReadController.getDashboard); // very legacy
 
 // Optimize
@@ -67,8 +68,8 @@ router.get('/optimize/run', auth.localhostOnlyControl, auth.rateLimit, optimizeC
 router.get('/taskhub/stats', taskHubController.getStats);
 router.get('/taskhub/tasks', taskHubController.getTasks);
 router.post('/taskhub/tasks', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, taskHubController.createTask);
-router.patch('/taskhub/tasks/:domain/:id', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, taskHubController.updateTask);
-router.delete('/taskhub/tasks/:domain/:id', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, taskHubController.deleteTask);
+router.patch('/taskhub/tasks/:domain/:id', validateDomain, auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, taskHubController.updateTask);
+router.delete('/taskhub/tasks/:domain/:id', validateDomain, auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, taskHubController.deleteTask);
 
 // Cron Jobs
 router.get('/cron/jobs', cronController.getJobs);

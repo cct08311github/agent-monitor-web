@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { getAuthConfig } = require('../config');
 
 function requireBearerToken(req, res, next) {
@@ -14,7 +15,9 @@ function requireBearerToken(req, res, next) {
 
     const token = m[1].trim();
     if (!token) return res.status(401).json({ success: false, error: 'unauthorized' });
-    if (token !== controlToken) {
+    const tokenBuf = Buffer.from(token, 'utf8');
+    const expectedBuf = Buffer.from(controlToken, 'utf8');
+    if (tokenBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(tokenBuf, expectedBuf)) {
         return res.status(401).json({ success: false, error: 'unauthorized' });
     }
 

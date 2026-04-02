@@ -23,8 +23,15 @@ describe('sessionReadService', () => {
     });
 
     describe('sanitizeId', () => {
-        it('strips non-alphanumeric separators', () => {
-            expect(sessionReadService.sanitizeId('../main:01?')).toBe('main01');
+        it('rejects IDs with invalid characters', () => {
+            expect(sessionReadService.sanitizeId('../main:01?')).toBe('');
+        });
+        it('accepts valid IDs', () => {
+            expect(sessionReadService.sanitizeId('main-agent_01')).toBe('main-agent_01');
+        });
+        it('rejects empty input', () => {
+            expect(sessionReadService.sanitizeId('')).toBe('');
+            expect(sessionReadService.sanitizeId(null)).toBe('');
         });
     });
 

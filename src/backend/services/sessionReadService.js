@@ -5,8 +5,12 @@ const path = require('path');
 const { getOpenClawConfig } = require('../config');
 const { ok } = require('../utils/apiResponse');
 
+const VALID_ID = /^[a-zA-Z0-9_-]+$/;
+
 function sanitizeId(value) {
-    return String(value || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    const str = String(value || '');
+    if (!str || !VALID_ID.test(str)) return '';
+    return str;
 }
 
 function getSessionsDir(agentId) {
