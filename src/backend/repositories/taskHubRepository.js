@@ -115,10 +115,11 @@ function findTasks({ domain = 'all', status, priority, search, limit = 100, proj
         const projectClause = project ? ' AND project = ?' : '';
         const parts = effectiveDomains.map(d => {
             const table = DOMAIN_TABLES[d];
-            return `SELECT ${DOMAIN_SELECT[d]}, '${d}' as domain FROM ${table} WHERE 1=1${whereClause}${projectClause}`;
+            return `SELECT ${DOMAIN_SELECT[d]}, ? as domain FROM ${table} WHERE 1=1${whereClause}${projectClause}`;
         });
         const allParams = [];
         for (const d of effectiveDomains) {
+            allParams.push(d);  // parameterized domain literal
             allParams.push(...params);
             if (project) allParams.push(project);
         }
@@ -135,7 +136,8 @@ function findTasks({ domain = 'all', status, priority, search, limit = 100, proj
         singleWhere += ' AND project = ?';
         singleParams.push(project);
     }
-    let sql = `SELECT *, '${domain}' as domain FROM ${table} WHERE 1=1${singleWhere}`;
+    let sql = `SELECT *, ? as domain FROM ${table} WHERE 1=1${singleWhere}`;
+    singleParams.unshift(domain);
     sql += ` ${ORDER_CLAUSE} LIMIT ?`;
     return conn.prepare(sql).all(...singleParams, parsedLimit);
 }
@@ -201,7 +203,7 @@ function updateTask(domain, id, fields) {
 
     if (info.changes === 0) return { changes: 0, notFound: true };
 
-    const updated = conn.prepare(`SELECT *, '${domain}' as domain FROM ${table} WHERE id = ?`).get(id);
+    const updated = conn.prepare(`SELECT *, ? as domain FROM ${table} WHERE id = ?`).get(domain, id);
     return { changes: info.changes, task: updated };
 }
 
@@ -262,7 +264,7 @@ function insertTask(domain, fields) {
     const placeholders = Object.keys(row).map(() => '?').join(', ');
     conn.prepare(`INSERT INTO ${table} (${cols}) VALUES (${placeholders})`).run(...Object.values(row));
 
-    return conn.prepare(`SELECT *, '${domain}' as domain FROM ${table} WHERE id = ?`).get(id);
+    return conn.prepare(`SELECT *, ? as domain FROM ${table} WHERE id = ?`).get(domain, id);
 }
 
 module.exports = {

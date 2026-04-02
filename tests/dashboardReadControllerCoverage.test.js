@@ -568,14 +568,11 @@ describe('getSessions', () => {
         expect(payload.sessions[0].messageCount).toBe(0);
     });
 
-    it('strips path traversal chars from agentId, treats sanitized id as valid', async () => {
-        // '../../etc/passwd' → strip non [a-zA-Z0-9_-] → 'etcpasswd' (non-empty, valid)
-        // sessions dir won't exist for that sanitized id
-        mockFs.existsSync.mockReturnValue(false);
+    it('rejects path traversal agentId with 400', async () => {
         const res = mockRes();
         await ctrl.getSessions({ params: { agentId: '../../etc/passwd' } }, res);
-        // Should return empty sessions (not 400), path traversal prevented by sanitization
-        expect(res.json).toHaveBeenCalledWith({ success: true, sessions: [] });
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({ success: false, error: 'invalid_agent_id' });
     });
 
     it('extracts lastTs from timestamp field if ts is absent', async () => {
