@@ -7,16 +7,18 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="OpenClaw Watch">
-    <meta name="theme-color" content="#0f172a">
+    <meta name="theme-color" content="#09090b">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <meta name="description" content="OpenClaw Watch Pro - Agent 架構監控系統">
     <title>OpenClaw Watch Pro</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/theme.css">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/taskhub.css">
     <link rel="stylesheet" href="css/a11y.css">
+    <link rel="stylesheet" href="css/overhaul.css?v=20260402">
     <link rel="stylesheet" href="css/ux-patterns.css">
     <script src="js/theme-manager.js?v=20260307"></script>
 </head>
@@ -142,10 +144,17 @@
                     </button>
                 </div>
                 <div id="subTabAgents" class="sub-tab-content active">
+                    <!-- Minimap: 16 dots for instant health check -->
+                    <div id="agentMinimap" class="agent-minimap"></div>
                     <div style="padding:8px 0 4px">
-                        <input id="agentSearch" type="text" placeholder="搜尋 agent (id / model / 狀態)…" oninput="onAgentSearch(this.value)" style="width:100%;box-sizing:border-box;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);font-size:13px;outline:none">
+                        <input id="agentSearch" type="text" placeholder="搜尋 agent (id / model / 狀態)…" oninput="onAgentSearch(this.value)" class="search-input">
                     </div>
-                    <div id="agentGrid" class="agent-grid"></div>
+                    <!-- Focus area: active agents (large) -->
+                    <div id="agentFocus" class="agent-focus"></div>
+                    <!-- Periphery: idle agents (compact list) -->
+                    <div id="agentPeriphery" class="agent-periphery"></div>
+                    <!-- Legacy grid (hidden, kept for compatibility) -->
+                    <div id="agentGrid" class="agent-grid" style="display:none"></div>
                 </div>
                 <div id="subTabSubagents" class="sub-tab-content">
                     <div id="subagentGrid" class="agent-grid subagent-grid"></div>
