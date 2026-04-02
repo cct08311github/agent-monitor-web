@@ -23,22 +23,20 @@ const staticOpts = {
 // Security headers (helmet)
 app.use(securityHeaders);
 
-// Rate limiting for all API routes
-app.use('/api', apiLimiter);
-if (BASE_PATH) app.use(BASE_PATH + '/api', apiLimiter);
-
-// Middlewares
+// Core sub-app: static files, body parsing, middleware, API routes
+const core = express.Router();
+core.use('/api', apiLimiter);
 /* istanbul ignore next */
-app.use(express.static(staticDir, staticOpts));
-if (BASE_PATH) app.use(BASE_PATH, express.static(staticDir, staticOpts));
-app.use(express.json({ limit: '1mb' })); // Prevent DoS via large payloads
-app.use(cookieParser());
-app.use(requestContext);
-app.use(requestLogger);
+core.use(express.static(staticDir, staticOpts));
+core.use(express.json({ limit: '1mb' })); // Prevent DoS via large payloads
+core.use(cookieParser());
+core.use(requestContext);
+core.use(requestLogger);
+core.use('/api', apiRoutes);
 
-// Routes
-app.use('/api', apiRoutes);
-if (BASE_PATH) app.use(BASE_PATH + '/api', apiRoutes);
+// Mount at root and optionally at BASE_PATH
+app.use('/', core);
+if (BASE_PATH) app.use(BASE_PATH, core);
 
 // Fallback route for SPA
 const indexFile = path.join(staticDir, 'index.html');
