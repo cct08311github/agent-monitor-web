@@ -40,9 +40,7 @@ body {
     background-size: 20px 20px;
 }
 
-[data-theme="light"] body {
-    background-image: radial-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px);
-}
+/* Light theme disabled — dark only */
 
 /* ══════════════════════════════════════════
    LAYOUT INNOVATION #1: Summary → Instrument Strip
