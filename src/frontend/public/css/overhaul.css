@@ -1,0 +1,768 @@
+/* ========================================
+   OpenClaw Watch Pro — Swiss Instrument Overhaul
+   Layout innovation: status-driven hierarchy
+   ======================================== */
+
+/* ── Typography Foundation ─────────────── */
+body {
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    letter-spacing: -0.01em;
+}
+
+.summary-value,
+.watchdog-stat-value,
+.cost-value,
+.agent-card-stat-value,
+.agent-info-value {
+    font-family: 'IBM Plex Mono', 'SF Mono', monospace;
+    font-weight: 500;
+    letter-spacing: -0.03em;
+}
+
+.agent-name {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: -0.02em;
+}
+
+.header-title h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: -0.03em;
+}
+
+/* ── Background: dot grid ──────────────── */
+body {
+    background-color: var(--bg);
+    background-image: radial-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+[data-theme="light"] body {
+    background-image: radial-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+}
+
+/* ══════════════════════════════════════════
+   LAYOUT INNOVATION #1: Summary → Instrument Strip
+   Stats become a single dense readout bar
+   ══════════════════════════════════════════ */
+
+.summary-section {
+    display: flex !important;
+    gap: 0 !important;
+    padding: 0 24px !important;
+    grid-template-columns: unset !important;
+}
+
+.summary-card {
+    flex: 1;
+    background: transparent !important;
+    border: none !important;
+    border-right: 1px solid var(--border) !important;
+    border-radius: 0 !important;
+    padding: 16px 20px !important;
+    transition: background 0.15s;
+}
+
+.summary-card:last-child {
+    border-right: none !important;
+}
+
+.summary-card:hover {
+    background: var(--bg-card) !important;
+    transform: none;
+    box-shadow: none;
+}
+
+.summary-value {
+    font-size: 28px;
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1;
+}
+
+.summary-value.cost {
+    color: var(--accent);
+    -webkit-text-fill-color: var(--accent);
+    background: none;
+    -webkit-background-clip: unset;
+    background-clip: unset;
+}
+
+.summary-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+/* Summary icon: much smaller, almost invisible */
+.summary-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    font-size: 14px;
+    opacity: 0.5;
+    box-shadow: none;
+}
+
+.summary-icon.blue,
+.summary-icon.green,
+.summary-icon.orange,
+.summary-icon.purple {
+    background: transparent;
+}
+
+/* Divider under the entire summary strip */
+.summary-section::after {
+    content: '';
+    display: block;
+    position: absolute;
+    bottom: 0;
+    left: 24px;
+    right: 24px;
+    height: 1px;
+    background: var(--border);
+}
+
+/* ══════════════════════════════════════════
+   LAYOUT INNOVATION #2: Active agents → 2-col span
+   Running/active agents are visually dominant
+   ══════════════════════════════════════════ */
+
+.agent-grid-inner {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+    gap: 10px !important;
+}
+
+/* On larger screens, running agents take double width */
+@media (min-width: 900px) {
+    .agent-card.running,
+    .agent-card.active {
+        grid-column: span 2;
+    }
+
+    /* When spanning 2 cols, use a horizontal layout */
+    .agent-card.running .agent-card-body,
+    .agent-card.active .agent-card-body {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px 24px;
+    }
+
+    .agent-card.running .agent-task-preview,
+    .agent-card.active .agent-task-preview {
+        grid-column: 1 / -1;
+    }
+
+    .agent-card.running .agent-card-actions,
+    .agent-card.active .agent-card-actions {
+        grid-column: 1 / -1;
+    }
+}
+
+/* ══════════════════════════════════════════
+   LAYOUT INNOVATION #3: Idle agents → compressed
+   Dormant cards collapse to a minimal strip
+   ══════════════════════════════════════════ */
+
+.agent-group-details .agent-card.dormant {
+    padding: 10px 16px;
+}
+
+/* Hide task preview on dormant cards */
+.agent-card.dormant .agent-task-preview {
+    display: none;
+}
+
+/* Hide action buttons on dormant cards — shown on hover */
+.agent-card.dormant .agent-card-actions {
+    opacity: 0;
+    max-height: 0;
+    margin: 0;
+    overflow: hidden;
+    transition: opacity 0.2s, max-height 0.2s;
+}
+
+.agent-card.dormant:hover .agent-card-actions {
+    opacity: 1;
+    max-height: 60px;
+    margin-top: 10px;
+}
+
+/* Dormant cards: muted styling */
+.agent-card.dormant {
+    opacity: 0.6;
+    transition: opacity 0.2s, border-color 0.2s;
+}
+
+.agent-card.dormant:hover {
+    opacity: 1;
+}
+
+/* ══════════════════════════════════════════
+   CARD STYLING (all states)
+   ══════════════════════════════════════════ */
+
+.agent-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color 0.2s, opacity 0.2s;
+    position: relative;
+}
+
+.agent-card:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: var(--text-muted);
+}
+
+/* Left border status indicator */
+.agent-card::before {
+    content: '';
+    position: absolute;
+    top: 12px;
+    bottom: 12px;
+    left: 0;
+    right: auto;
+    width: 3px;
+    height: auto;
+    background: transparent;
+    border-radius: 0 2px 2px 0;
+}
+
+.agent-card.running::before { background: var(--green); }
+.agent-card.active::before { background: var(--accent); }
+.agent-card.dormant::before { background: transparent; }
+.agent-card.error-state::before { background: var(--red); }
+
+/* Active card background tints */
+.agent-card.running {
+    border-color: rgba(16, 185, 129, 0.15);
+    background: rgba(16, 185, 129, 0.03);
+}
+
+.agent-card.active {
+    border-color: rgba(245, 158, 11, 0.15);
+    background: rgba(245, 158, 11, 0.02);
+}
+
+.agent-card.error-state {
+    border-color: rgba(239, 68, 68, 0.2);
+    background: rgba(239, 68, 68, 0.03);
+}
+
+/* ── Header: clean ─────────────────────── */
+.header {
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+}
+
+.header-logo {
+    background: var(--accent);
+    border-radius: 8px;
+    box-shadow: none;
+}
+
+/* ── Tabs: underline ───────────────────── */
+.desktop-tabs {
+    background: transparent;
+    border: none;
+    padding: 0;
+    gap: 0;
+}
+
+.desktop-tab {
+    background: none !important;
+    border-radius: 0 !important;
+    padding: 8px 20px;
+    color: var(--text-muted);
+    border-bottom: 2px solid transparent;
+    font-weight: 500;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.desktop-tab:hover { color: var(--text-secondary); }
+
+.desktop-tab.active {
+    color: var(--accent) !important;
+    background: none !important;
+    border-bottom-color: var(--accent) !important;
+    box-shadow: none !important;
+}
+
+/* ── Header Buttons: ghost ─────────────── */
+.header-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.header-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--text-muted);
+}
+
+/* ── Agent Avatar ──────────────────────── */
+.agent-avatar {
+    border-radius: 6px;
+    border: none;
+    box-shadow: none;
+    font-weight: 600;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+}
+
+/* ── Status Badge ──────────────────────── */
+.agent-status {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    border: none;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+/* ── Agent Hostname ────────────────────── */
+.agent-hostname {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+/* ── Agent Info Rows ───────────────────── */
+.agent-info-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
+.agent-info-value {
+    font-size: 13px;
+}
+
+/* ── Task Preview ──────────────────────── */
+.agent-task-preview {
+    border-left: 2px solid var(--border);
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.agent-card.running .agent-task-preview { border-left-color: rgba(16, 185, 129, 0.3); }
+.agent-card.active .agent-task-preview { border-left-color: rgba(245, 158, 11, 0.3); }
+
+/* ── Card Action Buttons ───────────────── */
+.agent-card-actions button {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: var(--radius-sm);
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.agent-card-actions button:hover {
+    color: var(--text-primary);
+    border-color: var(--text-muted);
+    box-shadow: none;
+}
+
+/* ── Sub Tabs ──────────────────────────── */
+.sub-tabs {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border);
+}
+
+.sub-tab.active {
+    background: transparent !important;
+    color: var(--accent) !important;
+    border-bottom: 2px solid var(--accent) !important;
+}
+
+/* ── Group Headers ─────────────────────── */
+.agent-group-header {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+/* ── Accent Buttons ────────────────────── */
+.ctrl-btn.accent,
+.btn-primary {
+    background: var(--accent) !important;
+    color: #09090b !important;
+    border: none !important;
+    font-weight: 600;
+    box-shadow: none !important;
+}
+
+/* ── Search Input ──────────────────────── */
+.search-input {
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-sm) !important;
+    font-family: 'Outfit', sans-serif;
+    transition: border-color 0.15s;
+}
+
+.search-input:focus {
+    border-color: var(--accent) !important;
+    box-shadow: none !important;
+}
+
+/* ── Modal ─────────────────────────────── */
+.modal-overlay {
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Scrollbar ─────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ══════════════════════════════════════════
+   MINIMAP: 16 dots for instant health
+   ══════════════════════════════════════════ */
+.agent-minimap {
+    display: flex;
+    gap: 6px;
+    padding: 12px 0 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.minimap-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    opacity: 0.4;
+}
+
+.minimap-dot:hover {
+    transform: scale(1.6);
+}
+
+.minimap-dot.running {
+    background: var(--green);
+    opacity: 1;
+    animation: minimapPulse 2s ease-in-out infinite;
+    box-shadow: 0 0 6px var(--green);
+}
+
+.minimap-dot.active {
+    background: var(--accent);
+    opacity: 1;
+    animation: minimapPulse 2s ease-in-out infinite;
+    box-shadow: 0 0 6px var(--accent);
+}
+
+.minimap-dot.dormant {
+    background: var(--text-muted);
+    opacity: 0.3;
+}
+
+@keyframes minimapPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* ══════════════════════════════════════════
+   FOCUS AREA: active agents, large + prominent
+   ══════════════════════════════════════════ */
+.agent-focus {
+    margin-bottom: 8px;
+}
+
+.focus-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--green);
+    padding: 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.focus-label::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: minimapPulse 2s ease-in-out infinite;
+}
+
+.focus-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 12px;
+}
+
+.focus-card {
+    border-color: rgba(16, 185, 129, 0.25) !important;
+    background: rgba(16, 185, 129, 0.04) !important;
+}
+
+.focus-card::before {
+    background: var(--green) !important;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+}
+
+/* ══════════════════════════════════════════
+   PERIPHERY: idle agents as compact table rows
+   ══════════════════════════════════════════ */
+.agent-periphery {
+    margin-top: 4px;
+}
+
+.periphery-details > summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.periphery-details > summary::-webkit-details-marker {
+    display: none;
+}
+
+.periphery-details > summary::before {
+    content: '▶ ';
+    font-size: 10px;
+    margin-right: 4px;
+}
+
+.periphery-details[open] > summary::before {
+    content: '▼ ';
+}
+
+.periphery-header {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 12px 0 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.periphery-row {
+    display: grid;
+    grid-template-columns: 16px 1fr 1fr 1fr 80px 80px;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--border-light);
+    cursor: pointer;
+    transition: background 0.1s;
+    font-size: 13px;
+}
+
+.periphery-row:hover {
+    background: var(--bg-hover);
+}
+
+.periphery-thead {
+    cursor: default;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    padding: 6px 4px;
+}
+
+.periphery-thead:hover {
+    background: transparent;
+}
+
+.periphery-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    opacity: 0.4;
+}
+
+.periphery-dot.running,
+.periphery-dot.active {
+    background: var(--green);
+    opacity: 1;
+}
+
+.periphery-dot.dormant {
+    background: var(--text-muted);
+    opacity: 0.3;
+}
+
+.periphery-dot-col {
+    width: 16px;
+}
+
+.periphery-name {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.periphery-model {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.periphery-activity {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.periphery-cost {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-align: right;
+}
+
+.periphery-tokens {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: right;
+}
+
+/* Mobile: simplify periphery */
+@media (max-width: 768px) {
+    .periphery-row {
+        grid-template-columns: 16px 1fr 80px;
+    }
+    .periphery-model,
+    .periphery-activity,
+    .periphery-tokens {
+        display: none;
+    }
+    .periphery-thead {
+        grid-template-columns: 16px 1fr 80px;
+    }
+    .periphery-thead .periphery-model,
+    .periphery-thead .periphery-activity,
+    .periphery-thead .periphery-tokens {
+        display: none;
+    }
+    .focus-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ── Load Animation ────────────────────── */
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.summary-card {
+    animation: fadeUp 0.25s ease both;
+}
+.summary-card:nth-child(1) { animation-delay: 0.03s; }
+.summary-card:nth-child(2) { animation-delay: 0.06s; }
+.summary-card:nth-child(3) { animation-delay: 0.09s; }
+.summary-card:nth-child(4) { animation-delay: 0.12s; }
+
+.agent-card {
+    animation: fadeUp 0.25s ease both;
+}
+.agent-card:nth-child(1) { animation-delay: 0.02s; }
+.agent-card:nth-child(2) { animation-delay: 0.05s; }
+.agent-card:nth-child(3) { animation-delay: 0.08s; }
+.agent-card:nth-child(4) { animation-delay: 0.11s; }
+.agent-card:nth-child(5) { animation-delay: 0.14s; }
+.agent-card:nth-child(n+6) { animation-delay: 0.17s; }
+
+/* ── Error Banner ──────────────────────── */
+.error-banner { background: var(--red); }
+
+/* ── Command Buttons ───────────────────── */
+.cmd-btn {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-family: 'Outfit', sans-serif;
+    font-weight: 500;
+}
+
+.cmd-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--text-muted);
+    box-shadow: none;
+}
+
+/* ── Log Terminal ──────────────────────── */
+.log-terminal {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    background: #09090b;
+    border: 1px solid var(--border);
+}
+
+/* ── Mobile Bottom Nav ─────────────────── */
+.bottom-nav {
+    background: var(--bg-card);
+    border-top: 1px solid var(--border);
+}
+
+.nav-btn.active { color: var(--accent); }
+
+/* ── Toast ─────────────────────────────── */
+.toast {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+}
+
+/* ── Cost Range Select ─────────────────── */
+.cost-range-selector select {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+}
+
+/* ── Monitor Section Title ─────────────── */
+.monitor-header-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+}

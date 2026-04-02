@@ -21,15 +21,25 @@
         if (listEl) {
             const sorted = Object.entries(allModelUsage).sort((a, b) => b[1].cost - a[1].cost);
             const maxCost = sorted.length > 0 ? (sorted[0][1].cost || 0.000001) : 0.000001;
+            // innerHTML used here with esc() sanitized values only - no user input
             listEl.innerHTML = sorted
                 .map(([model, u]) => {
                     const pct = Math.round((u.cost / maxCost) * 100);
-                    return `<div class="model-usage-item"><div><span class="model-usage-name">${esc(model)}</span><span class="model-usage-sessions">(${u.sessions})</span></div><div class="model-usage-bar" style="height:3px;border-radius:2px;background:var(--border);margin:3px 0"><div style="width:${pct}%;height:100%;border-radius:2px;background:var(--blue)"></div></div><div class="model-usage-stats"><div class="model-usage-tokens">${formatTokens(u.total)}</div><div class="model-usage-cost">${formatTWD(u.cost)}</div></div></div>`;
+                    return '<div class="model-usage-item"><div><span class="model-usage-name">' + esc(model) + '</span><span class="model-usage-sessions">(' + u.sessions + ')</span></div><div class="model-usage-bar" style="height:3px;border-radius:2px;background:var(--border);margin:3px 0"><div style="width:' + pct + '%;height:100%;border-radius:2px;background:var(--blue)"></div></div><div class="model-usage-stats"><div class="model-usage-tokens">' + formatTokens(u.total) + '</div><div class="model-usage-cost">' + formatTWD(u.cost) + '</div></div></div>';
                 }).join('')
                 || '<div style="color:var(--text-muted);padding:8px;font-size:12px;">尚無資料</div>';
         }
         const summaryEl = document.getElementById(summaryId);
-        if (summaryEl) summaryEl.innerHTML = `<span class="cost-summary-label">總計</span><span class="cost-summary-value">${formatTWD(totalCost)}</span>`;
+        if (summaryEl) {
+            summaryEl.textContent = '';
+            var lbl = document.createElement('span');
+            lbl.className = 'cost-summary-label';
+            lbl.textContent = '總計';
+            var val = document.createElement('span');
+            val.className = 'cost-summary-value';
+            val.textContent = formatTWD(totalCost);
+            summaryEl.append(lbl, val);
+        }
     }
 
     function buildAgentCardEl(a, cost) {
@@ -125,6 +135,103 @@
         return card;
     }
 
+    // Build a compact subagent card using safe DOM methods
+    function buildSubagentCardEl(s) {
+        var sc = s.status === 'running' ? 'running' : (s.status === 'recent' ? 'active' : '');
+        var sd = s.status === 'running' ? 'online' : (s.status === 'recent' ? 'running' : 'idle');
+
+        var card = document.createElement('div');
+        card.className = 'agent-card ' + sc;
+        card.style.padding = '12px';
+
+        // Header
+        var hdr = document.createElement('div');
+        hdr.className = 'agent-card-header';
+        hdr.style.marginBottom = '8px';
+        var nameWrap = document.createElement('div');
+        nameWrap.className = 'agent-card-name';
+        var av = document.createElement('div');
+        av.className = 'agent-avatar';
+        Object.assign(av.style, { width: '28px', height: '28px', fontSize: '12px' });
+        av.textContent = '🔗';
+        var nameInfo = document.createElement('div');
+        var nameEl = document.createElement('div');
+        nameEl.className = 'agent-name';
+        nameEl.style.fontSize = '12px';
+        nameEl.textContent = s.subagentId.slice(0, 8);
+        if (s.abortedLastRun) {
+            var abt = document.createElement('span');
+            abt.style.cssText = 'color:var(--red);font-weight:600;font-size:10px';
+            abt.textContent = ' ⚠️ ABORTED';
+            nameEl.appendChild(abt);
+        }
+        var hostEl = document.createElement('div');
+        hostEl.className = 'agent-hostname';
+        hostEl.textContent = 'by ' + s.ownerAgent;
+        nameInfo.append(nameEl, hostEl);
+        nameWrap.append(av, nameInfo);
+        var statusEl = document.createElement('div');
+        statusEl.className = 'agent-status ' + sd;
+        statusEl.style.cssText = 'font-size:10px;padding:2px 8px';
+        var statusDot = document.createElement('span');
+        statusDot.className = 'agent-status-dot';
+        statusEl.append(statusDot, document.createTextNode(s.status.toUpperCase()));
+        hdr.append(nameWrap, statusEl);
+
+        // Task preview
+        var preview = document.createElement('div');
+        preview.className = 'agent-task-preview';
+        preview.style.cssText = 'margin:4px 0 8px 0;background:rgba(0,0,0,0.03);border-radius:4px;padding:6px';
+        var taskContent = document.createElement('div');
+        taskContent.className = 'agent-task-content';
+        taskContent.style.cssText = 'font-size:11px;color:var(--text);white-space:pre-wrap;word-break:break-word;max-height:40px;overflow-y:auto';
+        taskContent.textContent = s.label;
+        preview.appendChild(taskContent);
+
+        // Info rows
+        function subInfoRow(label, value) {
+            var row = document.createElement('div');
+            row.className = 'agent-info-row';
+            row.style.fontSize = '11px';
+            var l = document.createElement('span');
+            l.className = 'agent-info-label';
+            l.textContent = label;
+            var v = document.createElement('span');
+            v.className = 'agent-info-value';
+            v.textContent = value;
+            row.append(l, v);
+            return row;
+        }
+
+        var row1 = subInfoRow('最後活動', s.lastActivity);
+        row1.style.marginBottom = '2px';
+
+        var row2 = document.createElement('div');
+        row2.className = 'agent-info-row';
+        row2.style.fontSize = '11px';
+        var r2l = document.createElement('span');
+        r2l.className = 'agent-info-label';
+        r2l.textContent = '模型 / 耗時';
+        var r2v = document.createElement('div');
+        r2v.style.cssText = 'display:flex;gap:4px;align-items:center';
+        var modelSpan = document.createElement('span');
+        modelSpan.className = 'agent-info-value';
+        modelSpan.style.cssText = 'font-size:10px;opacity:0.8';
+        modelSpan.textContent = s.model ? s.model.split('/').pop() : 'unknown';
+        r2v.appendChild(modelSpan);
+        if (s.duration) {
+            var durSpan = document.createElement('span');
+            durSpan.className = 'agent-info-value';
+            durSpan.style.cssText = 'background:var(--bg-muted);padding:1px 4px;border-radius:4px';
+            durSpan.textContent = s.duration;
+            r2v.appendChild(durSpan);
+        }
+        row2.append(r2l, r2v);
+
+        card.append(hdr, preview, row1, row2);
+        return card;
+    }
+
     function renderDashboard(data) {
         if (!data || !data.success) return;
         latestDashboard = data;
@@ -138,9 +245,9 @@
 
         agents.forEach(a => {
             const prev = previousAgentsMap[a.id];
-            if (!prev && a.status?.includes('active')) pushLog(`🟢 ${a.id} 上線 [${a.model}]`, 'info');
-            else if (prev && prev.status !== a.status) pushLog(`${a.status?.includes('active') ? '🟢' : '⚪'} ${a.id}: ${prev.status} → ${a.status}`, 'info');
-            else if (prev && prev.model !== a.model) pushLog(`🔄 ${a.id}: 模型 ${prev.model || 'N/A'} → ${a.model || 'N/A'}`, 'info');
+            if (!prev && a.status?.includes('active')) pushLog('🟢 ' + a.id + ' 上線 [' + a.model + ']', 'info');
+            else if (prev && prev.status !== a.status) pushLog((a.status?.includes('active') ? '🟢' : '⚪') + ' ' + a.id + ': ' + prev.status + ' → ' + a.status, 'info');
+            else if (prev && prev.model !== a.model) pushLog('🔄 ' + a.id + ': 模型 ' + (prev.model || 'N/A') + ' → ' + (a.model || 'N/A'), 'info');
             previousAgentsMap[a.id] = a;
         });
 
@@ -152,7 +259,7 @@
             set('cpuVal', (data.sys.cpu || 0) + '%'); set('memVal', (data.sys.memory || 0) + '%'); set('diskVal', (data.sys.disk || 0) + '%');
             setB('cpuBar', data.sys.cpu); setB('memBar', data.sys.memory); setB('diskBar', data.sys.disk);
             const md = document.getElementById('memDetail');
-            if (md && data.sys.memoryUsedGB) md.textContent = `${data.sys.memoryUsedGB} / ${data.sys.memoryTotalGB} GB`;
+            if (md && data.sys.memoryUsedGB) md.textContent = data.sys.memoryUsedGB + ' / ' + data.sys.memoryTotalGB + ' GB';
         }
 
         agents.sort((a, b) => {
@@ -175,114 +282,143 @@
             return parseFloat(range === 'all' ? (a.costs?.total ?? a.cost ?? 0) : (a.costs?.[range] ?? a.cost ?? 0));
         }
 
-        // Clear skeletons if present
         if (window.LoadingManager) LoadingManager.clearSkeletons('agentGrid');
 
-        const frag = document.createDocumentFragment();
-        if (filteredAgents.length === 0) {
-            const empty = document.createElement('div');
-            empty.className = 'empty-state';
-            const iconWrap = document.createElement('div');
-            iconWrap.className = 'empty-state-icon';
-            const iconInner = document.createElement('span');
-            iconInner.className = 'empty-icon-inner';
-            iconInner.textContent = '��';
-            iconWrap.appendChild(iconInner);
-            empty.appendChild(iconWrap);
-            const emptyTitle = document.createElement('div');
-            emptyTitle.className = 'empty-state-title';
-            emptyTitle.textContent = q ? '找不到符合的 Agent' : '沒有 Agent';
-            empty.appendChild(emptyTitle);
-            const emptyDesc = document.createElement('div');
-            emptyDesc.className = 'empty-state-desc';
-            emptyDesc.textContent = q ? '請嘗試其他關鍵字' : '目前沒有已註冊的 Agent';
-            empty.appendChild(emptyDesc);
-            frag.appendChild(empty);
-        } else {
+        // ── Minimap: one dot per agent for instant health overview ──
+        var minimapEl = document.getElementById('agentMinimap');
+        if (minimapEl) {
+            var mFrag = document.createDocumentFragment();
+            agents.forEach(function (a) {
+                var d = document.createElement('div');
+                var si2 = getStatusInfo(a.status);
+                d.className = 'minimap-dot ' + si2.class;
+                d.title = a.id + ' — ' + si2.text;
+                d.addEventListener('click', function () { showAgentDetail(a.id); });
+                mFrag.appendChild(d);
+            });
+            minimapEl.replaceChildren(mFrag);
+        }
+
+        // ── Focus area: active agents as large cards ──
+        var focusEl = document.getElementById('agentFocus');
+        if (focusEl) {
+            var fFrag = document.createDocumentFragment();
             if (activeAgents2.length > 0) {
-                const grpHdr = document.createElement('div');
-                grpHdr.className = 'agent-group-header';
-                const dot2 = document.createElement('span');
-                dot2.className = 'agent-group-dot online';
-                const lbl = document.createElement('span');
-                lbl.textContent = `執行中 (${activeAgents2.length})`;
-                grpHdr.append(dot2, lbl);
-                frag.appendChild(grpHdr);
-                const activeGrid = document.createElement('div');
-                activeGrid.className = 'agent-grid-inner';
-                activeAgents2.forEach(a => {
-                    const cost = buildAgentCost(a);
+                var focusLabel = document.createElement('div');
+                focusLabel.className = 'focus-label';
+                focusLabel.textContent = '執行中 (' + activeAgents2.length + ')';
+                fFrag.appendChild(focusLabel);
+                var focusGrid = document.createElement('div');
+                focusGrid.className = 'focus-grid';
+                activeAgents2.forEach(function (a) {
+                    var cost = buildAgentCost(a);
                     totalCost += cost;
                     activeCount++;
-                    activeGrid.appendChild(buildAgentCardEl(a, cost));
+                    var card = buildAgentCardEl(a, cost);
+                    card.classList.add('focus-card');
+                    focusGrid.appendChild(card);
                 });
-                frag.appendChild(activeGrid);
+                fFrag.appendChild(focusGrid);
             }
-
-            if (inactiveAgents.length > 0) {
-                const details = document.createElement('details');
-                details.open = true;
-                details.className = 'agent-group-details';
-                const summary = document.createElement('summary');
-                summary.className = 'agent-group-header agent-group-summary';
-                const dot2 = document.createElement('span');
-                dot2.className = 'agent-group-dot idle';
-                const lbl = document.createElement('span');
-                lbl.textContent = `閒置 (${inactiveAgents.length})`;
-                summary.append(dot2, lbl);
-                details.appendChild(summary);
-                const inactiveGrid = document.createElement('div');
-                inactiveGrid.className = 'agent-grid-inner';
-                inactiveAgents.forEach(a => {
-                    const cost = buildAgentCost(a);
-                    totalCost += cost;
-                    inactiveGrid.appendChild(buildAgentCardEl(a, cost));
-                });
-                details.appendChild(inactiveGrid);
-                frag.appendChild(details);
-            }
+            focusEl.replaceChildren(fFrag);
         }
-        gridEl.replaceChildren(frag);
 
+        // ── Periphery: idle agents as compact rows ──
+        var periphEl = document.getElementById('agentPeriphery');
+        if (periphEl) {
+            var pFrag = document.createDocumentFragment();
+            if (inactiveAgents.length > 0) {
+                var pDetails = document.createElement('details');
+                pDetails.open = true;
+                pDetails.className = 'periphery-details';
+                var pSummary = document.createElement('summary');
+                pSummary.className = 'periphery-header';
+                pSummary.textContent = '閒置 (' + inactiveAgents.length + ')';
+                pDetails.appendChild(pSummary);
+
+                var thead = document.createElement('div');
+                thead.className = 'periphery-row periphery-thead';
+                ['', 'AGENT', 'MODEL', 'ACTIVITY', 'COST', 'TOKENS'].forEach(function (t, i) {
+                    var sp = document.createElement('span');
+                    sp.className = ['periphery-dot-col', 'periphery-name', 'periphery-model', 'periphery-activity', 'periphery-cost', 'periphery-tokens'][i];
+                    sp.textContent = t;
+                    thead.appendChild(sp);
+                });
+                pDetails.appendChild(thead);
+
+                inactiveAgents.forEach(function (a) {
+                    var cost = buildAgentCost(a);
+                    totalCost += cost;
+                    var row = document.createElement('div');
+                    row.className = 'periphery-row';
+                    row.addEventListener('click', function () { showAgentDetail(a.id); });
+
+                    var si3 = getStatusInfo(a.status);
+                    var dotEl = document.createElement('span');
+                    dotEl.className = 'periphery-dot ' + si3.class;
+                    var nameEl2 = document.createElement('span');
+                    nameEl2.className = 'periphery-name';
+                    nameEl2.textContent = a.id;
+                    var modelEl = document.createElement('span');
+                    modelEl.className = 'periphery-model';
+                    modelEl.textContent = (a.model || '').split('/').pop() || 'N/A';
+                    var actEl = document.createElement('span');
+                    actEl.className = 'periphery-activity';
+                    actEl.textContent = a.lastActivity || '—';
+                    var costEl = document.createElement('span');
+                    costEl.className = 'periphery-cost';
+                    costEl.textContent = formatTWD(cost);
+                    var tokEl = document.createElement('span');
+                    tokEl.className = 'periphery-tokens';
+                    tokEl.textContent = formatTokens(a.tokens?.total);
+
+                    row.append(dotEl, nameEl2, modelEl, actEl, costEl, tokEl);
+                    pDetails.appendChild(row);
+                });
+                pFrag.appendChild(pDetails);
+            }
+            periphEl.replaceChildren(pFrag);
+        }
+
+        // Empty state
+        if (filteredAgents.length === 0 && focusEl) {
+            var empty = document.createElement('div');
+            empty.className = 'empty-state';
+            var eIcon = document.createElement('div');
+            eIcon.className = 'empty-state-icon';
+            eIcon.textContent = '🔍';
+            var eTitle = document.createElement('div');
+            eTitle.className = 'empty-state-title';
+            eTitle.textContent = q ? '找不到符合的 Agent' : '沒有 Agent';
+            var eDesc = document.createElement('div');
+            eDesc.className = 'empty-state-desc';
+            eDesc.textContent = q ? '請嘗試其他關鍵字' : '目前沒有已註冊的 Agent';
+            empty.append(eIcon, eTitle, eDesc);
+            focusEl.replaceChildren(empty);
+        }
+
+        if (gridEl) gridEl.replaceChildren();
+
+        // Subagents - use safe DOM methods
+        var subagentGridEl = document.getElementById('subagentGrid');
         const subagents = (data.subagents || []).sort((a, b) => ({ running: 0, recent: 1, idle: 2 }[a.status] ?? 3) - ({ running: 0, recent: 1, idle: 2 }[b.status] ?? 3));
-        document.getElementById('subagentGrid').innerHTML = subagents.slice(0, 40).map(s => {
-            const sc = s.status === 'running' ? 'running' : (s.status === 'recent' ? 'active' : '');
-            const sd = s.status === 'running' ? 'online' : (s.status === 'recent' ? 'running' : 'idle');
-            const abt = s.abortedLastRun ? '<span style="color:var(--red);font-weight:600;font-size:10px"> ⚠️ ABORTED</span>' : '';
-            const durationHtml = s.duration ? `<span class="agent-info-value" style="background:var(--bg-muted);padding:1px 4px;border-radius:4px">${s.duration}</span>` : '';
-
-            return `<div class="agent-card ${sc}" style="padding:12px">
-            <div class="agent-card-header" style="margin-bottom:8px">
-                <div class="agent-card-name">
-                    <div class="agent-avatar" style="width:28px;height:28px;font-size:12px;background:var(--accent-gradient)">🔗</div>
-                    <div>
-                        <div class="agent-name" style="font-size:12px">${esc(s.subagentId.slice(0, 8))}${abt}</div>
-                        <div class="agent-hostname">by ${esc(s.ownerAgent)}</div>
-                    </div>
-                </div>
-                <div class="agent-status ${sd}" style="font-size:10px;padding:2px 8px"><span class="agent-status-dot"></span>${esc(s.status.toUpperCase())}</div>
-            </div>
-            <div class="agent-task-preview" style="margin: 4px 0 8px 0; background: rgba(0,0,0,0.03); border-radius: 4px; padding: 6px;">
-                <div class="agent-task-content" style="font-size:11px; color:var(--text); white-space: pre-wrap; word-break: break-word; max-height: 40px; overflow-y: auto;">${esc(s.label)}</div>
-            </div>
-            <div class="agent-info-row" style="font-size:11px; margin-bottom:2px">
-                <span class="agent-info-label">最後活動</span>
-                <span class="agent-info-value">${esc(s.lastActivity)}</span>
-            </div>
-            <div class="agent-info-row" style="font-size:11px">
-                <span class="agent-info-label">模型 / 耗時</span>
-                <div style="display:flex; gap:4px; align-items:center">
-                    <span class="agent-info-value" style="font-size:10px; opacity:0.8">${s.model ? esc(s.model.split('/').pop()) : 'unknown'}</span>
-                    ${durationHtml}
-                </div>
-            </div>
-        </div>`;
-        }).join('') || '<div style="color:var(--text-muted);padding:20px;text-align:center;">沒有 Sub-Agents</div>';
+        var subFrag = document.createDocumentFragment();
+        if (subagents.length === 0) {
+            var noSub = document.createElement('div');
+            noSub.style.cssText = 'color:var(--text-muted);padding:20px;text-align:center';
+            noSub.textContent = '沒有 Sub-Agents';
+            subFrag.appendChild(noSub);
+        } else {
+            subagents.slice(0, 40).forEach(function (s) {
+                subFrag.appendChild(buildSubagentCardEl(s));
+            });
+        }
+        subagentGridEl.replaceChildren(subFrag);
 
         document.getElementById('totalAgents').textContent = agents.length;
         document.getElementById('activeAgents').textContent = activeCount;
         document.getElementById('totalSubagents').textContent = subagents.length;
-        document.getElementById('deviceOnlineStatus').textContent = `${activeCount}/${agents.length} 執行中`;
+        document.getElementById('deviceOnlineStatus').textContent = activeCount + '/' + agents.length + ' 執行中';
         document.getElementById('agentCountBadge').textContent = agents.length;
         document.getElementById('subagentCountBadge').textContent = subagents.length;
         updateCostDisplay();
