@@ -101,6 +101,6 @@ async function handleLogin() {
 </template>
 
 <style scoped>
-@import '../../public/css/theme.css';
-@import '../../public/css/login.css';
+@import '../assets/css/theme.css';
+@import '../assets/css/login.css';
 </style>

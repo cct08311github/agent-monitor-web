@@ -8,16 +8,11 @@ const requestLogger = require('./middlewares/requestLogger');
 const { securityHeaders } = require('./middlewares/securityHeaders');
 const { apiLimiter } = require('./middlewares/rateLimiter');
 
-const fs = require('fs');
-
 const app = express();
 
 const BASE_PATH = (process.env.BASE_PATH || '').replace(/\/+$/, '');
 
-// Serve Vite build output (dist/) when available, otherwise fall back to vanilla public/
-const viteDistDir = path.join(__dirname, '../../dist');
-const vanillaDir = path.join(__dirname, '../frontend/public');
-const staticDir = fs.existsSync(path.join(viteDistDir, 'index.html')) ? viteDistDir : vanillaDir;
+const staticDir = path.join(__dirname, '../../dist');
 
 const staticOpts = {
     setHeaders: (res) => {
