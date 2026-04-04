@@ -1,12 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-// Detect BASE_PATH from URL (same logic as base-path.js)
-function detectBasePath(): string {
-  const match = location.pathname.match(/^(\/[^/]+)/)
-  return match && match[1] !== '/' ? match[1] : ''
-}
-
-export const basePath = detectBasePath()
+// Use Vite's built-in base URL (injected from vite.config.ts `base` option)
+// import.meta.env.BASE_URL is always '/' or '/sub-path/' at build time
+export const basePath = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '')
 
 const router = createRouter({
   history: createWebHistory(basePath || '/'),

@@ -85,12 +85,12 @@ router.post('/command', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier,
 router.get('/agents', agentController.getAgents);
 
 // Security & Threats
-router.post('/threats/analyze', csrfVerifier, securityController.analyzeThreats);
-router.post('/security/analyze', csrfVerifier, securityController.analyzeSecurity);
+router.post('/threats/analyze', auth.rateLimit, csrfVerifier, securityController.analyzeThreats);
+router.post('/security/analyze', auth.rateLimit, csrfVerifier, securityController.analyzeSecurity);
 router.get('/learn/search', securityController.searchAndLearn);
 
 // Compliance
-router.post('/compliance/analyze', csrfVerifier, complianceController.analyzeCompliance);
+router.post('/compliance/analyze', auth.rateLimit, csrfVerifier, complianceController.analyzeCompliance);
 router.get('/compliance/status', complianceController.getComplianceStatus);
 
 // System Health
