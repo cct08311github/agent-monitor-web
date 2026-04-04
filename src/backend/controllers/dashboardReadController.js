@@ -33,7 +33,10 @@ class DashboardReadController {
             'Connection': 'keep-alive'
         });
 
-        dashboardPayloadService.addSseClient(res);
+        if (!dashboardPayloadService.addSseClient(res)) {
+            res.status(503).end();
+            return;
+        }
         dashboardPayloadService.startGlobalPolling();
         dashboardPayloadService.startSseHeartbeat();
 

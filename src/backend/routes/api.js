@@ -24,8 +24,6 @@ const { validateAgentId, validateSessionId, validateDomain } = require('../middl
 // ── Public Endpoints (no auth required) ───────────────────────────────────────
 router.get('/read/health', (req, res) => sendOk(res, { ts: new Date().toISOString() }));
 router.get('/read/liveness', systemController.getLiveness);
-router.get('/read/readiness', systemController.getReadiness);
-router.get('/read/dependencies', systemController.getDependencies);
 
 // Auth endpoints — must be public (before requireAuth)
 router.post('/auth/login', authLimiter, auth.loginRateLimit, authController.login);
@@ -47,6 +45,10 @@ router.use(auth.requireAuth);
 
 // Generate CSRF token for authenticated sessions
 router.use(csrfTokenGenerator);
+
+// Readiness/dependencies require auth (expose filesystem paths)
+router.get('/read/readiness', systemController.getReadiness);
+router.get('/read/dependencies', systemController.getDependencies);
 
 // Alerts
 router.get('/alerts/config', alertController.getConfig);
@@ -133,6 +135,7 @@ router.get('/flags', auth.localhostOnlyControl, (req, res) => {
 
 router.patch('/flags/:name', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, (req, res) => {
     const { name } = req.params;
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(name)) throw new AppError(400, 'invalid_flag_name', 'Invalid flag name');
     const { enabled, description } = req.body || {};
     if (typeof enabled !== 'boolean') {
         throw new AppError(400, 'invalid_flag_update', 'enabled must be boolean');
@@ -152,6 +155,7 @@ router.get('/plugins', auth.localhostOnlyControl, (req, res) => {
 
 router.post('/plugins/:name/toggle', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, (req, res) => {
     const { name } = req.params;
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(name)) throw new AppError(400, 'invalid_plugin_name', 'Invalid plugin name');
     const pluginRegistry = require('../services/pluginRegistry');
     const plugin = pluginRegistry.getPlugin(name);
     if (!plugin) {

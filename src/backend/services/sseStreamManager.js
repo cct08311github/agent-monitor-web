@@ -1,9 +1,14 @@
 'use strict';
 
 const sseClients = new Set();
+const MAX_SSE_CLIENTS = 20;
 
 function addClient(res) {
+    if (sseClients.size >= MAX_SSE_CLIENTS) {
+        return false;
+    }
     sseClients.add(res);
+    return true;
 }
 
 function removeClient(res) {
