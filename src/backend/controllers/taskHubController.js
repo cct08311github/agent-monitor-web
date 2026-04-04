@@ -22,7 +22,7 @@ async function getStats(req, res) {
         return sendOk(res, { stats });
     } catch (err) {
         logger.error('taskhub_stats_error', { requestId: req.requestId, details: logger.toErrorFields(err) });
-        return sendFail(res, 500, err.message);
+        return sendFail(res, 500, 'internal_error');
     }
 }
 
@@ -37,7 +37,7 @@ async function getTasks(req, res) {
         return sendOk(res, { tasks: tasks.map(withParsedTags), total: tasks.length });
     } catch (err) {
         logger.error('taskhub_get_tasks_error', { requestId: req.requestId, details: logger.toErrorFields(err) });
-        return sendFail(res, 500, err.message);
+        return sendFail(res, 500, 'internal_error');
     }
 }
 
@@ -63,7 +63,7 @@ async function updateTask(req, res) {
         return sendOk(res, { task: withParsedTags(result.task) });
     } catch (err) {
         logger.error('taskhub_update_task_error', { requestId: req.requestId, details: logger.toErrorFields(err) });
-        return sendFail(res, 500, err.message);
+        return sendFail(res, 500, 'internal_error');
     }
 }
 
@@ -80,7 +80,7 @@ async function deleteTask(req, res) {
         return sendOk(res, { deleted });
     } catch (err) {
         logger.error('taskhub_delete_task_error', { requestId: req.requestId, details: logger.toErrorFields(err) });
-        return sendFail(res, 500, err.message);
+        return sendFail(res, 500, 'internal_error');
     }
 }
 
@@ -101,7 +101,7 @@ async function createTask(req, res) {
         return sendOk(res, { task: withParsedTags(created) }, 201);
     } catch (err) {
         logger.error('taskhub_create_task_error', { requestId: req.requestId, details: logger.toErrorFields(err) });
-        return sendFail(res, 500, err.message);
+        return sendFail(res, 500, 'internal_error');
     }
 }
 

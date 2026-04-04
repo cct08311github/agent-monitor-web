@@ -60,7 +60,8 @@ class AdaptiveSecurity {
       to: newLevel,
       reason: reason
     });
-    
+    if (this.history.length > 200) this.history.shift();
+
     this.currentLevel = newLevel;
     
     logger.info('security_level_change', { from: this.history[this.history.length-1].from, to: newLevel, reason, actions: newInfo.actions });
