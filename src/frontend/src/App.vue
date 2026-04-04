@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTheme } from '@/composables/useTheme'
 import { useAuth } from '@/composables/useAuth'
+import { appState } from '@/stores/appState'
 
 const route = useRoute()
 const router = useRouter()
@@ -21,6 +22,23 @@ async function handleLogout() {
   await doLogout()
   router.push({ name: 'login' })
 }
+
+type DesktopTab = 'monitor' | 'system' | 'logs' | 'chat'
+
+function switchTab(tab: DesktopTab) {
+  // When switching away from detail, reset detail state
+  if (appState.currentDesktopTab === 'detail') {
+    appState.currentDetailAgentId = ''
+  }
+  appState.currentDesktopTab = tab
+}
+
+const activeDesktopTab = computed<DesktopTab>(() => {
+  const t = appState.currentDesktopTab
+  // 'detail' is a sub-state of 'monitor' — highlight monitor tab
+  if (t === 'detail') return 'monitor'
+  return (t as DesktopTab) ?? 'monitor'
+})
 </script>
 
 <template>
@@ -36,11 +54,30 @@ async function handleLogout() {
       </div>
       <div class="header-center">
         <div class="desktop-tabs" role="tablist" aria-label="主要導覽">
-          <!-- Tabs will be functional in Phase 2 when routes exist -->
-          <button class="desktop-tab active" role="tab" aria-selected="true">🖥️ 監控</button>
-          <button class="desktop-tab" role="tab" aria-selected="false">📊 系統/費用</button>
-          <button class="desktop-tab" role="tab" aria-selected="false">⚙️ 日誌</button>
-          <button class="desktop-tab" role="tab" aria-selected="false">💬 聊天室</button>
+          <button
+            :class="['desktop-tab', { active: activeDesktopTab === 'monitor' }]"
+            role="tab"
+            :aria-selected="activeDesktopTab === 'monitor'"
+            @click="switchTab('monitor')"
+          >🖥️ 監控</button>
+          <button
+            :class="['desktop-tab', { active: activeDesktopTab === 'system' }]"
+            role="tab"
+            :aria-selected="activeDesktopTab === 'system'"
+            @click="switchTab('system')"
+          >📊 系統/費用</button>
+          <button
+            :class="['desktop-tab', { active: activeDesktopTab === 'logs' }]"
+            role="tab"
+            :aria-selected="activeDesktopTab === 'logs'"
+            @click="switchTab('logs')"
+          >⚙️ 日誌</button>
+          <button
+            :class="['desktop-tab', { active: activeDesktopTab === 'chat' }]"
+            role="tab"
+            :aria-selected="activeDesktopTab === 'chat'"
+            @click="switchTab('chat')"
+          >💬 聊天室</button>
         </div>
       </div>
       <div class="header-right">

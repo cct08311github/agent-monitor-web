@@ -1,0 +1,164 @@
+// ---------------------------------------------------------------------------
+// useDashboard — core data flow composable for the Monitor tab
+// Fetches initial dashboard payload and maintains SSE connection
+// ---------------------------------------------------------------------------
+
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { api } from '@/composables/useApi'
+import { useSSE } from '@/composables/useSSE'
+import { appState } from '@/stores/appState'
+import type { Agent } from '@/types/api'
+
+export type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting'
+export type CostRange = 'today' | 'week' | 'month' | 'all'
+
+export function useDashboard() {
+  const dashboard = computed(() => appState.latestDashboard)
+  const connectionStatus = ref<ConnectionStatus>('disconnected')
+  const lastUpdateTs = ref(0)
+
+  // ── Agent list (sorted by priority) ──────────────────────────────────────
+
+  const agents = computed(() => {
+    const raw = dashboard.value?.agents ?? []
+    const prio: Record<string, number> = {
+      active_executing: 0,
+      active_recent: 1,
+      dormant: 2,
+      inactive: 3,
+    }
+    return [...raw].sort(
+      (a, b) =>
+        (prio[a.status] ?? 4) - (prio[b.status] ?? 4) || a.id.localeCompare(b.id),
+    )
+  })
+
+  const filteredAgents = computed<Agent[]>(() => {
+    const q = appState.agentSearchQuery.toLowerCase()
+    if (!q) return agents.value
+    return agents.value.filter(
+      (a) =>
+        a.id.toLowerCase().includes(q) ||
+        (a.model ?? '').toLowerCase().includes(q) ||
+        (a.status ?? '').toLowerCase().includes(q),
+    )
+  })
+
+  const activeAgents = computed<Agent[]>(() =>
+    filteredAgents.value.filter(
+      (a) => a.status === 'active_executing' || a.status === 'active_recent',
+    ),
+  )
+
+  const inactiveAgents = computed<Agent[]>(() =>
+    filteredAgents.value.filter(
+      (a) => a.status !== 'active_executing' && a.status !== 'active_recent',
+    ),
+  )
+
+  const subagents = computed(() => {
+    const raw = dashboard.value?.subagents ?? []
+    const p: Record<string, number> = { running: 0, recent: 1, idle: 2 }
+    return [...raw].sort((a, b) => (p[a.status] ?? 3) - (p[b.status] ?? 3))
+  })
+
+  // ── Cost helpers ──────────────────────────────────────────────────────────
+
+  const costRange = ref<CostRange>('month')
+
+  function getAgentCost(a: Agent): number {
+    const range = costRange.value
+    const c = a as unknown as Record<string, unknown>
+    const costs = c['costs'] as Record<string, unknown> | undefined
+    if (range === 'all') {
+      return parseFloat(String(costs?.['total'] ?? c['cost'] ?? 0))
+    }
+    return parseFloat(String(costs?.[range] ?? c['cost'] ?? 0))
+  }
+
+  const totalCost = computed<number>(() =>
+    (dashboard.value?.agents ?? []).reduce((sum, a) => sum + getAgentCost(a), 0),
+  )
+
+  // ── Initial fetch ─────────────────────────────────────────────────────────
+
+  async function fetchDashboard(force = false): Promise<void> {
+    try {
+      const url = force
+        ? `/api/read/dashboard?force=1&t=${Date.now()}`
+        : '/api/read/dashboard'
+      const data = await api.get(url)
+      const payload = data as typeof appState.latestDashboard
+      if (payload?.success) {
+        appState.latestDashboard = payload
+        const ext = data as Record<string, unknown>
+        if (ext['exchangeRate']) {
+          appState.currentExchangeRate = ext['exchangeRate'] as number
+        }
+        lastUpdateTs.value = Date.now()
+      }
+    } catch {
+      // Error handled by calling component / error boundary
+    }
+  }
+
+  // ── SSE connection ────────────────────────────────────────────────────────
+
+  const { connect, close, isConnected } = useSSE()
+
+  function startSSE(): void {
+    connect('/api/read/stream', {
+      onOpen() {
+        connectionStatus.value = 'connected'
+      },
+      onMessage(event) {
+        try {
+          const data = JSON.parse(event.data) as typeof appState.latestDashboard
+          if (data?.success) {
+            appState.latestDashboard = data
+            const ext = data as unknown as Record<string, unknown>
+            if (ext['exchangeRate']) {
+              appState.currentExchangeRate = ext['exchangeRate'] as number
+            }
+            lastUpdateTs.value = Date.now()
+            connectionStatus.value = 'connected'
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      },
+      onError() {
+        connectionStatus.value = 'disconnected'
+      },
+      onReconnecting() {
+        connectionStatus.value = 'reconnecting'
+      },
+      autoReconnect: true,
+    })
+  }
+
+  onMounted(() => {
+    fetchDashboard(true)
+    startSSE()
+  })
+
+  onUnmounted(() => {
+    close()
+  })
+
+  return {
+    dashboard,
+    agents,
+    filteredAgents,
+    activeAgents,
+    inactiveAgents,
+    subagents,
+    connectionStatus,
+    lastUpdateTs,
+    isConnected,
+    costRange,
+    getAgentCost,
+    totalCost,
+    fetchDashboard,
+  }
+}
