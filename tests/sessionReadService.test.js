@@ -2,6 +2,8 @@ const mockFs = {
     existsSync: jest.fn(),
     readFileSync: jest.fn(),
     readdirSync: jest.fn(),
+    realpathSync: jest.fn((p) => p),
+    statSync: jest.fn(() => ({ size: 1024 })),
 };
 
 const mockConfig = {
@@ -17,6 +19,8 @@ describe('sessionReadService', () => {
     beforeEach(() => {
         jest.resetModules();
         Object.values(mockFs).forEach((fn) => fn.mockReset());
+        mockFs.realpathSync.mockImplementation((p) => p);
+        mockFs.statSync.mockReturnValue({ size: 1024 });
         mockConfig.getOpenClawConfig.mockReset();
         mockConfig.getOpenClawConfig.mockReturnValue({ agentsRoot: '/tmp/agents' });
         sessionReadService = require('../src/backend/services/sessionReadService');

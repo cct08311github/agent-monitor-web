@@ -10,7 +10,8 @@ const mockFs = {
     existsSync: jest.fn().mockReturnValue(false),
     readFileSync: jest.fn().mockReturnValue(''),
     readdirSync: jest.fn().mockReturnValue([]),
-    statSync: jest.fn().mockReturnValue({ mtimeMs: Date.now() }),
+    statSync: jest.fn().mockReturnValue({ mtimeMs: Date.now(), size: 1024 }),
+    realpathSync: jest.fn((p) => p),
     mkdirSync: jest.fn(),
     promises: {
         access: jest.fn().mockRejectedValue(new Error('ENOENT')),
@@ -47,7 +48,8 @@ beforeEach(() => {
     Object.values(mockFs.promises).forEach(fn => fn.mockReset());
     mockFs.existsSync.mockReturnValue(false);
     mockFs.readdirSync.mockReturnValue([]);
-    mockFs.statSync.mockReturnValue({ mtimeMs: Date.now() });
+    mockFs.statSync.mockReturnValue({ mtimeMs: Date.now(), size: 1024 });
+    mockFs.realpathSync.mockImplementation((p) => p);
     mockFs.readFileSync.mockReturnValue('');
     mockFs.promises.access.mockRejectedValue(new Error('ENOENT'));
     mockFs.promises.readFile.mockResolvedValue('');

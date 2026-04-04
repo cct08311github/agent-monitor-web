@@ -6,6 +6,7 @@ const { getOpenClawConfig } = require('../config');
 const { ok } = require('../utils/apiResponse');
 
 const VALID_ID = /^[a-zA-Z0-9_-]+$/;
+const MAX_SESSION_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 function sanitizeId(value) {
     const str = String(value || '');
@@ -31,6 +32,23 @@ function readSessionContent(agentIdInput, sessionIdInput) {
     const filePath = getSessionFilePath(agentId, sessionId);
     if (!fs.existsSync(filePath)) {
         return { statusCode: 404, body: { success: false, error: 'not_found' } };
+    }
+
+    // Symlink guard: ensure resolved path stays within expected sessions dir
+    const sessionsDir = getSessionsDir(agentId);
+    try {
+        const realPath = fs.realpathSync(filePath);
+        if (!realPath.startsWith(sessionsDir + path.sep) && realPath !== sessionsDir) {
+            return { statusCode: 403, body: { success: false, error: 'forbidden' } };
+        }
+    } catch (_) {
+        return { statusCode: 404, body: { success: false, error: 'not_found' } };
+    }
+
+    // File size guard: prevent OOM from very large session files
+    const stat = fs.statSync(filePath);
+    if (stat.size > MAX_SESSION_FILE_BYTES) {
+        return { statusCode: 413, body: { success: false, error: 'session_too_large' } };
     }
 
     const content = fs.readFileSync(filePath, 'utf8');
@@ -73,6 +91,10 @@ function readSessions(agentIdInput) {
         let messageCount = 0;
         let lastTs = null;
         try {
+            const fstat = fs.statSync(filePath);
+            if (fstat.size > MAX_SESSION_FILE_BYTES) {
+                return { id: f.replace('.jsonl', ''), messageCount: -1, lastTs: null };
+            }
             const content = fs.readFileSync(filePath, 'utf8');
             const lines = content.split('\n').filter((l) => l.trim());
             messageCount = lines.length;
