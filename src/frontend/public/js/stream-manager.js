@@ -16,6 +16,7 @@
         var reconnectTimer = null;
         var attempt = 0;
         var pausedByVisibility = false;
+        var visibilityHandler = null;
 
         function clearReconnect() {
             if (reconnectTimer) {
@@ -35,8 +36,16 @@
             reconnectTimer = setTimeout(start, delay);
         }
 
+        function closeSource() {
+            if (source) {
+                try { source.close(); } catch (_) { }
+                source = null;
+            }
+        }
+
         function start() {
             if (closed) return;
+            closeSource();
             var base = window.__BASE_PATH || '';
             var fullUrl = (base && url.startsWith('/')) ? base + url : url;
             source = new EventSource(fullUrl);
@@ -65,7 +74,7 @@
                     settings.onError(event, source);
                 }
                 if (settings.autoReconnect) {
-                    try { source.close(); } catch (_) { }
+                    closeSource();
                     scheduleReconnect();
                 }
             };
@@ -74,19 +83,20 @@
         function close() {
             closed = true;
             clearReconnect();
-            if (source) {
-                try { source.close(); } catch (_) { }
-                source = null;
+            closeSource();
+            if (visibilityHandler) {
+                document.removeEventListener('visibilitychange', visibilityHandler);
+                visibilityHandler = null;
             }
         }
 
         // Page Visibility API: pause when hidden, reconnect when visible
         if (typeof document !== 'undefined' && settings.autoReconnect !== false) {
-            document.addEventListener('visibilitychange', function () {
+            visibilityHandler = function () {
                 if (document.hidden) {
-                    if (source && source.readyState !== 2) {
+                    if (source && source.readyState !== EventSource.CLOSED) {
                         pausedByVisibility = true;
-                        try { source.close(); } catch (_) { }
+                        closeSource();
                         clearReconnect();
                     }
                 } else if (pausedByVisibility && !closed) {
@@ -94,7 +104,8 @@
                     attempt = 0;
                     start();
                 }
-            });
+            };
+            document.addEventListener('visibilitychange', visibilityHandler);
         }
 
         start();
