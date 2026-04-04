@@ -1,9 +1,13 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Load .env from project root so BASE_PATH is available at build time
+  const env = loadEnv(mode, resolve(__dirname), '')
+
+  return {
   plugins: [vue()],
 
   // Vue source root
@@ -19,7 +23,7 @@ export default defineConfig({
   publicDir: resolve(__dirname, 'src/frontend/public'),
 
   // Sub-path for Tailscale serve or reverse proxy (e.g. /agent-monitor)
-  base: process.env.BASE_PATH ?? '/',
+  base: env.BASE_PATH ?? '/',
 
   resolve: {
     alias: {
@@ -38,4 +42,4 @@ export default defineConfig({
       },
     },
   },
-})
+}})
