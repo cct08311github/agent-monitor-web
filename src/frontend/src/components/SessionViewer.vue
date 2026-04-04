@@ -56,7 +56,7 @@ function truncateText(text: string): string {
       <!-- Header -->
       <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border-color);flex-shrink:0">
         <h3 style="margin:0;font-size:14px;font-weight:600">💬 {{ sessionId.slice(-12) }}</h3>
-        <button class="modal-close-btn ctrl-btn" @click="$emit('close')" aria-label="關閉">✕</button>
+        <button class="modal-close ctrl-btn" @click="$emit('close')" aria-label="關閉">✕</button>
       </div>
 
       <!-- Body -->

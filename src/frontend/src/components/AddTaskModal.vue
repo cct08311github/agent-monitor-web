@@ -66,7 +66,7 @@ async function handleSubmit() {
       <!-- Header -->
       <div class="modal-header">
         <h3>＋ 新增任務</h3>
-        <button class="modal-close-btn" aria-label="關閉" @click="emit('close')">✕</button>
+        <button class="modal-close" aria-label="關閉" @click="emit('close')">✕</button>
       </div>
 
       <!-- Body -->

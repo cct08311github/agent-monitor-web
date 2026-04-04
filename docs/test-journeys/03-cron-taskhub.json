@@ -5,7 +5,7 @@
   "credentials": {
     "USER": {
       "username": "admin",
-      "password": "openclaw2026",
+      "password": "${E2E_PASSWORD}",
       "role": "USER"
     }
   },
