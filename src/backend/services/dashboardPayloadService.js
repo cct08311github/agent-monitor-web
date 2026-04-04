@@ -238,7 +238,7 @@ function startGlobalPolling() {
 }
 
 function addSseClient(res) {
-    sseManager.addClient(res);
+    return sseManager.addClient(res);
 }
 
 function removeSseClient(res) {
