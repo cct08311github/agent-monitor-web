@@ -17,19 +17,19 @@ defineEmits<{
 </script>
 
 <template>
-  <div class="summary-cards">
+  <div class="summary-section">
     <!-- Active agents -->
     <div class="summary-card">
-      <div class="summary-card-label">活躍 Agent</div>
-      <div class="summary-card-value">
+      <div class="summary-label">活躍 Agent</div>
+      <div class="summary-value">
         {{ dashboard?.agents?.filter(a => a.status === 'active_executing' || a.status === 'active_recent').length ?? 0 }}
-        <span class="summary-card-sub">/ {{ dashboard?.agents?.length ?? 0 }}</span>
+        <span style="font-size:14px;color:var(--text-muted);font-weight:400">/ {{ dashboard?.agents?.length ?? 0 }}</span>
       </div>
     </div>
 
     <!-- Total cost -->
     <div class="summary-card">
-      <div class="summary-card-label">
+      <div class="summary-label">
         費用
         <select
           :value="costRange"
@@ -43,24 +43,24 @@ defineEmits<{
           <option value="all">全部</option>
         </select>
       </div>
-      <div class="summary-card-value" style="color:var(--green)">
+      <div class="summary-value cost">
         {{ formatTWD(totalCost, appState.currentExchangeRate) }}
       </div>
     </div>
 
     <!-- Cron jobs -->
     <div class="summary-card">
-      <div class="summary-card-label">Cron 任務</div>
-      <div class="summary-card-value">
+      <div class="summary-label">Cron 任務</div>
+      <div class="summary-value">
         {{ dashboard?.cron?.filter(c => c.enabled).length ?? 0 }}
-        <span class="summary-card-sub">啟用</span>
+        <span style="font-size:14px;color:var(--text-muted);font-weight:400">啟用</span>
       </div>
     </div>
 
     <!-- System CPU -->
     <div class="summary-card">
-      <div class="summary-card-label">CPU</div>
-      <div class="summary-card-value">
+      <div class="summary-label">CPU</div>
+      <div class="summary-value">
         {{ dashboard?.sys?.cpu != null ? dashboard.sys.cpu.toFixed(0) + '%' : '-' }}
       </div>
     </div>

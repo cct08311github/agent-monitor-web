@@ -387,15 +387,6 @@ body {
     overflow-y: auto;
 }
 
-.dtab-page {
-    display: none;
-}
-
-.dtab-page.active {
-    display: block;
-    animation: fadeIn 0.2s ease;
-}
-
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -462,13 +453,6 @@ body {
     color: white;
 }
 
-.sub-tab-content {
-    display: none;
-}
-
-.sub-tab-content.active {
-    display: block;
-}
 
 .section-header {
     display: flex;
