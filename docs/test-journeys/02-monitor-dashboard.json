@@ -2,7 +2,7 @@
   "journey": "monitor-dashboard",
   "prefix": "MON",
   "description": "Monitor tab — dashboard load, SSE status, agent grid, search, detail view, sub-tabs, modals, responsive layout, keyboard shortcut",
-  "baseUrl": "https://localhost:3001",
+  "baseUrl": "https://mac-mini.tailde842d.ts.net/agent-monitor",
   "credentials": {
     "USER": {
       "username": "admin",
@@ -46,7 +46,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "/login"
+          "url": "/agent-monitor/login"
         },
         {
           "action": "wait",
@@ -111,7 +111,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "/login"
+          "url": "/agent-monitor/login"
         },
         {
           "action": "wait",
@@ -163,7 +163,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "/login"
+          "url": "/agent-monitor/login"
         },
         {
           "action": "wait",
@@ -220,7 +220,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "/login"
+          "url": "/agent-monitor/login"
         },
         {
           "action": "wait",
@@ -296,7 +296,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "/login"
+          "url": "/agent-monitor/login"
         },
         {
           "action": "wait",
@@ -357,7 +357,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "/login"
+          "url": "/agent-monitor/login"
         },
         {
           "action": "wait",
@@ -425,7 +425,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "/login"
+          "url": "/agent-monitor/login"
         },
         {
           "action": "wait",
@@ -493,7 +493,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "/login"
+          "url": "/agent-monitor/login"
         },
         {
           "action": "wait",
@@ -554,7 +554,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "/login"
+          "url": "/agent-monitor/login"
         },
         {
           "action": "wait",
@@ -620,7 +620,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "/login"
+          "url": "/agent-monitor/login"
         },
         {
           "action": "wait",
@@ -674,7 +674,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "/login"
+          "url": "/agent-monitor/login"
         },
         {
           "action": "wait",
@@ -732,7 +732,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "/login"
+          "url": "/agent-monitor/login"
         },
         {
           "action": "wait",

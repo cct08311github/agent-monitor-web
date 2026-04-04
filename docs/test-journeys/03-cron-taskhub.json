@@ -1,7 +1,7 @@
 {
   "journey": "cron-taskhub",
   "description": "Cron job management and TaskHub task management within the Monitor tab",
-  "baseUrl": "https://localhost:3001",
+  "baseUrl": "https://mac-mini.tailde842d.ts.net/agent-monitor",
   "credentials": {
     "USER": {
       "username": "admin",
@@ -17,7 +17,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "{{baseUrl}}/",
+          "url": "/agent-monitor/",
           "description": "Start at root (assumes logged in)"
         },
         {
@@ -61,7 +61,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "{{baseUrl}}/",
+          "url": "/agent-monitor/",
           "description": "Start at root (assumes logged in)"
         },
         {
@@ -107,7 +107,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "{{baseUrl}}/",
+          "url": "/agent-monitor/",
           "description": "Start at root (assumes logged in)"
         },
         {
@@ -159,7 +159,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "{{baseUrl}}/",
+          "url": "/agent-monitor/",
           "description": "Start at root (assumes logged in)"
         },
         {
@@ -211,7 +211,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "{{baseUrl}}/",
+          "url": "/agent-monitor/",
           "description": "Start at root (assumes logged in)"
         },
         {
@@ -273,7 +273,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "{{baseUrl}}/",
+          "url": "/agent-monitor/",
           "description": "Start at root (assumes logged in)"
         },
         {
@@ -338,7 +338,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "{{baseUrl}}/",
+          "url": "/agent-monitor/",
           "description": "Start at root (assumes logged in)"
         },
         {
@@ -383,7 +383,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "{{baseUrl}}/",
+          "url": "/agent-monitor/",
           "description": "Start at root (assumes logged in)"
         },
         {
@@ -427,7 +427,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "{{baseUrl}}/",
+          "url": "/agent-monitor/",
           "description": "Start at root (assumes logged in)"
         },
         {
@@ -479,7 +479,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "{{baseUrl}}/",
+          "url": "/agent-monitor/",
           "description": "Start at root (assumes logged in)"
         },
         {
@@ -531,7 +531,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "{{baseUrl}}/",
+          "url": "/agent-monitor/",
           "description": "Start at root (assumes logged in)"
         },
         {
@@ -583,7 +583,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "{{baseUrl}}/",
+          "url": "/agent-monitor/",
           "description": "Start at root (assumes logged in)"
         },
         {
@@ -635,7 +635,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "{{baseUrl}}/",
+          "url": "/agent-monitor/",
           "description": "Start at root (assumes logged in)"
         },
         {
@@ -684,7 +684,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "{{baseUrl}}/",
+          "url": "/agent-monitor/",
           "description": "Start at root (assumes logged in)"
         },
         {
@@ -736,7 +736,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "{{baseUrl}}/",
+          "url": "/agent-monitor/",
           "description": "Start at root (assumes logged in)"
         },
         {
@@ -790,7 +790,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "{{baseUrl}}/",
+          "url": "/agent-monitor/",
           "description": "Start at root (assumes logged in)"
         },
         {
@@ -905,7 +905,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "{{baseUrl}}/",
+          "url": "/agent-monitor/",
           "description": "Start at root (assumes logged in)"
         },
         {
@@ -959,7 +959,7 @@
       "steps": [
         {
           "action": "navigate",
-          "url": "{{baseUrl}}/",
+          "url": "/agent-monitor/",
           "description": "Start at root (assumes logged in)"
         },
         {

@@ -1,7 +1,7 @@
 {
   "journey": "logs-chat",
   "description": "Logs streaming + Chat tab full user journey",
-  "baseUrl": "https://localhost:3001",
+  "baseUrl": "https://mac-mini.tailde842d.ts.net/agent-monitor",
   "credentials": {
     "USER": {
       "username": "admin",
@@ -14,19 +14,19 @@
     "steps": [
       {
         "action": "navigate",
-        "url": "{{baseUrl}}",
+        "url": "https://mac-mini.tailde842d.ts.net/agent-monitor",
         "description": "Open app"
       },
       {
         "action": "fill",
         "selector": "#username",
-        "value": "{{credentials.USER.username}}",
+        "value": "admin",
         "description": "Enter username"
       },
       {
         "action": "fill",
         "selector": "#password",
-        "value": "{{credentials.USER.password}}",
+        "value": "admin123",
         "description": "Enter password"
       },
       {
@@ -48,12 +48,16 @@
       "description": "Clicking the Logs desktop-tab renders the logs panel",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "click",
           "selector": ".desktop-tab:nth-child(3)",
           "description": "Click 日誌 tab"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".oc-log-terminal",
           "description": "Log terminal container is visible"
         },
@@ -79,12 +83,16 @@
       "description": "Clicking Start Monitoring opens SSE stream and appends log lines",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "click",
           "selector": ".desktop-tab:nth-child(3)",
           "description": "Navigate to Logs tab"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".oc-log-terminal",
           "description": "Terminal ready"
         },
@@ -94,7 +102,7 @@
           "description": "Click 開始監看 (Start Monitoring)"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".oc-log-badge.live",
           "description": "Status badge shows live state"
         },
@@ -126,12 +134,16 @@
       "description": "Typing in the filter input narrows visible log lines to matching entries",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "click",
           "selector": ".desktop-tab:nth-child(3)",
           "description": "Navigate to Logs tab"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".log-filter-input",
           "description": "Filter input is present"
         },
@@ -171,12 +183,16 @@
       "description": "Clicking the Error filter button shows only error-level log lines",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "click",
           "selector": ".desktop-tab:nth-child(3)",
           "description": "Navigate to Logs tab"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".log-filter-btn",
           "description": "Filter buttons are present"
         },
@@ -214,6 +230,10 @@
       "description": "Scrolling up pauses auto-scroll; clicking the new-messages button resumes it",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "click",
           "selector": ".desktop-tab:nth-child(3)",
           "description": "Navigate to Logs tab"
@@ -224,7 +244,7 @@
           "description": "Start streaming"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".oc-log-badge.live",
           "description": "Streaming active"
         },
@@ -276,12 +296,16 @@
       "description": "The log terminal is scrollable and scroll position is maintained",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "click",
           "selector": ".desktop-tab:nth-child(3)",
           "description": "Navigate to Logs tab"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".oc-log-terminal",
           "description": "Terminal container is present"
         },
@@ -315,12 +339,16 @@
       "description": "Clicking the Chat desktop-tab renders the chat panel",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "click",
           "selector": ".desktop-tab:nth-child(4)",
           "description": "Click 聊天室 tab"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".chat-tab-page",
           "description": "Chat tab page is rendered"
         },
@@ -351,12 +379,16 @@
       "description": "The agent pill list includes at least the 'main' agent",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "click",
           "selector": ".desktop-tab:nth-child(4)",
           "description": "Navigate to Chat tab"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".chat-agent-pills",
           "description": "Agent pills container loaded"
         },
@@ -383,12 +415,16 @@
       "description": "Clicking a different agent pill switches selection and clears message history",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "click",
           "selector": ".desktop-tab:nth-child(4)",
           "description": "Navigate to Chat tab"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".chat-agent-pills",
           "description": "Agent pills loaded"
         },
@@ -428,12 +464,16 @@
       "description": "Entering text and pressing the send button dispatches the message",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "click",
           "selector": ".desktop-tab:nth-child(4)",
           "description": "Navigate to Chat tab"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".chat-page-input",
           "description": "Chat input is ready"
         },
@@ -454,7 +494,7 @@
           "description": "Click send button"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".chat-msg.user",
           "description": "User message appears in log"
         },
@@ -476,12 +516,16 @@
       "description": "After sending, both user and agent messages appear in the message log",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "click",
           "selector": ".desktop-tab:nth-child(4)",
           "description": "Navigate to Chat tab"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".chat-page-input",
           "description": "Chat input ready"
         },
@@ -497,12 +541,12 @@
           "description": "Send the message"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".chat-msg.user",
           "description": "User message appears"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".chat-msg.agent, .chat-msg.error",
           "timeout": 15000,
           "description": "Agent reply or error appears (API call may be slow)"
@@ -529,17 +573,21 @@
       "description": "Clicking the Chat action on an agent card opens the ChatModal overlay",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "click",
           "selector": ".desktop-tab:first-child",
           "description": "Navigate to Monitor tab"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".main-content",
           "description": "Monitor content loaded"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".agent-card, .agent-card-focus, .agent-item",
           "timeout": 8000,
           "description": "Wait for at least one agent card to render"
@@ -551,7 +599,7 @@
           "description": "Click chat button on first visible agent card"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".modal-overlay",
           "description": "Chat modal overlay appears"
         },

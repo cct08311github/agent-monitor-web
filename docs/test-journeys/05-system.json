@@ -1,7 +1,7 @@
 {
   "journey": "system",
   "description": "System tab — resource metrics, cost charts, model usage, and responsive behaviour",
-  "baseUrl": "https://localhost:3001",
+  "baseUrl": "https://mac-mini.tailde842d.ts.net/agent-monitor",
   "credentials": {
     "USER": {
       "username": "admin",
@@ -14,19 +14,19 @@
     "steps": [
       {
         "action": "navigate",
-        "url": "{{baseUrl}}",
+        "url": "https://mac-mini.tailde842d.ts.net/agent-monitor",
         "description": "Open app"
       },
       {
         "action": "fill",
         "selector": "#username",
-        "value": "{{credentials.USER.username}}",
+        "value": "admin",
         "description": "Enter username"
       },
       {
         "action": "fill",
         "selector": "#password",
-        "value": "{{credentials.USER.password}}",
+        "value": "admin123",
         "description": "Enter password"
       },
       {
@@ -48,12 +48,16 @@
       "description": "Clicking the System/Cost desktop-tab renders the system layout",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "click",
           "selector": ".desktop-tab:nth-child(2)",
           "description": "Click 📊 系統/費用 tab"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".system-layout",
           "description": "System layout container is rendered"
         },
@@ -79,12 +83,16 @@
       "description": "CPU, MEM, and Disk metric cards appear with percentage values",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "click",
           "selector": ".desktop-tab:nth-child(2)",
           "description": "Navigate to System tab"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".sys-cards",
           "description": "System cards container rendered"
         },
@@ -130,12 +138,16 @@
       "description": "The total cost summary is shown with a currency value",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "click",
           "selector": ".desktop-tab:nth-child(2)",
           "description": "Navigate to System tab"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".cost-summary",
           "description": "Cost summary section rendered"
         },
@@ -167,12 +179,16 @@
       "description": "Canvas-based sparkline (system history) and bar charts (cost history, token spenders) are rendered",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "click",
           "selector": ".desktop-tab:nth-child(2)",
           "description": "Navigate to System tab"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".system-layout",
           "description": "System layout loaded"
         },
@@ -206,12 +222,16 @@
       "description": "Each section within the system tab has its section-header with the correct title",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "click",
           "selector": ".desktop-tab:nth-child(2)",
           "description": "Navigate to System tab"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".system-layout",
           "description": "System layout loaded"
         },
@@ -249,12 +269,16 @@
       "description": "The model usage list section is present; when data is available rows show model name and stats",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "click",
           "selector": ".desktop-tab:nth-child(2)",
           "description": "Navigate to System tab"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".model-usage-list",
           "description": "Model usage list container is present"
         },
@@ -297,9 +321,13 @@
       "description": "GET /api/read/health returns a 200 response confirming the backend is up",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "request",
           "method": "GET",
-          "url": "{{baseUrl}}/api/read/health",
+          "url": "https://mac-mini.tailde842d.ts.net/agent-monitor/api/read/health",
           "expectedStatus": 200,
           "description": "Health endpoint returns HTTP 200"
         },
@@ -311,11 +339,11 @@
         },
         {
           "action": "navigate",
-          "url": "{{baseUrl}}",
+          "url": "/agent-monitor",
           "description": "Return to app after direct API check"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".desktop-tabs",
           "description": "Dashboard reloaded"
         },
@@ -331,12 +359,16 @@
       "description": "Each sys-card progress fill width matches the displayed percentage",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "click",
           "selector": ".desktop-tab:nth-child(2)",
           "description": "Navigate to System tab"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".sys-cards",
           "description": "System cards loaded"
         },
@@ -379,6 +411,10 @@
       "description": "At mobile viewport size the system tab content stacks and remains readable",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "resize",
           "width": 375,
           "height": 667,
@@ -386,19 +422,19 @@
         },
         {
           "action": "navigate",
-          "url": "{{baseUrl}}",
+          "url": "/agent-monitor",
           "description": "Reload at mobile viewport"
         },
         {
           "action": "fill",
           "selector": "#username",
-          "value": "{{credentials.USER.username}}",
+          "value": "admin",
           "description": "Login at mobile viewport"
         },
         {
           "action": "fill",
           "selector": "#password",
-          "value": "{{credentials.USER.password}}",
+          "value": "admin123",
           "description": "Enter password"
         },
         {
@@ -407,7 +443,7 @@
           "description": "Submit login"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".desktop-tabs",
           "description": "Dashboard loaded"
         },
@@ -417,7 +453,7 @@
           "description": "Navigate to System tab at mobile size"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".system-layout",
           "description": "System layout visible"
         },
@@ -449,19 +485,23 @@
       "description": "The /api/read/history endpoint returns success and expected data shape",
       "steps": [
         {
+          "action": "navigate",
+          "url": "/agent-monitor/"
+        },
+        {
           "action": "click",
           "selector": ".desktop-tab:nth-child(2)",
           "description": "Navigate to System tab"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".system-layout",
           "description": "System layout loaded"
         },
         {
           "action": "request",
           "method": "GET",
-          "url": "{{baseUrl}}/api/read/history",
+          "url": "https://mac-mini.tailde842d.ts.net/agent-monitor/api/read/history",
           "withCredentials": true,
           "expectedStatus": 200,
           "description": "History API returns 200"
@@ -479,11 +519,11 @@
         },
         {
           "action": "navigate",
-          "url": "{{baseUrl}}",
+          "url": "/agent-monitor",
           "description": "Navigate back to app"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".desktop-tabs",
           "description": "Dashboard reloaded"
         },
@@ -493,7 +533,7 @@
           "description": "Re-open System tab to confirm charts re-render"
         },
         {
-          "action": "waitForSelector",
+          "action": "wait",
           "selector": ".system-layout",
           "description": "System layout re-rendered"
         },
