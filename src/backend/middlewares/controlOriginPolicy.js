@@ -36,12 +36,11 @@ function isAllowedHost(value) {
         }
     }
 
-    // Check prefixes for private ranges (must be exact prefix match)
+    // Check prefixes for private IP ranges — reject hostnames like 10.attacker.com
     for (const prefix of ALLOWED_PREFIXES) {
         if (hostOnly.startsWith(prefix)) {
-            // Ensure it's not bypassing (e.g., 100.0.0.1.ts.net.attacker.com)
-            // If we've already passed suffix check, and there's no dot before the prefix in suspicious positions
-            return true;
+            const remainder = hostOnly.slice(prefix.length);
+            if (/^[\d.]+$/.test(remainder)) return true;
         }
     }
 
