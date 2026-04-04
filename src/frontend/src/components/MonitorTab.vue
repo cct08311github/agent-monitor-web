@@ -150,8 +150,8 @@ const connectionClass = computed(() => connectionStatus.value)
         :agents="activeAgents"
         :get-agent-cost="getAgentCost"
         @agent-click="showAgentDetail"
-        @agent-chat="showAgentDetail"
-        @agent-model-switch="(id) => showAgentDetail(id)"
+        @agent-chat="(id: string) => emit('agent-chat', id)"
+        @agent-model-switch="(id: string, model: string) => emit('agent-model-switch', id, model)"
       />
 
       <!-- Periphery: idle/dormant agents -->
