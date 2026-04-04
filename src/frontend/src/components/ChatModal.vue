@@ -136,7 +136,7 @@ onMounted(async () => {
       </div>
 
       <!-- Input area -->
-      <div class="chat-input-area" style="padding: 8px; border-top: 1px solid var(--border)">
+      <div class="chat-input-row" style="padding: 8px; border-top: 1px solid var(--border)">
         <textarea
           v-model="inputText"
           placeholder="輸入訊息..."

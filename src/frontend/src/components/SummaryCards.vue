@@ -33,7 +33,7 @@ defineEmits<{
         費用
         <select
           :value="costRange"
-          class="cost-range-select"
+          class="cost-range-selector"
           style="font-size:11px;margin-left:4px;background:transparent;border:none;color:inherit;cursor:pointer"
           @change="$emit('update:costRange', ($event.target as HTMLSelectElement).value as CostRange)"
         >

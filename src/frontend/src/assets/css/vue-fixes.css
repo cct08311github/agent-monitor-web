@@ -3,17 +3,6 @@
    Fills gaps between Vue components and legacy CSS
    ══════════════════════════════════════════════════ */
 
-/* ── Monitor Tab Container ────────────────────── */
-.monitor-tab {
-  /* No special styles needed, acts as v-show container */
-}
-
-/* ── System / Logs Tab Containers ─────────────── */
-.system-tab,
-.logs-tab {
-  /* Neutral containers for v-show */
-}
-
 /* ── Agent Search ─────────────────────────────── */
 .agent-search-wrap {
   padding: 8px 0 16px;
@@ -96,6 +85,9 @@
   color: #cdd6f4;
 }
 
+/* Override ux-patterns.css: that file uses opacity:0/pointer-events:none as default hide,
+   which conflicts with Vue v-show (which uses display:none/block). Since v-show manages
+   visibility, we reset opacity and pointer-events so the button is fully visible when shown. */
 .log-scroll-bottom-btn {
   position: sticky;
   bottom: 8px;
@@ -110,6 +102,8 @@
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
   z-index: 5;
+  opacity: 1;
+  pointer-events: auto;
   transition: opacity 0.2s, transform 0.2s;
 }
 
@@ -161,30 +155,11 @@
   color: var(--text-muted);
 }
 
-/* ── Empty State Enhancement ──────────────────── */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  text-align: center;
-}
-
-.empty-state-icon {
-  font-size: 48px;
-  opacity: 0.3;
-  margin-bottom: 16px;
-}
-
-.empty-state-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 8px;
-}
-
-.empty-state-desc {
-  font-size: 13px;
-  color: var(--text-muted);
+/* ── Model Usage Bar ──────────────────────────── */
+.model-usage-bar {
+  height: 4px;
+  background: var(--accent);
+  border-radius: 2px;
+  margin-top: 4px;
+  opacity: 0.6;
 }
