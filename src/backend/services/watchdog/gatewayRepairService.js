@@ -15,7 +15,9 @@ function createRepairService({ state, CONFIG, OPENCLAW_PATH, OPENCLAW_CONFIG_PAT
         const diag = { reason, ts: fmtTime() };
 
         try {
-            const { stdout: portInfo } = await execPromise(`lsof -i :${GATEWAY_PORT} 2>/dev/null || echo "port_not_in_use"`, { timeout: 5_000 });
+            const safePort = parseInt(GATEWAY_PORT, 10);
+            if (!Number.isInteger(safePort) || safePort < 1 || safePort > 65535) throw new Error('invalid port');
+            const { stdout: portInfo } = await execPromise(`lsof -i :${safePort} 2>/dev/null || echo "port_not_in_use"`, { timeout: 5_000 });
             diag.portInfo = portInfo.trim().slice(0, 300);
         } catch (e) { diag.portInfo = `check_failed: ${e.message}`; }
 
