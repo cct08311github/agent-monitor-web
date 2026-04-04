@@ -7,6 +7,8 @@ import AgentFocus from '@/components/AgentFocus.vue'
 import AgentPeriphery from '@/components/AgentPeriphery.vue'
 import SubAgentGrid from '@/components/SubAgentGrid.vue'
 import SummaryCards from '@/components/SummaryCards.vue'
+import CronTab from '@/components/CronTab.vue'
+import TaskHubTab from '@/components/TaskHubTab.vue'
 
 const emit = defineEmits<{
   (e: 'agent-click', agentId: string): void
@@ -176,22 +178,14 @@ const connectionClass = computed(() => connectionStatus.value)
       <SubAgentGrid :subagents="subagentsAsRecords" />
     </template>
 
-    <!-- Cron tab (Phase 3 placeholder) -->
+    <!-- Cron tab -->
     <template v-else-if="activeSubTab === 'cron'">
-      <div class="placeholder-panel">
-        <div class="placeholder-icon">⏰</div>
-        <div class="placeholder-title">Cron Jobs</div>
-        <div class="placeholder-desc">Phase 3 實作中</div>
-      </div>
+      <CronTab />
     </template>
 
-    <!-- TaskHub tab (Phase 3 placeholder) -->
+    <!-- TaskHub tab -->
     <template v-else-if="activeSubTab === 'taskhub'">
-      <div class="placeholder-panel">
-        <div class="placeholder-icon">📋</div>
-        <div class="placeholder-title">TaskHub</div>
-        <div class="placeholder-desc">Phase 3 實作中</div>
-      </div>
+      <TaskHubTab />
     </template>
   </div>
 </template>

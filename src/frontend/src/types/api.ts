@@ -21,10 +21,14 @@ export interface CronJob {
   id: string
   name: string
   enabled: boolean
-  next: number
-  status: string
-  lastRunAt?: number
-  lastError?: string
+  schedule?: { expr: string }
+  agentId?: string
+  description?: string
+  state?: {
+    lastRunAtMs?: number
+    nextRunAtMs?: number
+    lastStatus?: string // 'ok' | 'error' | 'unknown'
+  }
 }
 
 export interface SubAgent {
