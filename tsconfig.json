@@ -1,0 +1,45 @@
+{
+  "compilerOptions": {
+    // Language / emit
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+
+    // Strict checks
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    // Interop
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+
+    // Vue support
+    "jsx": "preserve",
+    "types": ["vite/client"],
+
+    // Path alias — mirrors vite.config.ts resolve.alias
+    // baseUrl + paths are deprecated in TS 6 but still required for IDE path resolution.
+    // Vite itself handles the actual alias at build time; this only affects tsc/vue-tsc.
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/frontend/src/*"]
+    }
+  },
+  "include": [
+    "src/frontend/src/**/*.ts",
+    "src/frontend/src/**/*.vue",
+    "src/frontend/src/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests",
+    "src/backend"
+  ]
+}
