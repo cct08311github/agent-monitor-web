@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    // Node.js context for vite.config.ts
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+
+    // Allow __dirname in ESM-style config files used by Vite
+    "types": ["node"]
+  },
+  "include": [
+    "vite.config.ts"
+  ]
+}

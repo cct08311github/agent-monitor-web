@@ -6,6 +6,9 @@
   "scripts": {
     "start": "node --env-file=.env server.js",
     "dev": "nodemon --env-file=.env server.js",
+    "dev:vue": "vite",
+    "build:vue": "vue-tsc --noEmit && vite build",
+    "preview:vue": "vite preview",
     "test": "jest --forceExit --detectOpenHandles",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
@@ -21,13 +24,20 @@
     "express": "^4.18.2",
     "express-rate-limit": "^8.3.2",
     "helmet": "^8.1.0",
-    "node-fetch": "^2.6.9"
+    "node-fetch": "^2.6.9",
+    "vue": "^3.5.32",
+    "vue-router": "^5.0.4"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
+    "@vitejs/plugin-vue": "^6.0.5",
+    "@vue/tsconfig": "^0.9.1",
     "jest": "^30.2.0",
     "nodemon": "^3.0.1",
-    "supertest": "^7.2.2"
+    "supertest": "^7.2.2",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.3",
+    "vue-tsc": "^3.2.6"
   },
   "keywords": [
     "openclaw",
