@@ -17,3 +17,7 @@ playwright/.cache/
 .playwright-mcp/
 .claude/
 ecosystem.config.js
+# Playwright MCP screenshots
+*.png
+# Old Vite build output served by backend
+src/frontend/public/assets/

@@ -92,29 +92,29 @@ const connectionClass = computed(() => connectionStatus.value)
     />
 
     <!-- Sub-tab navigation -->
-    <div class="sub-tab-nav">
+    <div class="sub-tabs">
       <button
-        :class="['sub-tab-btn', { active: activeSubTab === 'agents' }]"
+        :class="['sub-tab', { active: activeSubTab === 'agents' }]"
         @click="activeSubTab = 'agents'"
       >
         Agents
-        <span class="badge">{{ dashboard?.agents?.length ?? 0 }}</span>
+        <span class="tab-badge">{{ dashboard?.agents?.length ?? 0 }}</span>
       </button>
       <button
-        :class="['sub-tab-btn', { active: activeSubTab === 'subagents' }]"
+        :class="['sub-tab', { active: activeSubTab === 'subagents' }]"
         @click="activeSubTab = 'subagents'"
       >
         Sub-Agents
-        <span class="badge">{{ subagents.length }}</span>
+        <span class="tab-badge">{{ subagents.length }}</span>
       </button>
       <button
-        :class="['sub-tab-btn', { active: activeSubTab === 'cron' }]"
+        :class="['sub-tab', { active: activeSubTab === 'cron' }]"
         @click="activeSubTab = 'cron'"
       >
         Cron
       </button>
       <button
-        :class="['sub-tab-btn', { active: activeSubTab === 'taskhub' }]"
+        :class="['sub-tab', { active: activeSubTab === 'taskhub' }]"
         @click="activeSubTab = 'taskhub'"
       >
         TaskHub
@@ -138,7 +138,7 @@ const connectionClass = computed(() => connectionStatus.value)
       <div class="agent-search-wrap">
         <input
           v-model="searchQuery"
-          class="agent-search"
+          class="search-input"
           type="search"
           placeholder="搜尋 Agent..."
           aria-label="搜尋 Agent"

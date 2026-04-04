@@ -6,7 +6,7 @@
   "credentials": {
     "USER": {
       "username": "admin",
-      "password": "admin123",
+      "password": "${E2E_PASSWORD}",
       "role": "USER"
     }
   },
@@ -25,7 +25,7 @@
       {
         "action": "fill",
         "selector": "input#password",
-        "value": "admin123"
+        "value": "${E2E_PASSWORD}"
       },
       {
         "action": "click",
@@ -61,7 +61,7 @@
         {
           "action": "fill",
           "selector": "input#password",
-          "value": "admin123"
+          "value": "${E2E_PASSWORD}"
         },
         {
           "action": "click",
@@ -126,7 +126,7 @@
         {
           "action": "fill",
           "selector": "input#password",
-          "value": "admin123"
+          "value": "${E2E_PASSWORD}"
         },
         {
           "action": "click",
@@ -178,7 +178,7 @@
         {
           "action": "fill",
           "selector": "input#password",
-          "value": "admin123"
+          "value": "${E2E_PASSWORD}"
         },
         {
           "action": "click",
@@ -235,7 +235,7 @@
         {
           "action": "fill",
           "selector": "input#password",
-          "value": "admin123"
+          "value": "${E2E_PASSWORD}"
         },
         {
           "action": "click",
@@ -311,7 +311,7 @@
         {
           "action": "fill",
           "selector": "input#password",
-          "value": "admin123"
+          "value": "${E2E_PASSWORD}"
         },
         {
           "action": "click",
@@ -372,7 +372,7 @@
         {
           "action": "fill",
           "selector": "input#password",
-          "value": "admin123"
+          "value": "${E2E_PASSWORD}"
         },
         {
           "action": "click",
@@ -440,7 +440,7 @@
         {
           "action": "fill",
           "selector": "input#password",
-          "value": "admin123"
+          "value": "${E2E_PASSWORD}"
         },
         {
           "action": "click",
@@ -508,7 +508,7 @@
         {
           "action": "fill",
           "selector": "input#password",
-          "value": "admin123"
+          "value": "${E2E_PASSWORD}"
         },
         {
           "action": "click",
@@ -569,7 +569,7 @@
         {
           "action": "fill",
           "selector": "input#password",
-          "value": "admin123"
+          "value": "${E2E_PASSWORD}"
         },
         {
           "action": "click",
@@ -635,7 +635,7 @@
         {
           "action": "fill",
           "selector": "input#password",
-          "value": "admin123"
+          "value": "${E2E_PASSWORD}"
         },
         {
           "action": "click",
@@ -689,7 +689,7 @@
         {
           "action": "fill",
           "selector": "input#password",
-          "value": "admin123"
+          "value": "${E2E_PASSWORD}"
         },
         {
           "action": "click",
@@ -747,7 +747,7 @@
         {
           "action": "fill",
           "selector": "input#password",
-          "value": "admin123"
+          "value": "${E2E_PASSWORD}"
         },
         {
           "action": "click",

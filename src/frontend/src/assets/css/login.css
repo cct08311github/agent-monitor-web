@@ -100,7 +100,6 @@ input::placeholder { color: #64748b; }
 .btn-login:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .error-msg {
-    display: none;
     margin-top: 14px;
     padding: 10px 14px;
     background: rgba(239,68,68,0.12);

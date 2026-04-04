@@ -107,7 +107,7 @@ async function handleDelete() {
         <h3>
           {{ DOMAIN_EMOJI[task.domain] || '📋' }} {{ task.title }}
         </h3>
-        <button class="modal-close-btn" aria-label="關閉" @click="emit('close')">✕</button>
+        <button class="modal-close" aria-label="關閉" @click="emit('close')">✕</button>
       </div>
 
       <!-- Body -->

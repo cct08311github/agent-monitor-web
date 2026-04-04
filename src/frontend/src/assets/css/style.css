@@ -387,15 +387,6 @@ body {
     overflow-y: auto;
 }
 
-.dtab-page {
-    display: none;
-}
-
-.dtab-page.active {
-    display: block;
-    animation: fadeIn 0.2s ease;
-}
-
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -462,13 +453,6 @@ body {
     color: white;
 }
 
-.sub-tab-content {
-    display: none;
-}
-
-.sub-tab-content.active {
-    display: block;
-}
 
 .section-header {
     display: flex;
@@ -1201,7 +1185,7 @@ body {
 
 /* ========== Dedicated Chat Tab Page ========== */
 .chat-tab-page {
-    display: none;
+    display: flex;
     flex-direction: column;
     /* Desktop: fill remaining space below header within main-content */
     height: calc(100vh - var(--header-height) - 60px);
@@ -1209,10 +1193,6 @@ body {
     padding: 0;
     /* Compensate for main-content padding */
     margin: -8px -24px -24px;
-}
-
-.chat-tab-page.active-tab {
-    display: flex;
 }
 
 /* Agent selector pill bar */

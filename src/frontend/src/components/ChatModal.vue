@@ -120,7 +120,7 @@ onMounted(async () => {
       <!-- Header -->
       <div class="modal-header">
         <span>{{ getAgentEmoji(agentId) }} <strong>{{ agentId }}</strong></span>
-        <button class="modal-close-btn" @click="$emit('close')">✕</button>
+        <button class="modal-close" @click="$emit('close')">✕</button>
       </div>
 
       <!-- Message log -->
@@ -136,7 +136,7 @@ onMounted(async () => {
       </div>
 
       <!-- Input area -->
-      <div class="chat-input-area" style="padding: 8px; border-top: 1px solid var(--border)">
+      <div class="chat-input-row" style="padding: 8px; border-top: 1px solid var(--border)">
         <textarea
           v-model="inputText"
           placeholder="輸入訊息..."

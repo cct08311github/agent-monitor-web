@@ -111,4 +111,5 @@ const activeDesktopTab = computed<DesktopTab>(() => {
 @import './assets/css/a11y.css';
 @import './assets/css/overhaul.css';
 @import './assets/css/ux-patterns.css';
+@import './assets/css/vue-fixes.css';
 </style>

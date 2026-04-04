@@ -65,8 +65,13 @@ async function handleLogin() {
 <template>
   <div class="login-container">
     <div class="login-card">
-      <div class="login-logo">🐾</div>
-      <h1>OpenClaw Watch Pro</h1>
+      <div class="logo">
+        <div class="logo-icon">🐾</div>
+        <div class="logo-text">
+          <h1>OpenClaw Watch Pro</h1>
+          <p>Agent Monitor Dashboard</p>
+        </div>
+      </div>
       <form @submit.prevent="handleLogin">
         <div class="form-group">
           <label for="username">使用者名稱</label>
@@ -92,7 +97,7 @@ async function handleLogin() {
           />
         </div>
         <div v-if="errorMsg" class="error-msg" role="alert">{{ errorMsg }}</div>
-        <button type="submit" :disabled="loading">
+        <button type="submit" class="btn-login" :disabled="loading">
           {{ loading ? '登入中...' : '登入' }}
         </button>
       </form>
@@ -103,4 +108,11 @@ async function handleLogin() {
 <style scoped>
 @import '../assets/css/theme.css';
 @import '../assets/css/login.css';
+
+.login-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
 </style>
