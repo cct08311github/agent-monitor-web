@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
 import { api } from '@/composables/useApi'
+import { showToast } from '@/composables/useToast'
 import { getAgentEmoji } from '@/utils/format'
 import { appState } from '@/stores/appState'
 
@@ -102,8 +103,7 @@ async function send(): Promise<void> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : '送出失敗'
     messages.value.push({ type: 'error', text: `錯誤：${msg}` })
-    // TODO: Phase 4 — show toast notification
-    console.log('[ChatTab] send error:', msg)
+    showToast('❌ ' + msg, 'error')
   } finally {
     sending.value = false
     scrollToBottom()

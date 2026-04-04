@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useTheme } from '@/composables/useTheme'
 import { useAuth } from '@/composables/useAuth'
 import { appState } from '@/stores/appState'
+import ToastContainer from '@/components/ToastContainer.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -94,6 +96,10 @@ const activeDesktopTab = computed<DesktopTab>(() => {
     </header>
 
     <router-view />
+
+    <!-- Global UI overlays -->
+    <ToastContainer />
+    <ConfirmDialog />
   </div>
 </template>
 

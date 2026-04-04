@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { api } from '@/composables/useApi'
+import { showToast } from '@/composables/useToast'
 
 const props = defineProps<{
   defaultDomain: string
@@ -33,8 +34,7 @@ watch(() => props.defaultDomain, (d) => {
 
 async function handleSubmit() {
   if (!title.value.trim()) {
-    // TODO: replace with toast notification
-    console.log('[AddTaskModal] 標題不可空白')
+    showToast('標題不可空白', 'error')
     return
   }
   submitting.value = true
@@ -50,12 +50,10 @@ async function handleSubmit() {
 
     const data = await api.post('/api/taskhub/tasks', body) as any
     if (!data.success) throw new Error(data.error)
-    // TODO: replace with toast notification
-    console.log('[AddTaskModal] 任務已建立')
+    showToast('✅ 任務已建立', 'success')
     emit('created')
   } catch (e: any) {
-    // TODO: replace with toast notification
-    console.error('[AddTaskModal] 建立失敗:', e.message)
+    showToast('❌ 建立失敗: ' + e.message, 'error')
   } finally {
     submitting.value = false
   }

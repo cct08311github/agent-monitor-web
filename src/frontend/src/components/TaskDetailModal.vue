@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { showToast } from '@/composables/useToast'
+import { confirm } from '@/composables/useConfirm'
 
 const props = defineProps<{
   task: any
@@ -66,8 +68,7 @@ watch(() => props.task, (t) => resetForm(t), { immediate: false })
 
 function handleSave() {
   if (!title.value.trim()) {
-    // TODO: replace with toast notification
-    console.log('[TaskDetailModal] 標題不可空白')
+    showToast('標題不可空白', 'error')
     return
   }
   const body: Record<string, unknown> = {
@@ -91,8 +92,9 @@ function handleSave() {
   emit('save', domain, props.task.id, body)
 }
 
-function handleDelete() {
-  if (!window.confirm(`確認刪除「${props.task.title}」？此操作無法復原。`)) return
+async function handleDelete() {
+  const ok = await confirm({ type: 'danger', title: '刪除任務', message: `確認刪除「${props.task.title}」？此操作無法復原。`, confirmLabel: '刪除' })
+  if (!ok) return
   emit('delete', props.task.domain, props.task.id)
 }
 </script>

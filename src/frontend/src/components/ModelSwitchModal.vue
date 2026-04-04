@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { api } from '@/composables/useApi'
+import { showToast } from '@/composables/useToast'
+import { confirm as showConfirm } from '@/composables/useConfirm'
 
 // ---------------------------------------------------------------------------
 // Props & emits
@@ -44,24 +46,23 @@ async function confirm(): Promise<void> {
 
   // Validate model name format
   if (!/^[A-Za-z0-9._/-]+$/.test(selectedModel.value)) {
-    // TODO: Phase 4 — show toast notification
-    console.log('[ModelSwitchModal] invalid model name:', selectedModel.value)
+    showToast('❌ 無效的模型名稱', 'error')
     return
   }
 
   // Validate agent ID
   if (!/^[A-Za-z0-9_-]+$/.test(props.agentId)) {
-    console.log('[ModelSwitchModal] invalid agentId:', props.agentId)
+    showToast('❌ 無效的 Agent ID', 'error')
     return
   }
 
-  if (
-    !window.confirm(
-      `確認將 ${props.agentId} 的模型從\n「${props.currentModel || '未知'}」\n切換為\n「${selectedModel.value}」？`,
-    )
-  ) {
-    return
-  }
+  const ok = await showConfirm({
+    type: 'warning',
+    title: '切換模型',
+    message: `確認將 ${props.agentId} 的模型從「${props.currentModel || '未知'}」切換為「${selectedModel.value}」？`,
+    confirmLabel: '切換',
+  })
+  if (!ok) return
 
   switching.value = true
   try {
@@ -74,8 +75,7 @@ async function confirm(): Promise<void> {
     emit('close')
   } catch (err) {
     const msg = err instanceof Error ? err.message : '切換失敗'
-    // TODO: Phase 4 — show toast notification
-    console.log('[ModelSwitchModal] confirm error:', msg)
+    showToast('❌ 切換失敗: ' + msg, 'error')
   } finally {
     switching.value = false
   }

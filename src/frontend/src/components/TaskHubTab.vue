@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { api } from '@/composables/useApi'
+import { showToast } from '@/composables/useToast'
 import TaskDetailModal from '@/components/TaskDetailModal.vue'
 import AddTaskModal from '@/components/AddTaskModal.vue'
 
@@ -117,7 +118,6 @@ async function fetchStats() {
     if (!data.success) return
     stats.value = data.stats
   } catch (e: any) {
-    // TODO: replace with toast notification
     console.error('[TaskHubTab] stats error:', e.message)
   }
 }
@@ -135,16 +135,14 @@ async function fetchTasks() {
     if (!data.success) throw new Error(data.error)
     tasks.value = data.tasks
   } catch (e: any) {
-    // TODO: replace with toast notification
-    console.error('[TaskHubTab] fetch error:', e.message)
+    showToast('❌ 載入失敗: ' + e.message, 'error')
   } finally {
     loading.value = false
   }
 }
 
 async function quickUpdateStatus(taskDomain: string, id: string, newStatus: string) {
-  // TODO: replace with toast notification
-  console.log(`[TaskHubTab] 更新狀態 → ${STATUS_MAP[newStatus]?.label || newStatus}`)
+  showToast('更新狀態...', 'info')
   try {
     const data = await api.patch(`/api/taskhub/tasks/${taskDomain}/${id}`, { status: newStatus }) as any
     if (!data.success) throw new Error(data.error)
@@ -152,7 +150,7 @@ async function quickUpdateStatus(taskDomain: string, id: string, newStatus: stri
     if (idx >= 0) tasks.value[idx] = data.task
     fetchStats()
   } catch (e: any) {
-    console.error('[TaskHubTab] 更新失敗:', e.message)
+    showToast('❌ 更新失敗: ' + e.message, 'error')
   }
 }
 
@@ -160,14 +158,13 @@ async function onSaveTask(taskDomain: string, id: string, body: Record<string, u
   try {
     const data = await api.patch(`/api/taskhub/tasks/${taskDomain}/${id}`, body) as any
     if (!data.success) throw new Error(data.error)
-    // TODO: replace with toast notification
-    console.log('[TaskHubTab] 已儲存')
+    showToast('✅ 已儲存', 'success')
     const idx = tasks.value.findIndex((t) => t.id === id)
     if (idx >= 0) tasks.value[idx] = data.task
     editingTask.value = null
     fetchStats()
   } catch (e: any) {
-    console.error('[TaskHubTab] 儲存失敗:', e.message)
+    showToast('❌ 儲存失敗: ' + e.message, 'error')
   }
 }
 
@@ -175,13 +172,12 @@ async function onDeleteTask(taskDomain: string, id: string) {
   try {
     const data = await api.del(`/api/taskhub/tasks/${taskDomain}/${id}`) as any
     if (!data.success) throw new Error(data.error)
-    // TODO: replace with toast notification
-    console.log('[TaskHubTab] 任務已刪除')
+    showToast('✅ 任務已刪除', 'success')
     tasks.value = tasks.value.filter((t) => !(t.id === id && t.domain === taskDomain))
     editingTask.value = null
     fetchStats()
   } catch (e: any) {
-    console.error('[TaskHubTab] 刪除失敗:', e.message)
+    showToast('❌ 刪除失敗: ' + e.message, 'error')
   }
 }
 

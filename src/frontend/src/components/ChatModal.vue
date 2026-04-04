@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from 'vue'
 import { api } from '@/composables/useApi'
+import { showToast } from '@/composables/useToast'
 import { getAgentEmoji } from '@/utils/format'
 
 // ---------------------------------------------------------------------------
@@ -83,8 +84,7 @@ async function sendMessage(text: string): Promise<void> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : '送出失敗'
     messages.value.push({ type: 'error', text: `錯誤：${msg}` })
-    // TODO: Phase 4 — show toast notification
-    console.log('[ChatModal] sendMessage error:', msg)
+    showToast('❌ ' + msg, 'error')
   } finally {
     sending.value = false
     scrollToBottom()

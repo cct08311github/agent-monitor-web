@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { api } from '@/composables/useApi'
+import { showToast } from '@/composables/useToast'
+import { confirm } from '@/composables/useConfirm'
 import { fmtTime } from '@/utils/format'
 import type { CronJob } from '@/types/api'
 
@@ -30,7 +32,6 @@ async function fetchJobs(): Promise<void> {
       jobs.value = data.jobs
     }
   } catch (e) {
-    // TODO: replace with toast notification system (Phase 4)
     console.error('獲取 Cron 任務失敗:', (e as Error).message)
   } finally {
     loading.value = false
@@ -38,47 +39,45 @@ async function fetchJobs(): Promise<void> {
 }
 
 async function toggleJob(id: string, enabled: boolean): Promise<void> {
-  // TODO: replace with toast notification system (Phase 4)
-  console.log(enabled ? '正在啟用任務...' : '正在停用任務...')
+  showToast(enabled ? '正在啟用任務...' : '正在停用任務...', 'info')
   try {
     const data = (await api.post(`/api/cron/jobs/${id}/toggle`, { enabled })) as {
       success: boolean
       error?: string
     }
     if (data.success) {
-      console.log(enabled ? '任務已啟用' : '任務已停用')
+      showToast(enabled ? '✅ 任務已啟用' : '✅ 任務已停用', 'success')
       const job = jobs.value.find((j) => j.id === id)
       if (job) job.enabled = enabled
     } else {
       throw new Error(data.error ?? 'Toggle failed')
     }
   } catch (e) {
-    console.error('操作失敗:', (e as Error).message)
+    showToast('❌ 操作失敗: ' + (e as Error).message, 'error')
     // Revert by re-fetching
     await fetchJobs()
   }
 }
 
 async function deleteJob(id: string, name: string): Promise<void> {
-  if (!window.confirm(`確認刪除 Cron 任務「${name}」？\n此操作無法復原。`)) return
-  // TODO: replace with toast notification system (Phase 4)
-  console.log('刪除中...')
+  const ok = await confirm({ type: 'danger', title: '刪除 Cron 任務', message: `確認刪除 Cron 任務「${name}」？\n此操作無法復原。`, confirmLabel: '刪除' })
+  if (!ok) return
+  showToast('刪除中...', 'info')
   try {
     const data = (await api.del(`/api/cron/jobs/${id}`)) as {
       success: boolean
       error?: string
     }
     if (!data.success) throw new Error(data.error ?? '刪除失敗')
-    console.log('任務已刪除')
+    showToast('✅ 任務已刪除', 'success')
     jobs.value = jobs.value.filter((j) => j.id !== id)
   } catch (e) {
-    console.error('刪除失敗:', (e as Error).message)
+    showToast('❌ 刪除失敗: ' + (e as Error).message, 'error')
   }
 }
 
 async function runJob(id: string): Promise<void> {
-  // TODO: replace with toast notification system (Phase 4)
-  console.log('正在執行任務...')
+  showToast('正在執行任務...', 'info')
   try {
     const data = (await api.post(`/api/cron/jobs/${id}/run`)) as {
       success: boolean
@@ -86,13 +85,13 @@ async function runJob(id: string): Promise<void> {
       error?: string
     }
     if (data.success) {
-      console.log(data.message ?? '任務已觸發（在背景執行中）')
+      showToast('✅ ' + (data.message ?? '任務已觸發（在背景執行中）'), 'success')
       await fetchJobs()
     } else {
       throw new Error(data.error ?? '執行失敗')
     }
   } catch (e) {
-    console.error('執行失敗:', (e as Error).message)
+    showToast('❌ 執行失敗: ' + (e as Error).message, 'error')
     await fetchJobs()
   }
 }
