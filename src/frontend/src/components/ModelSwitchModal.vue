@@ -88,7 +88,7 @@ async function confirm(): Promise<void> {
       <!-- Header -->
       <div class="modal-header">
         <span>🔄 切換模型</span>
-        <button class="modal-close-btn" @click="$emit('close')">✕</button>
+        <button class="modal-close" @click="$emit('close')">✕</button>
       </div>
 
       <!-- Body -->

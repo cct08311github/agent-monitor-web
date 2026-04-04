@@ -231,14 +231,14 @@ onUnmounted(() => {
     <!-- Header + controls -->
     <div class="section-header">
       <h2>⚙️ 日誌</h2>
-      <div class="log-controls">
-        <button @click="toggleStream">
+      <div class="log-filter-bar">
+        <button class="ctrl-btn" @click="toggleStream">
           {{ streaming ? '⏹ 停止監看' : '▶ 開始監看' }}
         </button>
-        <button @click="clearLog">🗑 清除</button>
+        <button class="ctrl-btn" @click="clearLog">🗑 清除</button>
         <input
           v-model="filterText"
-          class="log-filter-input"
+          class="log-search-input"
           placeholder="篩選..."
           @input="applyFilter"
         />
@@ -258,7 +258,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Status bar -->
-    <div class="oc-log-status-bar">
+    <div style="padding:4px 0">
       <span :class="['oc-log-badge', { live: streaming }]">
         {{ streaming ? '● 監看中' : '● 已停止' }}
       </span>

@@ -120,7 +120,7 @@ onMounted(async () => {
       <!-- Header -->
       <div class="modal-header">
         <span>{{ getAgentEmoji(agentId) }} <strong>{{ agentId }}</strong></span>
-        <button class="modal-close-btn" @click="$emit('close')">✕</button>
+        <button class="modal-close" @click="$emit('close')">✕</button>
       </div>
 
       <!-- Message log -->

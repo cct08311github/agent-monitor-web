@@ -96,7 +96,7 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
 </script>
 
 <template>
-  <div class="dtab-page active">
+  <div>
     <!-- Section header with back button -->
     <div class="section-header">
       <button class="ctrl-btn" @click="$emit('close')">← 返回</button>

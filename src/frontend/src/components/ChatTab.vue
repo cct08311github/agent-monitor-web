@@ -113,7 +113,7 @@ async function send(): Promise<void> {
 
 <template>
   <div class="chat-tab-page">
-    <div class="chat-page-header">
+    <div class="section-header" style="padding:12px 20px 0;flex-shrink:0">
       <h2>💬 聊天室</h2>
     </div>
 
@@ -152,26 +152,23 @@ async function send(): Promise<void> {
     </div>
 
     <!-- Input area -->
-    <div class="chat-page-input-area">
+    <div class="chat-page-input-row">
       <textarea
         ref="inputRef"
         v-model="inputText"
-        class="chat-page-input"
         placeholder="輸入訊息..."
         maxlength="2000"
+        style="flex:1;min-height:36px;max-height:120px;resize:none;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text-primary);font-size:13px;font-family:inherit;outline:none"
         @keydown="onKeydown"
         @input="autoGrow"
       ></textarea>
-      <div class="chat-page-footer">
-        <span class="chat-char-count">{{ inputText.length }}/2000</span>
-        <button
-          class="chat-send"
-          :disabled="sending || !inputText.trim()"
-          @click="send"
-        >
-          {{ appState.isMobile ? '↑' : '發送' }}
-        </button>
-      </div>
+      <button
+        class="chat-page-send ctrl-btn accent"
+        :disabled="sending || !inputText.trim()"
+        @click="send"
+      >
+        {{ appState.isMobile ? '↑' : '發送' }}
+      </button>
     </div>
   </div>
 </template>
