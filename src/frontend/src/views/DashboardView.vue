@@ -2,9 +2,23 @@
 import { ref } from 'vue'
 import MonitorTab from '@/components/MonitorTab.vue'
 import AgentDetail from '@/components/AgentDetail.vue'
+import SystemTab from '@/components/SystemTab.vue'
+import LogsTab from '@/components/LogsTab.vue'
+import ChatTab from '@/components/ChatTab.vue'
+import ChatModal from '@/components/ChatModal.vue'
+import ModelSwitchModal from '@/components/ModelSwitchModal.vue'
 import { appState } from '@/stores/appState'
 
 const detailAgentId = ref('')
+
+// Chat modal state
+const chatModalAgentId = ref('')
+const showChatModal = ref(false)
+
+// Model switch modal state
+const modelSwitchAgentId = ref('')
+const modelSwitchCurrentModel = ref('')
+const showModelModal = ref(false)
 
 function showAgentDetail(agentId: string) {
   detailAgentId.value = agentId
@@ -17,13 +31,14 @@ function closeDetail() {
 }
 
 function openChat(agentId: string) {
-  // TODO: Phase 3 — open chat modal
-  console.log('Open chat:', agentId)
+  chatModalAgentId.value = agentId
+  showChatModal.value = true
 }
 
 function openModelSwitch(agentId: string, model: string) {
-  // TODO: Phase 3 — open model switch modal
-  console.log('Model switch:', agentId, model)
+  modelSwitchAgentId.value = agentId
+  modelSwitchCurrentModel.value = model
+  showModelModal.value = true
 }
 </script>
 
@@ -48,23 +63,30 @@ function openModelSwitch(agentId: string, model: string) {
         @model-switch="openModelSwitch"
       />
 
-      <!-- System Tab Placeholder -->
-      <div v-show="appState.currentDesktopTab === 'system'" class="dtab-page">
-        <div class="section-header"><h2>📊 系統資源</h2></div>
-        <p style="color:var(--text-muted);padding:20px">Phase 3 遷移中...</p>
-      </div>
+      <!-- System Tab -->
+      <SystemTab v-show="appState.currentDesktopTab === 'system'" />
 
-      <!-- Logs Tab Placeholder -->
-      <div v-show="appState.currentDesktopTab === 'logs'" class="dtab-page">
-        <div class="section-header"><h2>⚙️ 日誌</h2></div>
-        <p style="color:var(--text-muted);padding:20px">Phase 3 遷移中...</p>
-      </div>
+      <!-- Logs Tab -->
+      <LogsTab v-show="appState.currentDesktopTab === 'logs'" />
 
-      <!-- Chat Tab Placeholder -->
-      <div v-show="appState.currentDesktopTab === 'chat'" class="dtab-page chat-tab-page">
-        <div class="section-header"><h2>💬 聊天室</h2></div>
-        <p style="color:var(--text-muted);padding:20px">Phase 3 遷移中...</p>
-      </div>
+      <!-- Chat Tab -->
+      <ChatTab v-show="appState.currentDesktopTab === 'chat'" />
     </main>
+
+    <!-- Chat Modal (from agent card actions) -->
+    <ChatModal
+      v-if="showChatModal"
+      :agentId="chatModalAgentId"
+      @close="showChatModal = false"
+    />
+
+    <!-- Model Switch Modal -->
+    <ModelSwitchModal
+      v-if="showModelModal"
+      :agentId="modelSwitchAgentId"
+      :currentModel="modelSwitchCurrentModel"
+      @close="showModelModal = false"
+      @switched="showModelModal = false"
+    />
   </div>
 </template>
