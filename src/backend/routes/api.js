@@ -172,8 +172,14 @@ router.post('/plugins/:name/toggle', auth.localhostOnlyControl, auth.rateLimit, 
 
 // OpenClaw Logs Streaming (SSE)
 // Streams `openclaw logs --follow` output as Server-Sent Events
+let logsStreamClients = 0;
+const MAX_LOGS_STREAM_CLIENTS = 5;
 /* istanbul ignore next */
 router.get('/logs/stream', auth.localhostOnlyControl, /* istanbul ignore next */ (req, res) => {
+    if (logsStreamClients >= MAX_LOGS_STREAM_CLIENTS) {
+        return res.status(503).json({ success: false, error: 'logs_stream_capacity_exceeded' });
+    }
+    logsStreamClients++;
     const { binPath } = getOpenClawConfig();
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -253,6 +259,7 @@ router.get('/logs/stream', auth.localhostOnlyControl, /* istanbul ignore next */
     });
 
     req.on('close', () => {
+        logsStreamClients--;
         clearInterval(heartbeat);
         try { child.kill('SIGTERM'); } catch (_) { /* process already exited */ }
     });
