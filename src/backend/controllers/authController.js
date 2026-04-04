@@ -51,6 +51,7 @@ function logout(req, res) {
     const token = req.cookies?.[COOKIE_NAME];
     if (token) sessionService.destroySession(token);
     res.clearCookie(COOKIE_NAME, { path: '/', httpOnly: true, secure: true, sameSite: 'Strict' });
+    res.clearCookie('_csrfSecret', { path: '/', httpOnly: false, secure: true, sameSite: 'Strict' });
     return res.json({ success: true });
 }
 
