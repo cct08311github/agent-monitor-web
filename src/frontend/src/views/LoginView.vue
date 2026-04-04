@@ -106,7 +106,6 @@ async function handleLogin() {
 </template>
 
 <style scoped>
-@import '../assets/css/theme.css';
 @import '../assets/css/login.css';
 
 .login-container {
