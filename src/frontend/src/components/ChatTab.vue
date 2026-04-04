@@ -156,9 +156,9 @@ async function send(): Promise<void> {
       <textarea
         ref="inputRef"
         v-model="inputText"
+        class="chat-page-textarea"
         placeholder="輸入訊息..."
         maxlength="2000"
-        style="flex:1;min-height:36px;max-height:120px;resize:none;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text-primary);font-size:13px;font-family:inherit;outline:none"
         @keydown="onKeydown"
         @input="autoGrow"
       ></textarea>

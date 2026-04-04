@@ -1,0 +1,190 @@
+/* ══════════════════════════════════════════════════
+   Vue 3 Migration — Missing CSS
+   Fills gaps between Vue components and legacy CSS
+   ══════════════════════════════════════════════════ */
+
+/* ── Monitor Tab Container ────────────────────── */
+.monitor-tab {
+  /* No special styles needed, acts as v-show container */
+}
+
+/* ── System / Logs Tab Containers ─────────────── */
+.system-tab,
+.logs-tab {
+  /* Neutral containers for v-show */
+}
+
+/* ── Agent Search ─────────────────────────────── */
+.agent-search-wrap {
+  padding: 8px 0 16px;
+}
+
+.agent-search-wrap .search-input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 14px;
+  padding-left: 36px;
+  background: var(--bg-card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%239c9a94' viewBox='0 0 24 24'%3E%3Cpath d='M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z'/%3E%3C/svg%3E") no-repeat 12px center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.agent-search-wrap .search-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(90, 90, 235, 0.1);
+  outline: none;
+}
+
+/* ── Connection Status ────────────────────────── */
+.connection-status {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg-input);
+  white-space: nowrap;
+}
+
+.connection-status.connected {
+  color: var(--green);
+  background: rgba(13, 150, 104, 0.1);
+}
+
+.connection-status.reconnecting {
+  color: var(--orange, #f59e0b);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.connection-status.disconnected {
+  color: var(--red, #ef5f5f);
+  background: rgba(239, 95, 95, 0.1);
+}
+
+/* ── Logs Tab Enhancements ────────────────────── */
+.logs-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: calc(100vh - var(--header-height) - 80px);
+  min-height: 0;
+}
+
+.logs-tab .section-header {
+  flex-shrink: 0;
+}
+
+.logs-tab .oc-log-terminal {
+  flex: 1;
+  min-height: 200px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  background: #0d0d0f;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  overflow-y: auto;
+  color: #d4d4d8;
+}
+
+[data-theme="light"] .logs-tab .oc-log-terminal {
+  background: #1e1e2e;
+  color: #cdd6f4;
+}
+
+.log-scroll-bottom-btn {
+  position: sticky;
+  bottom: 8px;
+  align-self: center;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  z-index: 5;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.log-scroll-bottom-btn:hover {
+  transform: translateY(-2px);
+}
+
+/* ── Chat Tab Enhancements ────────────────────── */
+.chat-tab-page .section-header {
+  padding: 12px 20px 0;
+  flex-shrink: 0;
+}
+
+.chat-tab-page .chat-agent-pills {
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.chat-tab-page .chat-agent-pills::-webkit-scrollbar {
+  display: none;
+}
+
+/* Chat input textarea (replaces inline styles) */
+.chat-page-textarea {
+  flex: 1;
+  min-height: 36px;
+  max-height: 120px;
+  resize: none;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.chat-page-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(90, 90, 235, 0.1);
+}
+
+.chat-page-textarea::placeholder {
+  color: var(--text-muted);
+}
+
+/* ── Empty State Enhancement ──────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  opacity: 0.3;
+  margin-bottom: 16px;
+}
+
+.empty-state-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.empty-state-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+}

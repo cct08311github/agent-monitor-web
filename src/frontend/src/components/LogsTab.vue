@@ -288,7 +288,7 @@ onUnmounted(() => {
     <!-- Scroll-to-bottom button -->
     <button
       v-show="hasNewMessages && userScrolledUp"
-      class="log-scroll-btn"
+      class="log-scroll-bottom-btn"
       @click="scrollToBottom"
     >
       ⬇ 新訊息

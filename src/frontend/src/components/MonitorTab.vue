@@ -189,15 +189,3 @@ const connectionClass = computed(() => connectionStatus.value)
     </template>
   </div>
 </template>
-
-<style>
-.connection-status {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  padding: 4px 8px;
-}
-.connection-status.connected { color: var(--green); }
-.connection-status.reconnecting { color: var(--orange, #f59e0b); }
-.connection-status.disconnected { color: var(--red, #ef5f5f); }
-</style>
