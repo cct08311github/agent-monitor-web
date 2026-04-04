@@ -227,7 +227,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="dtab-page">
+  <div class="logs-tab">
     <!-- Header + controls -->
     <div class="section-header">
       <h2>⚙️ 日誌</h2>

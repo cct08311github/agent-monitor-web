@@ -112,7 +112,7 @@ async function send(): Promise<void> {
 </script>
 
 <template>
-  <div class="dtab-page chat-tab-page active-tab">
+  <div class="chat-tab-page">
     <div class="chat-page-header">
       <h2>💬 聊天室</h2>
     </div>

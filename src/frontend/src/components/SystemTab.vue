@@ -403,7 +403,7 @@ watch(tokenChartRef, (el) => {
 </script>
 
 <template>
-  <div class="dtab-page">
+  <div class="system-tab">
     <div class="system-layout">
       <!-- Left column: system resources + sparkline -->
       <div class="system-left">
