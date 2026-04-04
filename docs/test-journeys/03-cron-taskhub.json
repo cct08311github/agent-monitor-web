@@ -1,0 +1,1031 @@
+{
+  "journey": "cron-taskhub",
+  "description": "Cron job management and TaskHub task management within the Monitor tab",
+  "baseUrl": "https://localhost:3001",
+  "credentials": {
+    "USER": {
+      "username": "admin",
+      "password": "admin123",
+      "role": "USER"
+    }
+  },
+  "testCases": [
+    {
+      "id": "CT-01",
+      "title": "Navigate to cron sub-tab",
+      "description": "User navigates from the root page to the Monitor tab and then opens the Cron sub-tab",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "{{baseUrl}}/",
+          "description": "Start at root (assumes logged in)"
+        },
+        {
+          "action": "click",
+          "selector": "[data-dtab='monitor']",
+          "description": "Click Monitor tab"
+        },
+        {
+          "action": "waitFor",
+          "selector": "[data-tab='cron']",
+          "description": "Wait for Cron sub-tab to be visible"
+        },
+        {
+          "action": "click",
+          "selector": "[data-tab='cron']",
+          "description": "Click Cron sub-tab"
+        },
+        {
+          "action": "waitFor",
+          "selector": "#cron-tab, .cron-section, [data-section='cron']",
+          "description": "Wait for Cron section to render"
+        },
+        {
+          "action": "screenshot",
+          "filename": "CT-01-cron-tab-active.png",
+          "description": "Verify Cron sub-tab is active and content is visible"
+        }
+      ],
+      "assertions": [
+        {
+          "type": "elementVisible",
+          "selector": "[data-tab='cron'].active, [data-tab='cron'][aria-selected='true']",
+          "description": "Cron sub-tab should be marked active"
+        }
+      ]
+    },
+    {
+      "id": "CT-02",
+      "title": "Cron job list loads",
+      "description": "The Cron section fetches and displays the list of cron jobs from GET /api/cron/jobs",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "{{baseUrl}}/",
+          "description": "Start at root (assumes logged in)"
+        },
+        {
+          "action": "click",
+          "selector": "[data-dtab='monitor']",
+          "description": "Click Monitor tab"
+        },
+        {
+          "action": "click",
+          "selector": "[data-tab='cron']",
+          "description": "Click Cron sub-tab"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".cron-job-list, .cron-jobs-table, [data-testid='cron-job-row'], .cron-job-item",
+          "description": "Wait for cron job list or table to appear"
+        },
+        {
+          "action": "screenshot",
+          "filename": "CT-02-cron-job-list-loaded.png",
+          "description": "Verify cron job list has loaded with at least one entry"
+        }
+      ],
+      "assertions": [
+        {
+          "type": "apiCall",
+          "method": "GET",
+          "endpoint": "/api/cron/jobs",
+          "expectedStatus": 200,
+          "description": "GET /api/cron/jobs should return 200"
+        },
+        {
+          "type": "elementVisible",
+          "selector": ".cron-job-list, .cron-jobs-table, .cron-job-item",
+          "description": "Cron job list container should be visible"
+        }
+      ]
+    },
+    {
+      "id": "CT-03",
+      "title": "Toggle cron job on/off",
+      "description": "User toggles a cron job's enabled state, which calls POST /api/cron/jobs/:id/toggle",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "{{baseUrl}}/",
+          "description": "Start at root (assumes logged in)"
+        },
+        {
+          "action": "click",
+          "selector": "[data-dtab='monitor']",
+          "description": "Click Monitor tab"
+        },
+        {
+          "action": "click",
+          "selector": "[data-tab='cron']",
+          "description": "Click Cron sub-tab"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".cron-job-item, .cron-job-row, [data-testid='cron-job-row']",
+          "description": "Wait for at least one cron job to appear"
+        },
+        {
+          "action": "click",
+          "selector": ".cron-job-item:first-child .toggle, .cron-job-row:first-child .cron-toggle, [data-testid='cron-toggle']:first-of-type",
+          "description": "Click the toggle for the first cron job"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".toast, .notification, [role='alert']",
+          "description": "Wait for success or error notification",
+          "optional": true
+        },
+        {
+          "action": "screenshot",
+          "filename": "CT-03-cron-toggle-after.png",
+          "description": "Verify cron job toggle state has changed"
+        }
+      ],
+      "assertions": [
+        {
+          "type": "apiCall",
+          "method": "POST",
+          "endpoint": "/api/cron/jobs/:id/toggle",
+          "expectedStatus": 200,
+          "description": "POST /api/cron/jobs/:id/toggle should return 200"
+        }
+      ]
+    },
+    {
+      "id": "CT-04",
+      "title": "Run cron job manually",
+      "description": "User clicks the Run button on a cron job to trigger it immediately via POST /api/cron/jobs/:id/run",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "{{baseUrl}}/",
+          "description": "Start at root (assumes logged in)"
+        },
+        {
+          "action": "click",
+          "selector": "[data-dtab='monitor']",
+          "description": "Click Monitor tab"
+        },
+        {
+          "action": "click",
+          "selector": "[data-tab='cron']",
+          "description": "Click Cron sub-tab"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".cron-job-item, .cron-job-row, [data-testid='cron-job-row']",
+          "description": "Wait for cron job list to appear"
+        },
+        {
+          "action": "click",
+          "selector": ".cron-job-item:first-child button:has-text('Run'), .cron-job-row:first-child .cron-run-btn, [data-testid='cron-run-btn']:first-of-type",
+          "description": "Click the Run button for the first cron job"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".toast, .notification, [role='alert']",
+          "description": "Wait for feedback notification",
+          "optional": true
+        },
+        {
+          "action": "screenshot",
+          "filename": "CT-04-cron-manual-run.png",
+          "description": "Verify feedback after manual run trigger"
+        }
+      ],
+      "assertions": [
+        {
+          "type": "apiCall",
+          "method": "POST",
+          "endpoint": "/api/cron/jobs/:id/run",
+          "expectedStatus": 200,
+          "description": "POST /api/cron/jobs/:id/run should return 200"
+        }
+      ]
+    },
+    {
+      "id": "CT-05",
+      "title": "Delete cron job with confirmation",
+      "description": "User clicks Delete on a cron job, confirms in the ConfirmDialog, and the job is removed via DELETE /api/cron/jobs/:id",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "{{baseUrl}}/",
+          "description": "Start at root (assumes logged in)"
+        },
+        {
+          "action": "click",
+          "selector": "[data-dtab='monitor']",
+          "description": "Click Monitor tab"
+        },
+        {
+          "action": "click",
+          "selector": "[data-tab='cron']",
+          "description": "Click Cron sub-tab"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".cron-job-item, .cron-job-row, [data-testid='cron-job-row']",
+          "description": "Wait for cron job list to appear"
+        },
+        {
+          "action": "click",
+          "selector": ".cron-job-item:first-child button:has-text('Delete'), .cron-job-row:first-child .cron-delete-btn, [data-testid='cron-delete-btn']:first-of-type",
+          "description": "Click the Delete button for the first cron job"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".confirm-dialog, [role='dialog'], .modal",
+          "description": "Wait for ConfirmDialog to appear"
+        },
+        {
+          "action": "click",
+          "selector": ".confirm-dialog button:has-text('Confirm'), .confirm-dialog button:has-text('Delete'), .confirm-dialog button:has-text('Yes'), [data-testid='confirm-ok']",
+          "description": "Click Confirm/Delete in the ConfirmDialog"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".toast, .notification, [role='alert']",
+          "description": "Wait for deletion feedback",
+          "optional": true
+        },
+        {
+          "action": "screenshot",
+          "filename": "CT-05-cron-delete-confirmed.png",
+          "description": "Verify cron job has been removed from the list"
+        }
+      ],
+      "assertions": [
+        {
+          "type": "apiCall",
+          "method": "DELETE",
+          "endpoint": "/api/cron/jobs/:id",
+          "expectedStatus": 200,
+          "description": "DELETE /api/cron/jobs/:id should return 200"
+        }
+      ]
+    },
+    {
+      "id": "CT-06",
+      "title": "Cancel delete confirmation",
+      "description": "User clicks Delete on a cron job but cancels the ConfirmDialog — no deletion occurs",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "{{baseUrl}}/",
+          "description": "Start at root (assumes logged in)"
+        },
+        {
+          "action": "click",
+          "selector": "[data-dtab='monitor']",
+          "description": "Click Monitor tab"
+        },
+        {
+          "action": "click",
+          "selector": "[data-tab='cron']",
+          "description": "Click Cron sub-tab"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".cron-job-item, .cron-job-row, [data-testid='cron-job-row']",
+          "description": "Wait for cron job list to appear"
+        },
+        {
+          "action": "click",
+          "selector": ".cron-job-item:first-child button:has-text('Delete'), .cron-job-row:first-child .cron-delete-btn, [data-testid='cron-delete-btn']:first-of-type",
+          "description": "Click the Delete button for the first cron job"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".confirm-dialog, [role='dialog'], .modal",
+          "description": "Wait for ConfirmDialog to appear"
+        },
+        {
+          "action": "click",
+          "selector": ".confirm-dialog button:has-text('Cancel'), [data-testid='confirm-cancel']",
+          "description": "Click Cancel in the ConfirmDialog"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".confirm-dialog, [role='dialog']",
+          "state": "hidden",
+          "description": "ConfirmDialog should close"
+        },
+        {
+          "action": "screenshot",
+          "filename": "CT-06-cron-delete-cancelled.png",
+          "description": "Verify cron job is still present and dialog is dismissed"
+        }
+      ],
+      "assertions": [
+        {
+          "type": "elementVisible",
+          "selector": ".cron-job-item, .cron-job-row",
+          "description": "Cron job list should still contain items after cancel"
+        },
+        {
+          "type": "elementHidden",
+          "selector": ".confirm-dialog, [role='dialog']",
+          "description": "ConfirmDialog should be closed"
+        }
+      ]
+    },
+    {
+      "id": "CT-07",
+      "title": "Empty state when no cron jobs",
+      "description": "When GET /api/cron/jobs returns an empty array, an empty-state message is shown",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "{{baseUrl}}/",
+          "description": "Start at root (assumes logged in)"
+        },
+        {
+          "action": "click",
+          "selector": "[data-dtab='monitor']",
+          "description": "Click Monitor tab"
+        },
+        {
+          "action": "click",
+          "selector": "[data-tab='cron']",
+          "description": "Click Cron sub-tab"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".cron-empty-state, .empty-state, [data-testid='cron-empty'], .no-cron-jobs",
+          "description": "Wait for empty state message (requires no cron jobs configured)",
+          "note": "This test may require test data setup to clear all cron jobs, or may be verified in an environment with no jobs configured"
+        },
+        {
+          "action": "screenshot",
+          "filename": "CT-07-cron-empty-state.png",
+          "description": "Verify empty state message is displayed when no cron jobs exist"
+        }
+      ],
+      "assertions": [
+        {
+          "type": "elementVisible",
+          "selector": ".cron-empty-state, .empty-state, [data-testid='cron-empty'], .no-cron-jobs",
+          "description": "Empty state indicator should be visible"
+        },
+        {
+          "type": "elementHidden",
+          "selector": ".cron-job-item, .cron-job-row",
+          "description": "No job rows should be present"
+        }
+      ]
+    },
+    {
+      "id": "CT-08",
+      "title": "Navigate to taskhub sub-tab",
+      "description": "User navigates from the root page to the Monitor tab and then opens the TaskHub sub-tab",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "{{baseUrl}}/",
+          "description": "Start at root (assumes logged in)"
+        },
+        {
+          "action": "click",
+          "selector": "[data-dtab='monitor']",
+          "description": "Click Monitor tab"
+        },
+        {
+          "action": "waitFor",
+          "selector": "[data-tab='taskhub']",
+          "description": "Wait for TaskHub sub-tab to be visible"
+        },
+        {
+          "action": "click",
+          "selector": "[data-tab='taskhub']",
+          "description": "Click TaskHub sub-tab"
+        },
+        {
+          "action": "waitFor",
+          "selector": "#taskhub-tab, .taskhub-section, [data-section='taskhub']",
+          "description": "Wait for TaskHub section to render"
+        },
+        {
+          "action": "screenshot",
+          "filename": "CT-08-taskhub-tab-active.png",
+          "description": "Verify TaskHub sub-tab is active and content is visible"
+        }
+      ],
+      "assertions": [
+        {
+          "type": "elementVisible",
+          "selector": "[data-tab='taskhub'].active, [data-tab='taskhub'][aria-selected='true']",
+          "description": "TaskHub sub-tab should be marked active"
+        }
+      ]
+    },
+    {
+      "id": "CT-09",
+      "title": "Task list loads with stats",
+      "description": "The TaskHub section fetches tasks from GET /api/taskhub/tasks and displays a task list along with summary stats",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "{{baseUrl}}/",
+          "description": "Start at root (assumes logged in)"
+        },
+        {
+          "action": "click",
+          "selector": "[data-dtab='monitor']",
+          "description": "Click Monitor tab"
+        },
+        {
+          "action": "click",
+          "selector": "[data-tab='taskhub']",
+          "description": "Click TaskHub sub-tab"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".task-list, .task-table, [data-testid='task-row'], .task-item",
+          "description": "Wait for task list or table to appear"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".task-stats, .taskhub-stats, [data-testid='task-stats']",
+          "description": "Wait for task stats summary to appear",
+          "optional": true
+        },
+        {
+          "action": "screenshot",
+          "filename": "CT-09-taskhub-loaded-with-stats.png",
+          "description": "Verify task list and stats are both visible"
+        }
+      ],
+      "assertions": [
+        {
+          "type": "apiCall",
+          "method": "GET",
+          "endpoint": "/api/taskhub/tasks",
+          "expectedStatus": 200,
+          "description": "GET /api/taskhub/tasks should return 200"
+        },
+        {
+          "type": "elementVisible",
+          "selector": ".task-list, .task-table, .task-item",
+          "description": "Task list container should be visible"
+        }
+      ]
+    },
+    {
+      "id": "CT-10",
+      "title": "Filter tasks by domain (work)",
+      "description": "User selects the 'work' domain filter and the task list updates to show only work tasks",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "{{baseUrl}}/",
+          "description": "Start at root (assumes logged in)"
+        },
+        {
+          "action": "click",
+          "selector": "[data-dtab='monitor']",
+          "description": "Click Monitor tab"
+        },
+        {
+          "action": "click",
+          "selector": "[data-tab='taskhub']",
+          "description": "Click TaskHub sub-tab"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".task-list, .task-table, .task-item",
+          "description": "Wait for task list to appear"
+        },
+        {
+          "action": "select",
+          "selector": "select[name='domain'], [data-testid='domain-filter'], .domain-filter select",
+          "value": "work",
+          "description": "Select 'work' from the domain filter dropdown"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".task-item, .task-row",
+          "description": "Wait for filtered task list to re-render"
+        },
+        {
+          "action": "screenshot",
+          "filename": "CT-10-taskhub-filter-domain-work.png",
+          "description": "Verify only 'work' domain tasks are displayed"
+        }
+      ],
+      "assertions": [
+        {
+          "type": "elementAttribute",
+          "selector": "select[name='domain'], [data-testid='domain-filter']",
+          "attribute": "value",
+          "expected": "work",
+          "description": "Domain filter should show 'work' selected"
+        }
+      ]
+    },
+    {
+      "id": "CT-11",
+      "title": "Filter tasks by priority (urgent)",
+      "description": "User selects the 'urgent' priority filter and the task list shows only urgent tasks",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "{{baseUrl}}/",
+          "description": "Start at root (assumes logged in)"
+        },
+        {
+          "action": "click",
+          "selector": "[data-dtab='monitor']",
+          "description": "Click Monitor tab"
+        },
+        {
+          "action": "click",
+          "selector": "[data-tab='taskhub']",
+          "description": "Click TaskHub sub-tab"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".task-list, .task-table, .task-item",
+          "description": "Wait for task list to appear"
+        },
+        {
+          "action": "select",
+          "selector": "select[name='priority'], [data-testid='priority-filter'], .priority-filter select",
+          "value": "urgent",
+          "description": "Select 'urgent' from the priority filter dropdown"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".task-item, .task-row",
+          "description": "Wait for filtered task list to re-render"
+        },
+        {
+          "action": "screenshot",
+          "filename": "CT-11-taskhub-filter-priority-urgent.png",
+          "description": "Verify only 'urgent' priority tasks are displayed"
+        }
+      ],
+      "assertions": [
+        {
+          "type": "elementAttribute",
+          "selector": "select[name='priority'], [data-testid='priority-filter']",
+          "attribute": "value",
+          "expected": "urgent",
+          "description": "Priority filter should show 'urgent' selected"
+        }
+      ]
+    },
+    {
+      "id": "CT-12",
+      "title": "Filter tasks by status (in_progress)",
+      "description": "User selects the 'in_progress' status filter and the task list shows only in-progress tasks",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "{{baseUrl}}/",
+          "description": "Start at root (assumes logged in)"
+        },
+        {
+          "action": "click",
+          "selector": "[data-dtab='monitor']",
+          "description": "Click Monitor tab"
+        },
+        {
+          "action": "click",
+          "selector": "[data-tab='taskhub']",
+          "description": "Click TaskHub sub-tab"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".task-list, .task-table, .task-item",
+          "description": "Wait for task list to appear"
+        },
+        {
+          "action": "select",
+          "selector": "select[name='status'], [data-testid='status-filter'], .status-filter select",
+          "value": "in_progress",
+          "description": "Select 'in_progress' from the status filter dropdown"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".task-item, .task-row",
+          "description": "Wait for filtered task list to re-render"
+        },
+        {
+          "action": "screenshot",
+          "filename": "CT-12-taskhub-filter-status-in-progress.png",
+          "description": "Verify only 'in_progress' status tasks are displayed"
+        }
+      ],
+      "assertions": [
+        {
+          "type": "elementAttribute",
+          "selector": "select[name='status'], [data-testid='status-filter']",
+          "attribute": "value",
+          "expected": "in_progress",
+          "description": "Status filter should show 'in_progress' selected"
+        }
+      ]
+    },
+    {
+      "id": "CT-13",
+      "title": "Sort tasks by due date",
+      "description": "User clicks the due date column header (or selects sort option) to sort tasks by due date ascending/descending",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "{{baseUrl}}/",
+          "description": "Start at root (assumes logged in)"
+        },
+        {
+          "action": "click",
+          "selector": "[data-dtab='monitor']",
+          "description": "Click Monitor tab"
+        },
+        {
+          "action": "click",
+          "selector": "[data-tab='taskhub']",
+          "description": "Click TaskHub sub-tab"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".task-list, .task-table, .task-item",
+          "description": "Wait for task list to appear"
+        },
+        {
+          "action": "click",
+          "selector": "th:has-text('Due'), th[data-sort='dueDate'], [data-testid='sort-dueDate'], select[name='sort'] option[value='dueDate']",
+          "description": "Click due date column header or select due date sort option"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".task-item, .task-row",
+          "description": "Wait for sorted list to render"
+        },
+        {
+          "action": "screenshot",
+          "filename": "CT-13-taskhub-sort-by-duedate.png",
+          "description": "Verify tasks are sorted by due date"
+        }
+      ],
+      "assertions": [
+        {
+          "type": "elementVisible",
+          "selector": ".task-item, .task-row",
+          "description": "Task list should still be visible after sort"
+        }
+      ]
+    },
+    {
+      "id": "CT-14",
+      "title": "Search tasks by text",
+      "description": "User types into the task search input and the list filters to tasks matching the query",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "{{baseUrl}}/",
+          "description": "Start at root (assumes logged in)"
+        },
+        {
+          "action": "click",
+          "selector": "[data-dtab='monitor']",
+          "description": "Click Monitor tab"
+        },
+        {
+          "action": "click",
+          "selector": "[data-tab='taskhub']",
+          "description": "Click TaskHub sub-tab"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".task-list, .task-table, .task-item",
+          "description": "Wait for task list to appear"
+        },
+        {
+          "action": "fill",
+          "selector": "input[name='search'], input[placeholder*='Search'], [data-testid='task-search']",
+          "value": "test",
+          "description": "Type 'test' into the task search input"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".task-item, .task-row, .task-empty-state",
+          "description": "Wait for filtered results or empty state"
+        },
+        {
+          "action": "screenshot",
+          "filename": "CT-14-taskhub-search-results.png",
+          "description": "Verify task list reflects the search query 'test'"
+        }
+      ],
+      "assertions": [
+        {
+          "type": "elementAttribute",
+          "selector": "input[name='search'], [data-testid='task-search']",
+          "attribute": "value",
+          "expected": "test",
+          "description": "Search input should contain the typed query"
+        }
+      ]
+    },
+    {
+      "id": "CT-15",
+      "title": "Open add task modal",
+      "description": "User clicks the 'Add Task' button and a modal/form appears for creating a new task",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "{{baseUrl}}/",
+          "description": "Start at root (assumes logged in)"
+        },
+        {
+          "action": "click",
+          "selector": "[data-dtab='monitor']",
+          "description": "Click Monitor tab"
+        },
+        {
+          "action": "click",
+          "selector": "[data-tab='taskhub']",
+          "description": "Click TaskHub sub-tab"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".task-list, .task-table, .task-item, .taskhub-section",
+          "description": "Wait for TaskHub section to render"
+        },
+        {
+          "action": "click",
+          "selector": "button:has-text('Add Task'), [data-testid='add-task-btn'], .add-task-button",
+          "description": "Click the Add Task button"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".modal, [role='dialog'], .task-form-modal, [data-testid='task-modal']",
+          "description": "Wait for the Add Task modal to appear"
+        },
+        {
+          "action": "screenshot",
+          "filename": "CT-15-taskhub-add-task-modal-open.png",
+          "description": "Verify Add Task modal is visible with form fields"
+        }
+      ],
+      "assertions": [
+        {
+          "type": "elementVisible",
+          "selector": ".modal, [role='dialog'], .task-form-modal",
+          "description": "Add Task modal should be open"
+        },
+        {
+          "type": "elementVisible",
+          "selector": "input[name='title'], [data-testid='task-title-input']",
+          "description": "Title field should be present in the modal"
+        }
+      ]
+    },
+    {
+      "id": "CT-16",
+      "title": "Create new task with all fields",
+      "description": "User fills in all task fields (title, status, priority, domain, project, dueDate, description) and submits to create a task via POST /api/taskhub/tasks",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "{{baseUrl}}/",
+          "description": "Start at root (assumes logged in)"
+        },
+        {
+          "action": "click",
+          "selector": "[data-dtab='monitor']",
+          "description": "Click Monitor tab"
+        },
+        {
+          "action": "click",
+          "selector": "[data-tab='taskhub']",
+          "description": "Click TaskHub sub-tab"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".task-list, .task-table, .task-item, .taskhub-section",
+          "description": "Wait for TaskHub section to render"
+        },
+        {
+          "action": "click",
+          "selector": "button:has-text('Add Task'), [data-testid='add-task-btn'], .add-task-button",
+          "description": "Click the Add Task button"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".modal, [role='dialog'], .task-form-modal",
+          "description": "Wait for the Add Task modal to appear"
+        },
+        {
+          "action": "fill",
+          "selector": "input[name='title'], [data-testid='task-title-input']",
+          "value": "E2E Test Task CT-16",
+          "description": "Enter task title"
+        },
+        {
+          "action": "select",
+          "selector": "select[name='status'], [data-testid='task-status-select']",
+          "value": "in_progress",
+          "description": "Select status: in_progress"
+        },
+        {
+          "action": "select",
+          "selector": "select[name='priority'], [data-testid='task-priority-select']",
+          "value": "high",
+          "description": "Select priority: high"
+        },
+        {
+          "action": "select",
+          "selector": "select[name='domain'], [data-testid='task-domain-select']",
+          "value": "work",
+          "description": "Select domain: work"
+        },
+        {
+          "action": "fill",
+          "selector": "input[name='project'], [data-testid='task-project-input']",
+          "value": "E2E Test Project",
+          "description": "Enter project name"
+        },
+        {
+          "action": "fill",
+          "selector": "input[name='dueDate'], input[type='date'], [data-testid='task-duedate-input']",
+          "value": "2026-12-31",
+          "description": "Enter due date"
+        },
+        {
+          "action": "fill",
+          "selector": "textarea[name='description'], [data-testid='task-description-input']",
+          "value": "This task was created by the E2E test journey CT-16.",
+          "description": "Enter task description"
+        },
+        {
+          "action": "click",
+          "selector": ".modal button[type='submit'], [data-testid='task-submit-btn'], button:has-text('Create'), button:has-text('Save')",
+          "description": "Submit the Add Task form"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".modal, [role='dialog']",
+          "state": "hidden",
+          "description": "Modal should close on successful creation"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".task-item:has-text('E2E Test Task CT-16'), .task-row:has-text('E2E Test Task CT-16')",
+          "description": "New task should appear in the list",
+          "optional": true
+        },
+        {
+          "action": "screenshot",
+          "filename": "CT-16-taskhub-task-created.png",
+          "description": "Verify new task appears in the task list"
+        }
+      ],
+      "assertions": [
+        {
+          "type": "apiCall",
+          "method": "POST",
+          "endpoint": "/api/taskhub/tasks",
+          "expectedStatus": 201,
+          "description": "POST /api/taskhub/tasks should return 201"
+        },
+        {
+          "type": "elementHidden",
+          "selector": ".modal, [role='dialog']",
+          "description": "Add Task modal should be closed after submission"
+        }
+      ]
+    },
+    {
+      "id": "CT-17",
+      "title": "Open task detail modal",
+      "description": "User clicks on a task row to open the task detail/edit modal",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "{{baseUrl}}/",
+          "description": "Start at root (assumes logged in)"
+        },
+        {
+          "action": "click",
+          "selector": "[data-dtab='monitor']",
+          "description": "Click Monitor tab"
+        },
+        {
+          "action": "click",
+          "selector": "[data-tab='taskhub']",
+          "description": "Click TaskHub sub-tab"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".task-item, .task-row, [data-testid='task-row']",
+          "description": "Wait for task list to appear"
+        },
+        {
+          "action": "click",
+          "selector": ".task-item:first-child, .task-row:first-child, [data-testid='task-row']:first-of-type",
+          "description": "Click the first task row to open detail view"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".modal, [role='dialog'], .task-detail-modal, [data-testid='task-detail-modal']",
+          "description": "Wait for task detail modal to appear"
+        },
+        {
+          "action": "screenshot",
+          "filename": "CT-17-taskhub-task-detail-modal.png",
+          "description": "Verify task detail modal is open and shows task fields"
+        }
+      ],
+      "assertions": [
+        {
+          "type": "elementVisible",
+          "selector": ".modal, [role='dialog'], .task-detail-modal",
+          "description": "Task detail modal should be open"
+        },
+        {
+          "type": "elementVisible",
+          "selector": "input[name='title'], [data-testid='task-title-input'], .task-detail-title",
+          "description": "Task title should be visible in the detail modal"
+        }
+      ]
+    },
+    {
+      "id": "CT-18",
+      "title": "Delete task with confirmation",
+      "description": "User clicks Delete on a task, confirms in the ConfirmDialog, and the task is removed via DELETE /api/taskhub/tasks/:domain/:id",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "{{baseUrl}}/",
+          "description": "Start at root (assumes logged in)"
+        },
+        {
+          "action": "click",
+          "selector": "[data-dtab='monitor']",
+          "description": "Click Monitor tab"
+        },
+        {
+          "action": "click",
+          "selector": "[data-tab='taskhub']",
+          "description": "Click TaskHub sub-tab"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".task-item, .task-row, [data-testid='task-row']",
+          "description": "Wait for task list to appear"
+        },
+        {
+          "action": "click",
+          "selector": ".task-item:first-child button:has-text('Delete'), .task-row:first-child .task-delete-btn, [data-testid='task-delete-btn']:first-of-type",
+          "description": "Click the Delete button on the first task",
+          "note": "If delete is inside a detail modal, open the task first then click delete"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".confirm-dialog, [role='dialog'].confirm, .modal:has-text('Delete')",
+          "description": "Wait for ConfirmDialog to appear"
+        },
+        {
+          "action": "click",
+          "selector": ".confirm-dialog button:has-text('Confirm'), .confirm-dialog button:has-text('Delete'), .confirm-dialog button:has-text('Yes'), [data-testid='confirm-ok']",
+          "description": "Confirm the delete action in the ConfirmDialog"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".confirm-dialog, [role='dialog'].confirm",
+          "state": "hidden",
+          "description": "ConfirmDialog should close after confirmation"
+        },
+        {
+          "action": "waitFor",
+          "selector": ".toast, .notification, [role='alert']",
+          "description": "Wait for deletion feedback toast",
+          "optional": true
+        },
+        {
+          "action": "screenshot",
+          "filename": "CT-18-taskhub-task-deleted.png",
+          "description": "Verify task has been removed from the list"
+        }
+      ],
+      "assertions": [
+        {
+          "type": "apiCall",
+          "method": "DELETE",
+          "endpoint": "/api/taskhub/tasks/:domain/:id",
+          "expectedStatus": 200,
+          "description": "DELETE /api/taskhub/tasks/:domain/:id should return 200"
+        },
+        {
+          "type": "elementHidden",
+          "selector": ".confirm-dialog",
+          "description": "ConfirmDialog should be closed after deletion"
+        }
+      ]
+    }
+  ],
+  "version": "1.0.0"
+}

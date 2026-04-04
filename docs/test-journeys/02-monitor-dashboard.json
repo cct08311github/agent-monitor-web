@@ -1,0 +1,791 @@
+{
+  "journey": "monitor-dashboard",
+  "prefix": "MON",
+  "description": "Monitor tab — dashboard load, SSE status, agent grid, search, detail view, sub-tabs, modals, responsive layout, keyboard shortcut",
+  "baseUrl": "https://localhost:3001",
+  "credentials": {
+    "USER": {
+      "username": "admin",
+      "password": "admin123",
+      "role": "USER"
+    }
+  },
+  "setup": {
+    "description": "All MON test cases start authenticated on the dashboard. Each test case should begin from a freshly authenticated session at /.",
+    "loginSteps": [
+      {
+        "action": "navigate",
+        "url": "/login"
+      },
+      {
+        "action": "fill",
+        "selector": "input#username",
+        "value": "admin"
+      },
+      {
+        "action": "fill",
+        "selector": "input#password",
+        "value": "admin123"
+      },
+      {
+        "action": "click",
+        "selector": "button[type=\"submit\"]"
+      },
+      {
+        "action": "wait",
+        "selector": ".app-header",
+        "timeout": 10000
+      }
+    ]
+  },
+  "testCases": [
+    {
+      "id": "MON-01",
+      "title": "Dashboard loads with summary cards",
+      "description": "After login the dashboard must show the summary-cards section with agent count and cost info",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "/login"
+        },
+        {
+          "action": "wait",
+          "selector": "input#username",
+          "timeout": 5000
+        },
+        {
+          "action": "fill",
+          "selector": "input#username",
+          "value": "admin"
+        },
+        {
+          "action": "fill",
+          "selector": "input#password",
+          "value": "admin123"
+        },
+        {
+          "action": "click",
+          "selector": "button[type=\"submit\"]"
+        },
+        {
+          "action": "wait",
+          "selector": ".app-header",
+          "timeout": 10000
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".app-header"
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".summary-cards"
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".summary-card",
+          "note": "At least one summary card must be rendered"
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".desktop-tabs"
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".sub-tab-nav"
+        },
+        {
+          "action": "screenshot",
+          "name": "MON-01-dashboard-summary-cards"
+        }
+      ]
+    },
+    {
+      "id": "MON-02",
+      "title": "SSE connection indicator shows connected",
+      "description": "The connection status badge in the sub-tab nav must show a connected state after the SSE stream is established",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "/login"
+        },
+        {
+          "action": "wait",
+          "selector": "input#username",
+          "timeout": 5000
+        },
+        {
+          "action": "fill",
+          "selector": "input#username",
+          "value": "admin"
+        },
+        {
+          "action": "fill",
+          "selector": "input#password",
+          "value": "admin123"
+        },
+        {
+          "action": "click",
+          "selector": "button[type=\"submit\"]"
+        },
+        {
+          "action": "wait",
+          "selector": ".connection-status",
+          "timeout": 12000,
+          "note": "Give SSE time to establish — may take a few seconds"
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".connection-status"
+        },
+        {
+          "action": "assert",
+          "type": "class_contains",
+          "selector": ".connection-status",
+          "value": "connected",
+          "note": "connectionStatus reactive value should settle to 'connected'"
+        },
+        {
+          "action": "screenshot",
+          "name": "MON-02-sse-connected-indicator"
+        }
+      ]
+    },
+    {
+      "id": "MON-03",
+      "title": "Agent grid displays agents",
+      "description": "The Agents sub-tab must render AgentFocus and/or AgentPeriphery sections containing agent cards, or an empty-state if no agents are registered",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "/login"
+        },
+        {
+          "action": "wait",
+          "selector": "input#username",
+          "timeout": 5000
+        },
+        {
+          "action": "fill",
+          "selector": "input#username",
+          "value": "admin"
+        },
+        {
+          "action": "fill",
+          "selector": "input#password",
+          "value": "admin123"
+        },
+        {
+          "action": "click",
+          "selector": "button[type=\"submit\"]"
+        },
+        {
+          "action": "wait",
+          "selector": ".sub-tab-btn",
+          "timeout": 10000
+        },
+        {
+          "action": "click",
+          "selector": ".sub-tab-btn:first-child",
+          "note": "Click the Agents sub-tab to ensure it is active"
+        },
+        {
+          "action": "wait",
+          "milliseconds": 800
+        },
+        {
+          "action": "assert",
+          "type": "visible_any",
+          "selectors": [
+            ".agent-card",
+            ".empty-state"
+          ],
+          "note": "Either agent cards or an empty-state placeholder must be present"
+        },
+        {
+          "action": "screenshot",
+          "name": "MON-03-agent-grid"
+        }
+      ]
+    },
+    {
+      "id": "MON-04",
+      "title": "Agent search filters results",
+      "description": "Typing in the search input must filter the displayed agent cards in real time",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "/login"
+        },
+        {
+          "action": "wait",
+          "selector": "input#username",
+          "timeout": 5000
+        },
+        {
+          "action": "fill",
+          "selector": "input#username",
+          "value": "admin"
+        },
+        {
+          "action": "fill",
+          "selector": "input#password",
+          "value": "admin123"
+        },
+        {
+          "action": "click",
+          "selector": "button[type=\"submit\"]"
+        },
+        {
+          "action": "wait",
+          "selector": "input.agent-search",
+          "timeout": 10000
+        },
+        {
+          "action": "fill",
+          "selector": "input.agent-search",
+          "value": "zzznomatch_xyz"
+        },
+        {
+          "action": "wait",
+          "milliseconds": 500
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".empty-state",
+          "note": "A query that matches nothing should show the empty-state block"
+        },
+        {
+          "action": "assert",
+          "type": "text_contains",
+          "selector": ".empty-state-title",
+          "value": "找不到符合的 Agent"
+        },
+        {
+          "action": "fill",
+          "selector": "input.agent-search",
+          "value": ""
+        },
+        {
+          "action": "wait",
+          "milliseconds": 300
+        },
+        {
+          "action": "assert",
+          "type": "not_visible",
+          "selector": ".empty-state",
+          "note": "Clearing the search should restore the grid (if agents exist)"
+        },
+        {
+          "action": "screenshot",
+          "name": "MON-04-agent-search-filter"
+        }
+      ]
+    },
+    {
+      "id": "MON-05",
+      "title": "Click agent card opens detail view",
+      "description": "Clicking an agent card must transition currentDesktopTab to 'detail' and render AgentDetail",
+      "precondition": "At least one agent card must be present",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "/login"
+        },
+        {
+          "action": "wait",
+          "selector": "input#username",
+          "timeout": 5000
+        },
+        {
+          "action": "fill",
+          "selector": "input#username",
+          "value": "admin"
+        },
+        {
+          "action": "fill",
+          "selector": "input#password",
+          "value": "admin123"
+        },
+        {
+          "action": "click",
+          "selector": "button[type=\"submit\"]"
+        },
+        {
+          "action": "wait",
+          "selector": ".agent-card",
+          "timeout": 12000
+        },
+        {
+          "action": "click",
+          "selector": ".agent-card",
+          "note": "Click the first agent card"
+        },
+        {
+          "action": "wait",
+          "selector": "#detailContent",
+          "timeout": 8000
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": "#detailContent"
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".section-header button.ctrl-btn",
+          "note": "Back button must be visible in detail view"
+        },
+        {
+          "action": "screenshot",
+          "name": "MON-05-agent-card-opens-detail"
+        }
+      ]
+    },
+    {
+      "id": "MON-06",
+      "title": "Agent detail shows sessions, cost, status",
+      "description": "The detail panel must render the basic-info card (status, model, cost), token card, and sessions card",
+      "precondition": "At least one agent card must be present",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "/login"
+        },
+        {
+          "action": "wait",
+          "selector": "input#username",
+          "timeout": 5000
+        },
+        {
+          "action": "fill",
+          "selector": "input#username",
+          "value": "admin"
+        },
+        {
+          "action": "fill",
+          "selector": "input#password",
+          "value": "admin123"
+        },
+        {
+          "action": "click",
+          "selector": "button[type=\"submit\"]"
+        },
+        {
+          "action": "wait",
+          "selector": ".agent-card",
+          "timeout": 12000
+        },
+        {
+          "action": "click",
+          "selector": ".agent-card"
+        },
+        {
+          "action": "wait",
+          "selector": "#detailContent",
+          "timeout": 8000
+        },
+        {
+          "action": "assert",
+          "type": "count_at_least",
+          "selector": ".detail-card",
+          "min": 2,
+          "note": "At least basic-info card and sessions card should render"
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".detail-card-title",
+          "note": "Each card must have a title"
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".detail-row",
+          "note": "Detail rows (status, model, cost, etc.) must be present"
+        },
+        {
+          "action": "screenshot",
+          "name": "MON-06-agent-detail-content"
+        }
+      ]
+    },
+    {
+      "id": "MON-07",
+      "title": "Close agent detail returns to grid",
+      "description": "Clicking the back button in the detail header must set currentDesktopTab back to 'monitor' and show the agent grid again",
+      "precondition": "At least one agent card must be present",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "/login"
+        },
+        {
+          "action": "wait",
+          "selector": "input#username",
+          "timeout": 5000
+        },
+        {
+          "action": "fill",
+          "selector": "input#username",
+          "value": "admin"
+        },
+        {
+          "action": "fill",
+          "selector": "input#password",
+          "value": "admin123"
+        },
+        {
+          "action": "click",
+          "selector": "button[type=\"submit\"]"
+        },
+        {
+          "action": "wait",
+          "selector": ".agent-card",
+          "timeout": 12000
+        },
+        {
+          "action": "click",
+          "selector": ".agent-card"
+        },
+        {
+          "action": "wait",
+          "selector": ".section-header button.ctrl-btn",
+          "timeout": 8000
+        },
+        {
+          "action": "click",
+          "selector": ".section-header button.ctrl-btn",
+          "note": "← 返回 button"
+        },
+        {
+          "action": "wait",
+          "selector": ".sub-tab-nav",
+          "timeout": 5000
+        },
+        {
+          "action": "assert",
+          "type": "not_visible",
+          "selector": "#detailContent"
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".sub-tab-nav"
+        },
+        {
+          "action": "screenshot",
+          "name": "MON-07-close-detail-returns-to-grid"
+        }
+      ]
+    },
+    {
+      "id": "MON-08",
+      "title": "Switch to sub-agents tab",
+      "description": "Clicking the Sub-Agents sub-tab button must render SubAgentGrid instead of the agent focus/periphery sections",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "/login"
+        },
+        {
+          "action": "wait",
+          "selector": "input#username",
+          "timeout": 5000
+        },
+        {
+          "action": "fill",
+          "selector": "input#username",
+          "value": "admin"
+        },
+        {
+          "action": "fill",
+          "selector": "input#password",
+          "value": "admin123"
+        },
+        {
+          "action": "click",
+          "selector": "button[type=\"submit\"]"
+        },
+        {
+          "action": "wait",
+          "selector": ".sub-tab-btn",
+          "timeout": 10000
+        },
+        {
+          "action": "click",
+          "selector": ".sub-tab-btn:nth-child(2)",
+          "note": "Second sub-tab button = Sub-Agents"
+        },
+        {
+          "action": "wait",
+          "milliseconds": 500
+        },
+        {
+          "action": "assert",
+          "type": "class_contains",
+          "selector": ".sub-tab-btn:nth-child(2)",
+          "value": "active"
+        },
+        {
+          "action": "assert",
+          "type": "not_visible",
+          "selector": "input.agent-search",
+          "note": "Search input only shows on agents sub-tab"
+        },
+        {
+          "action": "screenshot",
+          "name": "MON-08-subagents-tab"
+        }
+      ]
+    },
+    {
+      "id": "MON-09",
+      "title": "Open chat modal from agent",
+      "description": "Clicking the chat action button on an agent card must open the ChatModal overlay",
+      "precondition": "At least one agent card must be present",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "/login"
+        },
+        {
+          "action": "wait",
+          "selector": "input#username",
+          "timeout": 5000
+        },
+        {
+          "action": "fill",
+          "selector": "input#username",
+          "value": "admin"
+        },
+        {
+          "action": "fill",
+          "selector": "input#password",
+          "value": "admin123"
+        },
+        {
+          "action": "click",
+          "selector": "button[type=\"submit\"]"
+        },
+        {
+          "action": "wait",
+          "selector": ".agent-card",
+          "timeout": 12000
+        },
+        {
+          "action": "click",
+          "selector": ".agent-card .agent-action-btn:first-child",
+          "note": "First action button = 💬 對話"
+        },
+        {
+          "action": "wait",
+          "selector": ".modal-overlay",
+          "timeout": 5000
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".modal-overlay"
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".modal-content",
+          "note": "Chat modal inner content must be rendered"
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".modal-close-btn"
+        },
+        {
+          "action": "screenshot",
+          "name": "MON-09-chat-modal-open"
+        }
+      ]
+    },
+    {
+      "id": "MON-10",
+      "title": "Open model switch modal",
+      "description": "Clicking the model action button on an agent card must open the ModelSwitchModal overlay",
+      "precondition": "At least one agent card must be present",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "/login"
+        },
+        {
+          "action": "wait",
+          "selector": "input#username",
+          "timeout": 5000
+        },
+        {
+          "action": "fill",
+          "selector": "input#username",
+          "value": "admin"
+        },
+        {
+          "action": "fill",
+          "selector": "input#password",
+          "value": "admin123"
+        },
+        {
+          "action": "click",
+          "selector": "button[type=\"submit\"]"
+        },
+        {
+          "action": "wait",
+          "selector": ".agent-card",
+          "timeout": 12000
+        },
+        {
+          "action": "click",
+          "selector": ".agent-card .agent-action-btn:nth-child(2)",
+          "note": "Second action button = 🔄 模型"
+        },
+        {
+          "action": "wait",
+          "selector": ".modal-overlay",
+          "timeout": 5000
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".modal-overlay"
+        },
+        {
+          "action": "screenshot",
+          "name": "MON-10-model-switch-modal-open"
+        }
+      ]
+    },
+    {
+      "id": "MON-11",
+      "title": "Responsive layout — mobile view at 375x667",
+      "description": "At 375x667 the layout must remain usable: header and content must be visible and not overflow horizontally",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "/login"
+        },
+        {
+          "action": "wait",
+          "selector": "input#username",
+          "timeout": 5000
+        },
+        {
+          "action": "fill",
+          "selector": "input#username",
+          "value": "admin"
+        },
+        {
+          "action": "fill",
+          "selector": "input#password",
+          "value": "admin123"
+        },
+        {
+          "action": "click",
+          "selector": "button[type=\"submit\"]"
+        },
+        {
+          "action": "wait",
+          "selector": ".app-header",
+          "timeout": 10000
+        },
+        {
+          "action": "viewport",
+          "width": 375,
+          "height": 667
+        },
+        {
+          "action": "wait",
+          "milliseconds": 500
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".app-header"
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".main-content"
+        },
+        {
+          "action": "screenshot",
+          "name": "MON-11-responsive-mobile-375x667"
+        }
+      ]
+    },
+    {
+      "id": "MON-12",
+      "title": "Keyboard shortcut Shift+? shows help",
+      "description": "Pressing Shift+? on the dashboard must trigger the registered keyboard shortcut handler (useKeyboardShortcuts). If a help overlay is rendered it must be visible; at minimum the shortcut must not throw an error.",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "/login"
+        },
+        {
+          "action": "wait",
+          "selector": "input#username",
+          "timeout": 5000
+        },
+        {
+          "action": "fill",
+          "selector": "input#username",
+          "value": "admin"
+        },
+        {
+          "action": "fill",
+          "selector": "input#password",
+          "value": "admin123"
+        },
+        {
+          "action": "click",
+          "selector": "button[type=\"submit\"]"
+        },
+        {
+          "action": "wait",
+          "selector": ".app-header",
+          "timeout": 10000
+        },
+        {
+          "action": "click",
+          "selector": "body",
+          "note": "Ensure focus is on document body, not an input"
+        },
+        {
+          "action": "keyboard",
+          "key": "?",
+          "modifiers": [
+            "Shift"
+          ],
+          "note": "Shift+? dispatches keydown with event.key='?' and event.shiftKey=true"
+        },
+        {
+          "action": "wait",
+          "milliseconds": 500
+        },
+        {
+          "action": "assert",
+          "type": "no_console_errors",
+          "note": "The shortcut must not produce uncaught JS errors"
+        },
+        {
+          "action": "screenshot",
+          "name": "MON-12-keyboard-shortcut-shift-question"
+        }
+      ]
+    }
+  ],
+  "version": "1.0.0"
+}

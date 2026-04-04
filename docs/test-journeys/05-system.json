@@ -1,0 +1,508 @@
+{
+  "journey": "system",
+  "description": "System tab — resource metrics, cost charts, model usage, and responsive behaviour",
+  "baseUrl": "https://localhost:3001",
+  "credentials": {
+    "USER": {
+      "username": "admin",
+      "password": "admin123",
+      "role": "USER"
+    }
+  },
+  "setup": {
+    "description": "Login before every test case",
+    "steps": [
+      {
+        "action": "navigate",
+        "url": "{{baseUrl}}",
+        "description": "Open app"
+      },
+      {
+        "action": "fill",
+        "selector": "#username",
+        "value": "{{credentials.USER.username}}",
+        "description": "Enter username"
+      },
+      {
+        "action": "fill",
+        "selector": "#password",
+        "value": "{{credentials.USER.password}}",
+        "description": "Enter password"
+      },
+      {
+        "action": "click",
+        "selector": "button[type='submit']",
+        "description": "Submit login"
+      },
+      {
+        "action": "waitForSelector",
+        "selector": ".desktop-tabs",
+        "description": "Wait for dashboard to load"
+      }
+    ]
+  },
+  "testCases": [
+    {
+      "id": "SYS-01",
+      "name": "Navigate to System tab",
+      "description": "Clicking the System/Cost desktop-tab renders the system layout",
+      "steps": [
+        {
+          "action": "click",
+          "selector": ".desktop-tab:nth-child(2)",
+          "description": "Click 📊 系統/費用 tab"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".system-layout",
+          "description": "System layout container is rendered"
+        },
+        {
+          "action": "assertVisible",
+          "selector": ".system-left",
+          "description": "Left column (resources) is visible"
+        },
+        {
+          "action": "assertVisible",
+          "selector": ".system-right",
+          "description": "Right column (cost/tokens) is visible"
+        },
+        {
+          "action": "screenshot",
+          "name": "SYS-01-system-tab-loaded"
+        }
+      ]
+    },
+    {
+      "id": "SYS-02",
+      "name": "System status overview loads",
+      "description": "CPU, MEM, and Disk metric cards appear with percentage values",
+      "steps": [
+        {
+          "action": "click",
+          "selector": ".desktop-tab:nth-child(2)",
+          "description": "Navigate to System tab"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".sys-cards",
+          "description": "System cards container rendered"
+        },
+        {
+          "action": "assertPresent",
+          "selector": ".sys-card",
+          "minCount": 3,
+          "description": "Three metric cards present (CPU, MEM, Disk)"
+        },
+        {
+          "action": "assertText",
+          "selector": ".sys-card:nth-child(1) .sys-card-header span:first-child",
+          "contains": "CPU",
+          "description": "First card is CPU"
+        },
+        {
+          "action": "assertText",
+          "selector": ".sys-card:nth-child(2) .sys-card-header span:first-child",
+          "contains": "MEM",
+          "description": "Second card is MEM"
+        },
+        {
+          "action": "assertText",
+          "selector": ".sys-card:nth-child(3) .sys-card-header span:first-child",
+          "contains": "Disk",
+          "description": "Third card is Disk"
+        },
+        {
+          "action": "assertPattern",
+          "selector": ".sys-card .sys-val",
+          "pattern": "\\d+%",
+          "description": "Each metric card shows a percentage value"
+        },
+        {
+          "action": "screenshot",
+          "name": "SYS-02-system-status-overview"
+        }
+      ]
+    },
+    {
+      "id": "SYS-03",
+      "name": "Cost summary card displays",
+      "description": "The total cost summary is shown with a currency value",
+      "steps": [
+        {
+          "action": "click",
+          "selector": ".desktop-tab:nth-child(2)",
+          "description": "Navigate to System tab"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".cost-summary",
+          "description": "Cost summary section rendered"
+        },
+        {
+          "action": "assertVisible",
+          "selector": ".cost-summary-label",
+          "description": "Cost summary label is visible"
+        },
+        {
+          "action": "assertText",
+          "selector": ".cost-summary-label",
+          "contains": "總費用",
+          "description": "Label reads 總費用"
+        },
+        {
+          "action": "assertVisible",
+          "selector": ".cost-summary-value",
+          "description": "Cost value element is visible"
+        },
+        {
+          "action": "screenshot",
+          "name": "SYS-03-cost-summary-card"
+        }
+      ]
+    },
+    {
+      "id": "SYS-04",
+      "name": "Resource charts render",
+      "description": "Canvas-based sparkline (system history) and bar charts (cost history, token spenders) are rendered",
+      "steps": [
+        {
+          "action": "click",
+          "selector": ".desktop-tab:nth-child(2)",
+          "description": "Navigate to System tab"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".system-layout",
+          "description": "System layout loaded"
+        },
+        {
+          "action": "assertPresent",
+          "selector": "canvas",
+          "minCount": 3,
+          "description": "Three canvas elements present (sys trend, cost history, token spenders)"
+        },
+        {
+          "action": "assertAttribute",
+          "selector": "canvas:first-of-type",
+          "attribute": "style",
+          "contains": "width: 100%",
+          "description": "System sparkline canvas fills its container"
+        },
+        {
+          "action": "wait",
+          "ms": 1000,
+          "description": "Allow fetchHistory API call to complete and canvases to paint"
+        },
+        {
+          "action": "screenshot",
+          "name": "SYS-04-resource-charts-rendered"
+        }
+      ]
+    },
+    {
+      "id": "SYS-05",
+      "name": "Section headers for resources, cost, and tokens are visible",
+      "description": "Each section within the system tab has its section-header with the correct title",
+      "steps": [
+        {
+          "action": "click",
+          "selector": ".desktop-tab:nth-child(2)",
+          "description": "Navigate to System tab"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".system-layout",
+          "description": "System layout loaded"
+        },
+        {
+          "action": "assertText",
+          "selector": ".system-left .section-header:first-child h2",
+          "contains": "系統資源",
+          "description": "Left column header reads 系統資源"
+        },
+        {
+          "action": "assertText",
+          "selector": ".system-right .section-header:first-child h2",
+          "contains": "費用分析",
+          "description": "Right column first header reads 費用分析"
+        },
+        {
+          "action": "assertTextPresent",
+          "text": "Token 消耗排行",
+          "description": "Token leaderboard section header is present"
+        },
+        {
+          "action": "assertTextPresent",
+          "text": "模型使用明細",
+          "description": "Model usage detail section header is present"
+        },
+        {
+          "action": "screenshot",
+          "name": "SYS-05-section-headers-visible"
+        }
+      ]
+    },
+    {
+      "id": "SYS-06",
+      "name": "Model usage list renders",
+      "description": "The model usage list section is present; when data is available rows show model name and stats",
+      "steps": [
+        {
+          "action": "click",
+          "selector": ".desktop-tab:nth-child(2)",
+          "description": "Navigate to System tab"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".model-usage-list",
+          "description": "Model usage list container is present"
+        },
+        {
+          "action": "assertVisible",
+          "selector": ".model-usage-list",
+          "description": "Model usage list is visible"
+        },
+        {
+          "action": "wait",
+          "ms": 1500,
+          "description": "Allow API response to populate model usage rows"
+        },
+        {
+          "action": "conditionalAssert",
+          "condition": "document.querySelectorAll('.model-usage-item').length > 0",
+          "description": "If rows exist, assert each has a model name and stats columns",
+          "then": [
+            {
+              "action": "assertVisible",
+              "selector": ".model-usage-item:first-child .model-usage-name",
+              "description": "First row shows model name"
+            },
+            {
+              "action": "assertVisible",
+              "selector": ".model-usage-item:first-child .model-usage-stats",
+              "description": "First row shows token/cost stats"
+            }
+          ]
+        },
+        {
+          "action": "screenshot",
+          "name": "SYS-06-model-usage-list"
+        }
+      ]
+    },
+    {
+      "id": "SYS-07",
+      "name": "Health check endpoint accessible",
+      "description": "GET /api/read/health returns a 200 response confirming the backend is up",
+      "steps": [
+        {
+          "action": "request",
+          "method": "GET",
+          "url": "{{baseUrl}}/api/read/health",
+          "expectedStatus": 200,
+          "description": "Health endpoint returns HTTP 200"
+        },
+        {
+          "action": "assertResponseField",
+          "field": "success",
+          "value": true,
+          "description": "Response body has success: true"
+        },
+        {
+          "action": "navigate",
+          "url": "{{baseUrl}}",
+          "description": "Return to app after direct API check"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".desktop-tabs",
+          "description": "Dashboard reloaded"
+        },
+        {
+          "action": "screenshot",
+          "name": "SYS-07-health-check"
+        }
+      ]
+    },
+    {
+      "id": "SYS-08",
+      "name": "Progress bars reflect metric values",
+      "description": "Each sys-card progress fill width matches the displayed percentage",
+      "steps": [
+        {
+          "action": "click",
+          "selector": ".desktop-tab:nth-child(2)",
+          "description": "Navigate to System tab"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".sys-cards",
+          "description": "System cards loaded"
+        },
+        {
+          "action": "assertPresent",
+          "selector": ".progress-bar .progress-fill",
+          "minCount": 3,
+          "description": "Three progress fill bars are present"
+        },
+        {
+          "action": "assertAttribute",
+          "selector": ".progress-fill.blue",
+          "attribute": "style",
+          "contains": "width:",
+          "description": "CPU progress fill has inline width style"
+        },
+        {
+          "action": "assertAttribute",
+          "selector": ".progress-fill.green",
+          "attribute": "style",
+          "contains": "width:",
+          "description": "MEM progress fill has inline width style"
+        },
+        {
+          "action": "assertAttribute",
+          "selector": ".progress-fill.orange",
+          "attribute": "style",
+          "contains": "width:",
+          "description": "Disk progress fill has inline width style"
+        },
+        {
+          "action": "screenshot",
+          "name": "SYS-08-progress-bars"
+        }
+      ]
+    },
+    {
+      "id": "SYS-09",
+      "name": "System tab responsive on mobile viewport (375x667)",
+      "description": "At mobile viewport size the system tab content stacks and remains readable",
+      "steps": [
+        {
+          "action": "resize",
+          "width": 375,
+          "height": 667,
+          "description": "Set viewport to iPhone SE size"
+        },
+        {
+          "action": "navigate",
+          "url": "{{baseUrl}}",
+          "description": "Reload at mobile viewport"
+        },
+        {
+          "action": "fill",
+          "selector": "#username",
+          "value": "{{credentials.USER.username}}",
+          "description": "Login at mobile viewport"
+        },
+        {
+          "action": "fill",
+          "selector": "#password",
+          "value": "{{credentials.USER.password}}",
+          "description": "Enter password"
+        },
+        {
+          "action": "click",
+          "selector": "button[type='submit']",
+          "description": "Submit login"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".desktop-tabs",
+          "description": "Dashboard loaded"
+        },
+        {
+          "action": "click",
+          "selector": ".desktop-tab:nth-child(2)",
+          "description": "Navigate to System tab at mobile size"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".system-layout",
+          "description": "System layout visible"
+        },
+        {
+          "action": "assertVisible",
+          "selector": ".sys-cards",
+          "description": "Resource cards visible at mobile width"
+        },
+        {
+          "action": "assertVisible",
+          "selector": ".cost-summary",
+          "description": "Cost summary visible at mobile width"
+        },
+        {
+          "action": "screenshot",
+          "name": "SYS-09-system-tab-mobile-375"
+        },
+        {
+          "action": "resize",
+          "width": 1280,
+          "height": 800,
+          "description": "Restore desktop viewport"
+        }
+      ]
+    },
+    {
+      "id": "SYS-10",
+      "name": "Refresh system data via history API",
+      "description": "The /api/read/history endpoint returns success and expected data shape",
+      "steps": [
+        {
+          "action": "click",
+          "selector": ".desktop-tab:nth-child(2)",
+          "description": "Navigate to System tab"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".system-layout",
+          "description": "System layout loaded"
+        },
+        {
+          "action": "request",
+          "method": "GET",
+          "url": "{{baseUrl}}/api/read/history",
+          "withCredentials": true,
+          "expectedStatus": 200,
+          "description": "History API returns 200"
+        },
+        {
+          "action": "assertResponseField",
+          "field": "success",
+          "value": true,
+          "description": "History response has success: true"
+        },
+        {
+          "action": "assertResponseFieldPresent",
+          "field": "history",
+          "description": "Response includes history array"
+        },
+        {
+          "action": "navigate",
+          "url": "{{baseUrl}}",
+          "description": "Navigate back to app"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".desktop-tabs",
+          "description": "Dashboard reloaded"
+        },
+        {
+          "action": "click",
+          "selector": ".desktop-tab:nth-child(2)",
+          "description": "Re-open System tab to confirm charts re-render"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".system-layout",
+          "description": "System layout re-rendered"
+        },
+        {
+          "action": "screenshot",
+          "name": "SYS-10-system-data-refreshed"
+        }
+      ]
+    }
+  ],
+  "version": "1.0.0"
+}

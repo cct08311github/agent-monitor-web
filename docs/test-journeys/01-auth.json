@@ -1,0 +1,427 @@
+{
+  "journey": "auth",
+  "prefix": "AUTH",
+  "description": "Authentication flow — login page, validation, session lifecycle, theme persistence",
+  "baseUrl": "https://localhost:3001",
+  "credentials": {
+    "USER": {
+      "username": "admin",
+      "password": "admin123",
+      "role": "USER"
+    }
+  },
+  "testCases": [
+    {
+      "id": "AUTH-01",
+      "title": "Login page loads correctly",
+      "description": "Verify the login page renders with all required UI elements",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "/login"
+        },
+        {
+          "action": "wait",
+          "selector": ".login-card",
+          "timeout": 5000
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".login-card"
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": "h1"
+        },
+        {
+          "action": "assert",
+          "type": "text_contains",
+          "selector": "h1",
+          "value": "OpenClaw Watch Pro"
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": "input#username"
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": "input#password"
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": "button[type=\"submit\"]"
+        },
+        {
+          "action": "screenshot",
+          "name": "AUTH-01-login-page-loaded"
+        }
+      ]
+    },
+    {
+      "id": "AUTH-02",
+      "title": "Login with empty fields shows validation",
+      "description": "Submitting the login form with empty fields should trigger HTML5 required validation and not call the API",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "/login"
+        },
+        {
+          "action": "wait",
+          "selector": "button[type=\"submit\"]",
+          "timeout": 5000
+        },
+        {
+          "action": "click",
+          "selector": "button[type=\"submit\"]"
+        },
+        {
+          "action": "assert",
+          "type": "url_contains",
+          "value": "/login"
+        },
+        {
+          "action": "assert",
+          "type": "not_visible",
+          "selector": ".error-msg",
+          "note": "HTML5 required validation fires before JS; no .error-msg should appear"
+        },
+        {
+          "action": "screenshot",
+          "name": "AUTH-02-empty-fields-validation"
+        }
+      ]
+    },
+    {
+      "id": "AUTH-03",
+      "title": "Login with wrong credentials shows error",
+      "description": "Invalid username/password must surface the error message returned by the API",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "/login"
+        },
+        {
+          "action": "wait",
+          "selector": "input#username",
+          "timeout": 5000
+        },
+        {
+          "action": "fill",
+          "selector": "input#username",
+          "value": "wronguser"
+        },
+        {
+          "action": "fill",
+          "selector": "input#password",
+          "value": "wrongpassword"
+        },
+        {
+          "action": "click",
+          "selector": "button[type=\"submit\"]"
+        },
+        {
+          "action": "wait",
+          "selector": ".error-msg[role=\"alert\"]",
+          "timeout": 5000
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".error-msg[role=\"alert\"]"
+        },
+        {
+          "action": "assert",
+          "type": "url_contains",
+          "value": "/login"
+        },
+        {
+          "action": "screenshot",
+          "name": "AUTH-03-wrong-credentials-error"
+        }
+      ]
+    },
+    {
+      "id": "AUTH-04",
+      "title": "Successful login redirects to dashboard",
+      "description": "Valid credentials must set the session cookie and redirect to the dashboard at /",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "/login"
+        },
+        {
+          "action": "wait",
+          "selector": "input#username",
+          "timeout": 5000
+        },
+        {
+          "action": "fill",
+          "selector": "input#username",
+          "value": "admin"
+        },
+        {
+          "action": "fill",
+          "selector": "input#password",
+          "value": "admin123"
+        },
+        {
+          "action": "click",
+          "selector": "button[type=\"submit\"]"
+        },
+        {
+          "action": "wait",
+          "selector": ".app-header",
+          "timeout": 10000
+        },
+        {
+          "action": "assert",
+          "type": "url_matches",
+          "value": "^https://localhost:3001/?$"
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".app-header"
+        },
+        {
+          "action": "screenshot",
+          "name": "AUTH-04-successful-login-dashboard"
+        }
+      ]
+    },
+    {
+      "id": "AUTH-05",
+      "title": "Session persists on page reload",
+      "description": "After login, a hard reload should keep the user on the dashboard without redirecting to login",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "/login"
+        },
+        {
+          "action": "wait",
+          "selector": "input#username",
+          "timeout": 5000
+        },
+        {
+          "action": "fill",
+          "selector": "input#username",
+          "value": "admin"
+        },
+        {
+          "action": "fill",
+          "selector": "input#password",
+          "value": "admin123"
+        },
+        {
+          "action": "click",
+          "selector": "button[type=\"submit\"]"
+        },
+        {
+          "action": "wait",
+          "selector": ".app-header",
+          "timeout": 10000
+        },
+        {
+          "action": "navigate",
+          "url": "/",
+          "note": "Simulate page reload"
+        },
+        {
+          "action": "wait",
+          "selector": ".app-header",
+          "timeout": 8000
+        },
+        {
+          "action": "assert",
+          "type": "not_url_contains",
+          "value": "/login"
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".app-header"
+        },
+        {
+          "action": "screenshot",
+          "name": "AUTH-05-session-persists-after-reload"
+        }
+      ]
+    },
+    {
+      "id": "AUTH-06",
+      "title": "Logout clears session",
+      "description": "Clicking the logout button must call POST /api/auth/logout, clear the session cookie, and redirect to /login",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "/login"
+        },
+        {
+          "action": "wait",
+          "selector": "input#username",
+          "timeout": 5000
+        },
+        {
+          "action": "fill",
+          "selector": "input#username",
+          "value": "admin"
+        },
+        {
+          "action": "fill",
+          "selector": "input#password",
+          "value": "admin123"
+        },
+        {
+          "action": "click",
+          "selector": "button[type=\"submit\"]"
+        },
+        {
+          "action": "wait",
+          "selector": "button[aria-label=\"登出\"]",
+          "timeout": 10000
+        },
+        {
+          "action": "click",
+          "selector": "button[aria-label=\"登出\"]"
+        },
+        {
+          "action": "wait",
+          "selector": ".login-card",
+          "timeout": 8000
+        },
+        {
+          "action": "assert",
+          "type": "url_contains",
+          "value": "/login"
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": ".login-card"
+        },
+        {
+          "action": "screenshot",
+          "name": "AUTH-06-logout-redirects-to-login"
+        }
+      ]
+    },
+    {
+      "id": "AUTH-07",
+      "title": "Unauthenticated access redirects to login",
+      "description": "A fresh browser session navigating to / with no cookie must be redirected to /login",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "/",
+          "clearCookies": true,
+          "note": "Must start with no session cookie"
+        },
+        {
+          "action": "wait",
+          "selector": ".login-card",
+          "timeout": 8000
+        },
+        {
+          "action": "assert",
+          "type": "url_contains",
+          "value": "/login"
+        },
+        {
+          "action": "assert",
+          "type": "visible",
+          "selector": "input#username"
+        },
+        {
+          "action": "screenshot",
+          "name": "AUTH-07-unauthenticated-redirects-to-login"
+        }
+      ]
+    },
+    {
+      "id": "AUTH-08",
+      "title": "Theme toggle persists across sessions",
+      "description": "Switching theme before logout, then logging back in, should restore the previously chosen theme from localStorage",
+      "steps": [
+        {
+          "action": "navigate",
+          "url": "/login"
+        },
+        {
+          "action": "wait",
+          "selector": "input#username",
+          "timeout": 5000
+        },
+        {
+          "action": "fill",
+          "selector": "input#username",
+          "value": "admin"
+        },
+        {
+          "action": "fill",
+          "selector": "input#password",
+          "value": "admin123"
+        },
+        {
+          "action": "click",
+          "selector": "button[type=\"submit\"]"
+        },
+        {
+          "action": "wait",
+          "selector": ".header-btn.icon-only[title]",
+          "timeout": 10000,
+          "note": "Wait for theme toggle button (title attr = themeIcon emoji)"
+        },
+        {
+          "action": "assert",
+          "type": "attr_present",
+          "selector": "#vue-app",
+          "attr": "data-theme"
+        },
+        {
+          "action": "click",
+          "selector": ".header-btn.icon-only[title]",
+          "note": "Cycle theme once"
+        },
+        {
+          "action": "wait",
+          "milliseconds": 300
+        },
+        {
+          "action": "assert",
+          "type": "attr_present",
+          "selector": "#vue-app",
+          "attr": "data-theme",
+          "note": "data-theme is updated on the root element after toggle"
+        },
+        {
+          "action": "navigate",
+          "url": "/",
+          "note": "Reload to verify theme persists via localStorage"
+        },
+        {
+          "action": "wait",
+          "selector": ".app-header",
+          "timeout": 8000
+        },
+        {
+          "action": "assert",
+          "type": "attr_present",
+          "selector": "#vue-app",
+          "attr": "data-theme"
+        },
+        {
+          "action": "screenshot",
+          "name": "AUTH-08-theme-toggle-persists"
+        }
+      ]
+    }
+  ],
+  "version": "1.0.0"
+}

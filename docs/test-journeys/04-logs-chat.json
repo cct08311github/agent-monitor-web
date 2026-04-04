@@ -1,0 +1,586 @@
+{
+  "journey": "logs-chat",
+  "description": "Logs streaming + Chat tab full user journey",
+  "baseUrl": "https://localhost:3001",
+  "credentials": {
+    "USER": {
+      "username": "admin",
+      "password": "admin123",
+      "role": "USER"
+    }
+  },
+  "setup": {
+    "description": "Login before every test case",
+    "steps": [
+      {
+        "action": "navigate",
+        "url": "{{baseUrl}}",
+        "description": "Open app"
+      },
+      {
+        "action": "fill",
+        "selector": "#username",
+        "value": "{{credentials.USER.username}}",
+        "description": "Enter username"
+      },
+      {
+        "action": "fill",
+        "selector": "#password",
+        "value": "{{credentials.USER.password}}",
+        "description": "Enter password"
+      },
+      {
+        "action": "click",
+        "selector": "button[type='submit']",
+        "description": "Submit login"
+      },
+      {
+        "action": "waitForSelector",
+        "selector": ".desktop-tabs",
+        "description": "Wait for dashboard to load"
+      }
+    ]
+  },
+  "testCases": [
+    {
+      "id": "LC-01",
+      "name": "Navigate to Logs tab",
+      "description": "Clicking the Logs desktop-tab renders the logs panel",
+      "steps": [
+        {
+          "action": "click",
+          "selector": ".desktop-tab:nth-child(3)",
+          "description": "Click 日誌 tab"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".oc-log-terminal",
+          "description": "Log terminal container is visible"
+        },
+        {
+          "action": "assertVisible",
+          "selector": ".log-controls",
+          "description": "Log controls toolbar is visible"
+        },
+        {
+          "action": "assertVisible",
+          "selector": ".oc-log-status-bar",
+          "description": "Status bar is visible"
+        },
+        {
+          "action": "screenshot",
+          "name": "LC-01-logs-tab-loaded"
+        }
+      ]
+    },
+    {
+      "id": "LC-02",
+      "name": "Logs stream connects and shows entries",
+      "description": "Clicking Start Monitoring opens SSE stream and appends log lines",
+      "steps": [
+        {
+          "action": "click",
+          "selector": ".desktop-tab:nth-child(3)",
+          "description": "Navigate to Logs tab"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".oc-log-terminal",
+          "description": "Terminal ready"
+        },
+        {
+          "action": "click",
+          "selector": ".log-controls button:first-child",
+          "description": "Click 開始監看 (Start Monitoring)"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".oc-log-badge.live",
+          "description": "Status badge shows live state"
+        },
+        {
+          "action": "assertText",
+          "selector": ".oc-log-badge.live",
+          "contains": "監看中",
+          "description": "Badge text confirms streaming is active"
+        },
+        {
+          "action": "wait",
+          "ms": 2000,
+          "description": "Allow time for initial log lines to arrive"
+        },
+        {
+          "action": "screenshot",
+          "name": "LC-02-logs-streaming-active"
+        },
+        {
+          "action": "click",
+          "selector": ".log-controls button:first-child",
+          "description": "Click 停止監看 (Stop Monitoring) to clean up"
+        }
+      ]
+    },
+    {
+      "id": "LC-03",
+      "name": "Filter logs by text input",
+      "description": "Typing in the filter input narrows visible log lines to matching entries",
+      "steps": [
+        {
+          "action": "click",
+          "selector": ".desktop-tab:nth-child(3)",
+          "description": "Navigate to Logs tab"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".log-filter-input",
+          "description": "Filter input is present"
+        },
+        {
+          "action": "fill",
+          "selector": ".log-filter-input",
+          "value": "error",
+          "description": "Type 'error' into filter input"
+        },
+        {
+          "action": "assertAttribute",
+          "selector": ".log-filter-input",
+          "attribute": "value",
+          "value": "error",
+          "description": "Filter input reflects typed value"
+        },
+        {
+          "action": "assertNotPresent",
+          "description": "Log lines not matching filter keyword are hidden from visible output",
+          "note": "visibleLines computed property filters client-side; non-matching .log-line elements are not rendered"
+        },
+        {
+          "action": "screenshot",
+          "name": "LC-03-logs-text-filter-active"
+        },
+        {
+          "action": "fill",
+          "selector": ".log-filter-input",
+          "value": "",
+          "description": "Clear filter to reset"
+        }
+      ]
+    },
+    {
+      "id": "LC-04",
+      "name": "Filter error-level logs only",
+      "description": "Clicking the Error filter button shows only error-level log lines",
+      "steps": [
+        {
+          "action": "click",
+          "selector": ".desktop-tab:nth-child(3)",
+          "description": "Navigate to Logs tab"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".log-filter-btn",
+          "description": "Filter buttons are present"
+        },
+        {
+          "action": "click",
+          "selector": ".log-filter-btn:first-of-type",
+          "description": "Click ❌ Error filter button"
+        },
+        {
+          "action": "assertClass",
+          "selector": ".log-filter-btn:first-of-type",
+          "class": "active-error",
+          "description": "Error filter button has active-error class"
+        },
+        {
+          "action": "assertNotClass",
+          "selector": ".log-filter-btn:last-of-type",
+          "class": "active-warn",
+          "description": "Warn filter is deactivated when error is active"
+        },
+        {
+          "action": "screenshot",
+          "name": "LC-04-logs-error-filter-active"
+        },
+        {
+          "action": "click",
+          "selector": ".log-filter-btn:first-of-type",
+          "description": "Click again to deactivate error filter"
+        }
+      ]
+    },
+    {
+      "id": "LC-05",
+      "name": "Toggle auto-scroll off and on",
+      "description": "Scrolling up pauses auto-scroll; clicking the new-messages button resumes it",
+      "steps": [
+        {
+          "action": "click",
+          "selector": ".desktop-tab:nth-child(3)",
+          "description": "Navigate to Logs tab"
+        },
+        {
+          "action": "click",
+          "selector": ".log-controls button:first-child",
+          "description": "Start streaming"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".oc-log-badge.live",
+          "description": "Streaming active"
+        },
+        {
+          "action": "wait",
+          "ms": 1500,
+          "description": "Allow log lines to accumulate"
+        },
+        {
+          "action": "scroll",
+          "selector": ".oc-log-terminal",
+          "direction": "up",
+          "amount": 200,
+          "description": "Scroll up to trigger userScrolledUp state"
+        },
+        {
+          "action": "wait",
+          "ms": 1000,
+          "description": "Allow new lines to arrive and set hasNewMessages"
+        },
+        {
+          "action": "screenshot",
+          "name": "LC-05a-autoscroll-paused"
+        },
+        {
+          "action": "click",
+          "selector": ".log-scroll-btn",
+          "description": "Click ⬇ 新訊息 button to resume auto-scroll"
+        },
+        {
+          "action": "assertNotVisible",
+          "selector": ".log-scroll-btn",
+          "description": "Scroll-to-bottom button hides after clicking"
+        },
+        {
+          "action": "screenshot",
+          "name": "LC-05b-autoscroll-resumed"
+        },
+        {
+          "action": "click",
+          "selector": ".log-controls button:first-child",
+          "description": "Stop streaming to clean up"
+        }
+      ]
+    },
+    {
+      "id": "LC-06",
+      "name": "Manual scroll in log container",
+      "description": "The log terminal is scrollable and scroll position is maintained",
+      "steps": [
+        {
+          "action": "click",
+          "selector": ".desktop-tab:nth-child(3)",
+          "description": "Navigate to Logs tab"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".oc-log-terminal",
+          "description": "Terminal container is present"
+        },
+        {
+          "action": "assertScrollable",
+          "selector": ".oc-log-terminal",
+          "description": "Terminal container has overflow-y scroll capability"
+        },
+        {
+          "action": "scroll",
+          "selector": ".oc-log-terminal",
+          "direction": "up",
+          "amount": 100,
+          "description": "Scroll up manually"
+        },
+        {
+          "action": "assertScrollPosition",
+          "selector": ".oc-log-terminal",
+          "expectNotAtBottom": true,
+          "description": "Scroll position is not at bottom after manual scroll up"
+        },
+        {
+          "action": "screenshot",
+          "name": "LC-06-manual-scroll-up"
+        }
+      ]
+    },
+    {
+      "id": "LC-07",
+      "name": "Navigate to Chat tab",
+      "description": "Clicking the Chat desktop-tab renders the chat panel",
+      "steps": [
+        {
+          "action": "click",
+          "selector": ".desktop-tab:nth-child(4)",
+          "description": "Click 聊天室 tab"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".chat-tab-page",
+          "description": "Chat tab page is rendered"
+        },
+        {
+          "action": "assertVisible",
+          "selector": ".chat-page-header",
+          "description": "Chat header is visible"
+        },
+        {
+          "action": "assertVisible",
+          "selector": ".chat-agent-pills",
+          "description": "Agent selector pills container is visible"
+        },
+        {
+          "action": "assertVisible",
+          "selector": ".chat-page-input",
+          "description": "Chat textarea input is visible"
+        },
+        {
+          "action": "screenshot",
+          "name": "LC-07-chat-tab-loaded"
+        }
+      ]
+    },
+    {
+      "id": "LC-08",
+      "name": "Agent selector shows available agents",
+      "description": "The agent pill list includes at least the 'main' agent",
+      "steps": [
+        {
+          "action": "click",
+          "selector": ".desktop-tab:nth-child(4)",
+          "description": "Navigate to Chat tab"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".chat-agent-pills",
+          "description": "Agent pills container loaded"
+        },
+        {
+          "action": "assertPresent",
+          "selector": ".chat-agent-pill",
+          "description": "At least one agent pill is rendered"
+        },
+        {
+          "action": "assertText",
+          "selector": ".chat-agent-pill.active",
+          "contains": "main",
+          "description": "Default selected agent is 'main'"
+        },
+        {
+          "action": "screenshot",
+          "name": "LC-08-agent-pills-visible"
+        }
+      ]
+    },
+    {
+      "id": "LC-09",
+      "name": "Select a different agent",
+      "description": "Clicking a different agent pill switches selection and clears message history",
+      "steps": [
+        {
+          "action": "click",
+          "selector": ".desktop-tab:nth-child(4)",
+          "description": "Navigate to Chat tab"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".chat-agent-pills",
+          "description": "Agent pills loaded"
+        },
+        {
+          "action": "evaluate",
+          "description": "Count available agent pills",
+          "script": "document.querySelectorAll('.chat-agent-pill').length",
+          "storeAs": "pillCount"
+        },
+        {
+          "action": "conditionalClick",
+          "condition": "pillCount > 1",
+          "selector": ".chat-agent-pill:nth-child(2)",
+          "description": "Click second agent pill if more than one exists"
+        },
+        {
+          "action": "assertClass",
+          "selector": ".chat-agent-pill:nth-child(2)",
+          "class": "active",
+          "description": "Second pill is now active",
+          "condition": "pillCount > 1"
+        },
+        {
+          "action": "assertNotPresent",
+          "selector": ".chat-msg",
+          "description": "Message history is cleared when switching agents"
+        },
+        {
+          "action": "screenshot",
+          "name": "LC-09-agent-switched"
+        }
+      ]
+    },
+    {
+      "id": "LC-10",
+      "name": "Type and send a message",
+      "description": "Entering text and pressing the send button dispatches the message",
+      "steps": [
+        {
+          "action": "click",
+          "selector": ".desktop-tab:nth-child(4)",
+          "description": "Navigate to Chat tab"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".chat-page-input",
+          "description": "Chat input is ready"
+        },
+        {
+          "action": "fill",
+          "selector": ".chat-page-input",
+          "value": "Hello, test message from E2E",
+          "description": "Type test message"
+        },
+        {
+          "action": "assertEnabled",
+          "selector": ".chat-send",
+          "description": "Send button is enabled when input is non-empty"
+        },
+        {
+          "action": "click",
+          "selector": ".chat-send",
+          "description": "Click send button"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".chat-msg.user",
+          "description": "User message appears in log"
+        },
+        {
+          "action": "assertText",
+          "selector": ".chat-msg.user:last-of-type",
+          "contains": "Hello, test message from E2E",
+          "description": "User message text matches what was typed"
+        },
+        {
+          "action": "screenshot",
+          "name": "LC-10-message-sent"
+        }
+      ]
+    },
+    {
+      "id": "LC-11",
+      "name": "Chat history displays messages",
+      "description": "After sending, both user and agent messages appear in the message log",
+      "steps": [
+        {
+          "action": "click",
+          "selector": ".desktop-tab:nth-child(4)",
+          "description": "Navigate to Chat tab"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".chat-page-input",
+          "description": "Chat input ready"
+        },
+        {
+          "action": "fill",
+          "selector": ".chat-page-input",
+          "value": "ping",
+          "description": "Type short test message"
+        },
+        {
+          "action": "click",
+          "selector": ".chat-send",
+          "description": "Send the message"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".chat-msg.user",
+          "description": "User message appears"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".chat-msg.agent, .chat-msg.error",
+          "timeout": 15000,
+          "description": "Agent reply or error appears (API call may be slow)"
+        },
+        {
+          "action": "assertPresent",
+          "selector": ".chat-page-log .chat-msg",
+          "description": "At least one message exists in the log"
+        },
+        {
+          "action": "assertNotPresent",
+          "selector": ".chat-page-empty",
+          "description": "Empty state is gone once messages are present"
+        },
+        {
+          "action": "screenshot",
+          "name": "LC-11-chat-history-displayed"
+        }
+      ]
+    },
+    {
+      "id": "LC-12",
+      "name": "Open chat modal from agent card",
+      "description": "Clicking the Chat action on an agent card opens the ChatModal overlay",
+      "steps": [
+        {
+          "action": "click",
+          "selector": ".desktop-tab:first-child",
+          "description": "Navigate to Monitor tab"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".main-content",
+          "description": "Monitor content loaded"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".agent-card, .agent-card-focus, .agent-item",
+          "timeout": 8000,
+          "description": "Wait for at least one agent card to render"
+        },
+        {
+          "action": "click",
+          "selector": ".agent-card .ctrl-btn[title*='聊天'], .agent-card-focus button[title*='chat'], .agent-card button.chat-btn",
+          "fallbackSelector": ".agent-card button:nth-child(2)",
+          "description": "Click chat button on first visible agent card"
+        },
+        {
+          "action": "waitForSelector",
+          "selector": ".modal-overlay",
+          "description": "Chat modal overlay appears"
+        },
+        {
+          "action": "assertVisible",
+          "selector": ".modal-content",
+          "description": "Modal content is visible"
+        },
+        {
+          "action": "assertVisible",
+          "selector": ".modal-close-btn",
+          "description": "Close button is present"
+        },
+        {
+          "action": "screenshot",
+          "name": "LC-12-chat-modal-open"
+        },
+        {
+          "action": "click",
+          "selector": ".modal-close-btn",
+          "description": "Close the modal"
+        },
+        {
+          "action": "assertNotPresent",
+          "selector": ".modal-overlay",
+          "description": "Modal is dismissed"
+        }
+      ]
+    }
+  ],
+  "version": "1.0.0"
+}
