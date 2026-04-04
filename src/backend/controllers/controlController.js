@@ -38,6 +38,9 @@ class ControlController {
                 if (!agentId || !message || !/^[A-Za-z0-9_-]+$/.test(agentId)) {
                     return sendFail(res, 400, 'bad_request', { message: 'Invalid agent ID format.' });
                 }
+                if (message.length > 4096) {
+                    return sendFail(res, 400, 'bad_request', { message: 'Message too long (max 4096 chars).' });
+                }
 
                 const { stdout, stderr } = await openclawClient.runArgs(['agent', '--agent', agentId, '--message', message, '--no-color']);
                 return sendOk(res, { output: /* istanbul ignore next */ stdout || stderr });
@@ -97,7 +100,12 @@ class ControlController {
             /* istanbul ignore next */
             if (command === 'notion_sync') {
                 const { notionSyncScript } = getPaths();
-                const { stdout, stderr } = await openclawClient.runArgs([notionSyncScript], { binPath: 'python3' });
+                const resolved = require('path').resolve(notionSyncScript);
+                const allowedPrefix = require('path').resolve(getOpenClawConfig().root);
+                if (!resolved.startsWith(allowedPrefix + '/')) {
+                    return sendFail(res, 400, 'bad_request', { message: 'Invalid sync script path.' });
+                }
+                const { stdout, stderr } = await openclawClient.runArgs([resolved], { binPath: 'python3' });
                 return sendOk(res, { output: /* istanbul ignore next */ stdout || stderr });
             }
 

@@ -50,7 +50,7 @@ async function login(req, res) {
 function logout(req, res) {
     const token = req.cookies?.[COOKIE_NAME];
     if (token) sessionService.destroySession(token);
-    res.clearCookie(COOKIE_NAME, { path: '/' });
+    res.clearCookie(COOKIE_NAME, { path: '/', httpOnly: true, secure: true, sameSite: 'Strict' });
     return res.json({ success: true });
 }
 

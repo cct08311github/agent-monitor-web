@@ -85,6 +85,11 @@ function get(url: string, options?: RequestInit): Promise<unknown> {
   return request(url, options)
 }
 
+function getCsrfToken(): string | null {
+  const m = document.cookie.match(/(?:^|;\s*)_csrfSecret=([^;]+)/)
+  return m ? decodeURIComponent(m[1]) : null
+}
+
 function withJsonBody(
   method: string,
   url: string,
@@ -95,6 +100,8 @@ function withJsonBody(
     'Content-Type': 'application/json',
     ...((options?.headers as Record<string, string>) ?? {}),
   }
+  const csrf = getCsrfToken()
+  if (csrf) headers['x-csrf-token'] = csrf
   return request(url, {
     ...options,
     method,
@@ -103,16 +110,21 @@ function withJsonBody(
   })
 }
 
+function del(url: string, options?: RequestInit): Promise<unknown> {
+  const headers: Record<string, string> = {
+    ...((options?.headers as Record<string, string>) ?? {}),
+  }
+  const csrf = getCsrfToken()
+  if (csrf) headers['x-csrf-token'] = csrf
+  return request(url, { ...options, method: 'DELETE', headers })
+}
+
 function post(url: string, body?: unknown, options?: RequestInit): Promise<unknown> {
   return withJsonBody('POST', url, body, options)
 }
 
 function patch(url: string, body?: unknown, options?: RequestInit): Promise<unknown> {
   return withJsonBody('PATCH', url, body, options)
-}
-
-function del(url: string, options?: RequestInit): Promise<unknown> {
-  return request(url, { ...options, method: 'DELETE' })
 }
 
 // ---------------------------------------------------------------------------
