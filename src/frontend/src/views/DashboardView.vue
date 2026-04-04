@@ -57,6 +57,7 @@ function openModelSwitch(agentId: string, model: string) {
       <!-- Agent Detail -->
       <AgentDetail
         v-if="appState.currentDesktopTab === 'detail' && detailAgentId"
+        :key="detailAgentId"
         :agentId="detailAgentId"
         @close="closeDetail"
         @chat="openChat"

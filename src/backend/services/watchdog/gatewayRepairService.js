@@ -32,7 +32,7 @@ function createRepairService({ state, CONFIG, OPENCLAW_PATH, OPENCLAW_CONFIG_PAT
             const logPaths = [
                 path.join(OPENCLAW_LOG_DIR, `openclaw-${ymd}.log`),
                 `/tmp/openclaw-1000/openclaw-${ymd}.log`
-            ].join(' ');
+            ].map(p => `"${p.replace(/"/g, '\\"')}"`).join(' ');
 
             const { stdout: logs } = await execPromise(
                 `cat ${logPaths} 2>/dev/null | tail -100 | grep -i "error\\|fatal\\|invalid\\|failed\\|EADDRINUSE" | tail -30 || true`,

@@ -27,16 +27,15 @@ class DashboardReadController {
     }
 
     async streamDashboard(req, res) {
+        if (!dashboardPayloadService.addSseClient(res)) {
+            return res.status(503).json({ success: false, error: 'sse_capacity_exceeded' });
+        }
+
         res.writeHead(200, {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
             'Connection': 'keep-alive'
         });
-
-        if (!dashboardPayloadService.addSseClient(res)) {
-            res.status(503).end();
-            return;
-        }
         dashboardPayloadService.startGlobalPolling();
         dashboardPayloadService.startSseHeartbeat();
 
