@@ -10,6 +10,9 @@ const { apiLimiter } = require('./middlewares/rateLimiter');
 
 const app = express();
 
+// Trust one proxy hop (Tailscale serve / Nginx) so req.ip reflects the real client
+app.set('trust proxy', 1);
+
 const BASE_PATH = (process.env.BASE_PATH || '').replace(/\/+$/, '');
 
 const staticDir = path.join(__dirname, '../../dist');

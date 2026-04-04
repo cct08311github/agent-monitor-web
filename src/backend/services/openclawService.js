@@ -25,7 +25,8 @@ class OpenClawService {
     }
 
     try {
-      const { stdout } = await openclawClient.runCommand(command);
+      const args = command.replace(/^openclaw\s+/, '').split(/\s+/);
+      const { stdout } = await openclawClient.runArgs(args);
 
       if (command === 'openclaw agents list') {
         cache.agentsText = stdout;

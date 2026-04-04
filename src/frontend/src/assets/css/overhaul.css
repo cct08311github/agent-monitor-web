@@ -501,7 +501,7 @@ body {
 .nav-btn.active { color: var(--accent); }
 
 /* ── COST SELECTOR ─────────────────────── */
-.cost-range-selector select {
+select.cost-range-selector {
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
     background: var(--bg-input);

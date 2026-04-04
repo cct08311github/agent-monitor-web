@@ -44,7 +44,7 @@ async function login(req, res) {
 
     const token = sessionService.createSession(username);
     res.cookie(COOKIE_NAME, token, cookieOptions(authConfig.sessionTtlHours));
-    return res.json({ success: true, username, token });
+    return res.json({ success: true, username });
 }
 
 function logout(req, res) {

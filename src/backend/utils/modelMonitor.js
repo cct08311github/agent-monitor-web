@@ -13,7 +13,7 @@ async function fetchModelCooldowns() {
     }
 
     try {
-        const { stdout } = await openclawClient.runCommand('openclaw models status');
+        const { stdout } = await openclawClient.runArgs(['models', 'status']);
         const lines = stdout.split('\n');
         const cooldowns = {};
 

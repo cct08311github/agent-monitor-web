@@ -368,7 +368,7 @@ body {
     margin-top: 8px;
 }
 
-.cost-range-selector select {
+select.cost-range-selector {
     width: 100%;
     padding: 4px 8px;
     border: 1px solid var(--border);
