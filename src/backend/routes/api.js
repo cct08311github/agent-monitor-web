@@ -23,7 +23,6 @@ const { validateAgentId, validateSessionId, validateDomain } = require('../middl
 
 // ── Public Endpoints (no auth required) ───────────────────────────────────────
 router.get('/read/health', (req, res) => sendOk(res, { ts: new Date().toISOString() }));
-router.get('/read/liveness', systemController.getLiveness);
 
 // Auth endpoints — must be public (before requireAuth)
 router.post('/auth/login', authLimiter, auth.loginRateLimit, authController.login);
@@ -46,7 +45,8 @@ router.use(auth.requireAuth);
 // Generate CSRF token for authenticated sessions
 router.use(csrfTokenGenerator);
 
-// Readiness/dependencies require auth (expose filesystem paths)
+// Liveness/readiness/dependencies require auth (expose pid, filesystem paths)
+router.get('/read/liveness', systemController.getLiveness);
 router.get('/read/readiness', systemController.getReadiness);
 router.get('/read/dependencies', systemController.getDependencies);
 

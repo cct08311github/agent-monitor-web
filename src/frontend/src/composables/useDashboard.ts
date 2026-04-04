@@ -4,7 +4,8 @@
 // ---------------------------------------------------------------------------
 
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { api } from '@/composables/useApi'
+import { useRouter } from 'vue-router'
+import { api, type ApiRequestError } from '@/composables/useApi'
 import { useSSE } from '@/composables/useSSE'
 import { appState } from '@/stores/appState'
 import type { Agent } from '@/types/api'
@@ -13,8 +14,10 @@ export type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting'
 export type CostRange = 'today' | 'week' | 'month' | 'all'
 
 export function useDashboard() {
+  const router = useRouter()
   const dashboard = computed(() => appState.latestDashboard)
   const connectionStatus = ref<ConnectionStatus>('disconnected')
+  const fetchError = ref<string | null>(null)
   const lastUpdateTs = ref(0)
 
   // ── Agent list (sorted by priority) ──────────────────────────────────────
@@ -97,8 +100,13 @@ export function useDashboard() {
         }
         lastUpdateTs.value = Date.now()
       }
-    } catch {
-      // Error handled by calling component / error boundary
+    } catch (err) {
+      const apiErr = err as ApiRequestError
+      if (apiErr.status === 401) {
+        router.push({ name: 'login' })
+        return
+      }
+      fetchError.value = 'Dashboard 載入失敗'
     }
   }
 
@@ -157,6 +165,7 @@ export function useDashboard() {
     inactiveAgents,
     subagents,
     connectionStatus,
+    fetchError,
     lastUpdateTs,
     isConnected,
     costRange,
