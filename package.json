@@ -7,7 +7,7 @@
     "start": "node --env-file=.env server.js",
     "dev": "nodemon --env-file=.env server.js",
     "dev:vue": "vite",
-    "build:vue": "vue-tsc --noEmit && vite build",
+    "build": "vue-tsc --noEmit && vite build",
     "preview:vue": "vite preview",
     "test": "jest --forceExit --detectOpenHandles",
     "test:e2e": "playwright test",

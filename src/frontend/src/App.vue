@@ -105,10 +105,10 @@ const activeDesktopTab = computed<DesktopTab>(() => {
 
 <style>
 /* Import existing CSS files — they use CSS custom properties from theme.css */
-@import '../public/css/theme.css';
-@import '../public/css/style.css';
-@import '../public/css/taskhub.css';
-@import '../public/css/a11y.css';
-@import '../public/css/overhaul.css';
-@import '../public/css/ux-patterns.css';
+@import './assets/css/theme.css';
+@import './assets/css/style.css';
+@import './assets/css/taskhub.css';
+@import './assets/css/a11y.css';
+@import './assets/css/overhaul.css';
+@import './assets/css/ux-patterns.css';
 </style>
