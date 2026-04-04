@@ -4,7 +4,7 @@ export interface Agent {
   name: string
   workspace: string
   model: string
-  status: 'active_executing' | 'active_recent' | 'dormant' | 'offline'
+  status: 'active_executing' | 'active_recent' | 'dormant' | 'offline' | 'inactive'
   emoji: string
   label: string
   currentTask?: {
