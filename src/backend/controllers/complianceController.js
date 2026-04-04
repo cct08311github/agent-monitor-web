@@ -1,5 +1,6 @@
 const { adaptiveSecurity, complianceSystem } = require('../security');
 const { sendOk, sendFail } = require('../utils/apiResponse');
+const logger = require('../utils/logger');
 
 class ComplianceController {
     analyzeCompliance(req, res) {
@@ -28,7 +29,8 @@ class ComplianceController {
 
             return sendOk(res, report);
         } catch (error) { /* istanbul ignore next */
-            return sendFail(res, 500, error.message);
+            logger.error('compliance_analyze_error', { details: logger.toErrorFields(error) });
+            return sendFail(res, 500, 'internal_error');
         }
     }
 
@@ -36,7 +38,8 @@ class ComplianceController {
         try {
             return sendOk(res, complianceSystem.getStatus());
         } catch (error) { /* istanbul ignore next */
-            return sendFail(res, 500, error.message);
+            logger.error('compliance_get_status_error', { details: logger.toErrorFields(error) });
+            return sendFail(res, 500, 'internal_error');
         }
     }
 }

@@ -1,5 +1,6 @@
 const { threatIntel, adaptiveSecurity } = require('../security');
 const { sendOk, sendFail } = require('../utils/apiResponse');
+const logger = require('../utils/logger');
 
 class SecurityController {
     analyzeThreats(req, res) {
@@ -13,7 +14,8 @@ class SecurityController {
             const analysis = threatIntel.analyze(content);
             return sendOk(res, analysis);
         } catch (error) { /* istanbul ignore next */
-            return sendFail(res, 500, error.message);
+            logger.error('security_analyze_threats_error', { details: logger.toErrorFields(error) });
+            return sendFail(res, 500, 'internal_error');
         }
     }
 
@@ -28,7 +30,8 @@ class SecurityController {
             const result = adaptiveSecurity.analyze(content, context || {});
             return sendOk(res, result);
         } catch (error) { /* istanbul ignore next */
-            return sendFail(res, 500, error.message);
+            logger.error('security_analyze_security_error', { details: logger.toErrorFields(error) });
+            return sendFail(res, 500, 'internal_error');
         }
     }
 

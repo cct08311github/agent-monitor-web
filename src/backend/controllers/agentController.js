@@ -1,5 +1,6 @@
 const openclawService = require('../services/openclawService');
 const { sendOk, sendFail } = require('../utils/apiResponse');
+const logger = require('../utils/logger');
 
 class AgentController {
     async getAgents(req, res) {
@@ -41,7 +42,8 @@ class AgentController {
             });
 
         } catch (error) { /* istanbul ignore next */
-            return sendFail(res, 500, error.message);
+            logger.error('agent_get_agents_error', { details: logger.toErrorFields(error) });
+            return sendFail(res, 500, 'internal_error');
         }
     }
 }

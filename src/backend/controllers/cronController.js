@@ -40,7 +40,7 @@ class CronController {
             return sendOk(res, { jobs: data.jobs || [] });
         } catch (error) {
             logger.error('cron_jobs_fetch_error', { requestId: req.requestId, details: logger.toErrorFields(error) });
-            return sendFail(res, 500, error.message);
+            return sendFail(res, 500, 'internal_error');
         }
     }
 
@@ -50,6 +50,10 @@ class CronController {
     async toggleJob(req, res) {
         const { id } = req.params;
         const { enabled } = req.body;
+
+        if (typeof enabled !== 'boolean') {
+            return sendFail(res, 400, 'invalid_enabled');
+        }
 
         if (!validateJobId(id)) {
             logger.warn('cron_job_invalid_id', { requestId: req.requestId, id });
@@ -79,7 +83,7 @@ class CronController {
             return sendOk(res, { job: data.jobs[jobIndex] });
         } catch (error) {
             logger.error('cron_job_toggle_error', { requestId: req.requestId, id, details: logger.toErrorFields(error) });
-            return sendFail(res, 500, error.message);
+            return sendFail(res, 500, 'internal_error');
         }
     }
 
@@ -110,7 +114,7 @@ class CronController {
             return sendOk(res);
         } catch (error) {
             logger.error('cron_job_delete_error', { requestId: req.requestId, id, details: logger.toErrorFields(error) });
-            return sendFail(res, 500, error.message);
+            return sendFail(res, 500, 'internal_error');
         }
     }
 
@@ -153,7 +157,7 @@ class CronController {
             });
         } catch (error) {
             logger.error('cron_job_run_error', { requestId: req.requestId, id, details: logger.toErrorFields(error) });
-            return sendFail(res, 500, error.message);
+            return sendFail(res, 500, 'internal_error');
         }
     }
 }
