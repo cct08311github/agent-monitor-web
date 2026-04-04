@@ -3,9 +3,9 @@
 /**
  * CSRF Protection Middleware using Double-Submit Cookie Pattern
  *
- * Strategy: Generate a random CSRF token, store in HttpOnly cookie (set by server),
+ * Strategy: Generate a random CSRF token, store in a cookie (set by server),
  * and require the client to send it via X-CSRF-Token header for state-changing requests.
- * The cookie is HttpOnly so JavaScript cannot read it (prevents XSS stealing tokens).
+ * The cookie is NOT HttpOnly so the frontend can read and double-submit it.
  *
  * Note: With SameSite=Strict cookies, CSRF is already heavily mitigated.
  * This provides defense-in-depth for cases where SameSite might be downgraded.
@@ -31,9 +31,10 @@ function csrfTokenGenerator(req, res, next) {
     const existingToken = req.cookies?.[CSRF_SECRET_COOKIE];
     const token = existingToken || generateCsrfToken();
 
-    // Set as HttpOnly cookie - JavaScript cannot read this
+    // Non-HttpOnly so the frontend JS can read and send it via X-CSRF-Token header
+    // (standard double-submit cookie pattern)
     res.cookie(CSRF_SECRET_COOKIE, token, {
-        httpOnly: true,
+        httpOnly: false,
         secure: true,           // HTTPS only
         sameSite: 'strict',    // Cannot be sent cross-site
         maxAge: 24 * 60 * 60 * 1000, // 24 hours

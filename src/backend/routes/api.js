@@ -18,6 +18,7 @@ const auth = require('../middlewares/auth');
 const alertController = require('../controllers/alertController');
 const authController = require('../controllers/authController');
 const { csrfTokenGenerator, csrfVerifier } = require('../middlewares/csrfProtection');
+const { authLimiter } = require('../middlewares/rateLimiter');
 const { validateAgentId, validateSessionId, validateDomain } = require('../middlewares/inputValidation');
 
 // ── Public Endpoints (no auth required) ───────────────────────────────────────
@@ -27,7 +28,7 @@ router.get('/read/readiness', systemController.getReadiness);
 router.get('/read/dependencies', systemController.getDependencies);
 
 // Auth endpoints — must be public (before requireAuth)
-router.post('/auth/login', auth.loginRateLimit, authController.login);
+router.post('/auth/login', authLimiter, auth.loginRateLimit, authController.login);
 router.post('/auth/logout', authController.logout);
 router.get('/auth/me', authController.me);
 
