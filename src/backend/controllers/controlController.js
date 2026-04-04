@@ -74,7 +74,7 @@ class ControlController {
                     }
                     return sendFail(res, 404, 'not_found', { message: `Agent ${agentId} not found in config` });
                 } catch (err) {
-                    return sendFail(res, 500, 'config_error', { message: err.message });
+                    return sendFail(res, 500, 'config_error', { message: 'config_read_failed' });
                 }
             }
 
@@ -128,7 +128,7 @@ class ControlController {
                 details: logger.toErrorFields(error),
             });
             /* istanbul ignore next */
-            return sendFail(res, 500, 'command_failed', { output: error.stdout || error.stderr || error.message });
+            return sendFail(res, 500, 'command_failed', { output: 'command execution failed' });
         }
 
         /* istanbul ignore next */

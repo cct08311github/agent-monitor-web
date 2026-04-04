@@ -50,7 +50,7 @@ const cleanupAgentsStmt = db.prepare(`DELETE FROM agent_metrics WHERE timestamp 
 function saveSnapshot(systemData, agents) {
     try {
         const insertTx = db.transaction(() => {
-            const activeCount = agents.filter(a => a.status.includes('active')).length;
+            const activeCount = agents.filter(a => a.status?.includes('active')).length;
             insertSystemStmt.run(systemData.cpu, systemData.memory, systemData.disk, agents.length, activeCount);
 
             for (const agent of agents) {

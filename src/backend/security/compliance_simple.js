@@ -65,6 +65,7 @@ class ComplianceSystem {
     };
     
     this.history.push(analysis);
+    if (this.history.length > 200) this.history.shift();
     logger.info('security_compliance_analyzed', { score: score.toFixed(1), level });
     
     return analysis;
