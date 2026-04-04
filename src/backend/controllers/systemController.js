@@ -2,6 +2,7 @@ const { threatIntel, adaptiveSecurity, complianceSystem } = require('../security
 const openclawService = require('../services/openclawService');
 const healthService = require('../services/healthService');
 const { sendOk, sendFail } = require('../utils/apiResponse');
+const logger = require('../utils/logger');
 
 class SystemController {
     async getComprehensiveStatus(req, res) {
@@ -67,7 +68,8 @@ class SystemController {
             });
 
         } catch (error) { /* istanbul ignore next */
-            return sendFail(res, 500, error.message);
+            logger.error('system_get_comprehensive_status_error', { details: logger.toErrorFields(error) });
+            return sendFail(res, 500, 'internal_error');
         }
     }
 
