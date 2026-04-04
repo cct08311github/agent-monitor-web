@@ -133,6 +133,9 @@ export function useDashboard() {
       onReconnecting() {
         connectionStatus.value = 'reconnecting'
       },
+      onResumed() {
+        fetchDashboard(true)
+      },
       autoReconnect: true,
     })
   }

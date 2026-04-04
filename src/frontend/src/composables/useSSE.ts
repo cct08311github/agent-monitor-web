@@ -35,6 +35,8 @@ export interface SSEOptions {
   onError?: (event: Event, source: EventSource) => void
   /** Fire just before a reconnect attempt. */
   onReconnecting?: (attempt: number, delayMs: number) => void
+  /** Fire when the tab becomes visible again after being paused. */
+  onResumed?: () => void
   /** Named event listeners (e.g. `{ dashboard: handler }`). */
   events?: Record<string, (event: MessageEvent, source: EventSource) => void>
   /** Enable automatic reconnection (default: true). */
@@ -168,6 +170,7 @@ export function useSSE(): SSEHandle {
           pausedByVisibility = false
           reconnectAttempt.value = 0
           start()
+          _currentOptions.onResumed?.()
         }
       }
       document.addEventListener('visibilitychange', visibilityHandler)
