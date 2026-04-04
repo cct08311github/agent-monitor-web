@@ -33,6 +33,8 @@ async function run(req, res) {
         return;
     }
 
+    isRunning = true;
+
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
@@ -46,8 +48,6 @@ async function run(req, res) {
     function sendProgress(step, msg) {
         if (!clientGone) res.write(`event: progress\ndata: ${JSON.stringify({ step, msg })}\n\n`);
     }
-
-    isRunning = true;
     try {
         sendProgress(1, '收集數據中...');
         const data = await optimizeService.collectData();

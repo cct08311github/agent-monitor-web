@@ -25,6 +25,8 @@ class SystemController {
 
             const complianceAnalysis = complianceSystem.analyze(systemData);
 
+            const activeAgentCount = agentsList.filter(a => openclawService.detectRealActivity(a.id, a.workspace).status !== 'inactive').length;
+
             return sendOk(res, {
                 timestamp: new Date().toISOString(),
                 system: {
@@ -36,7 +38,7 @@ class SystemController {
                     monitoring: {
                         status: 'operational',
                         agents: agentsList.length,
-                        activeAgents: agentsList.filter(a => openclawService.detectRealActivity(a.id, a.workspace).status !== 'inactive').length
+                        activeAgents: activeAgentCount
                     },
                     security: {
                         status: 'operational',
@@ -54,7 +56,7 @@ class SystemController {
                 summary: {
                     securityLevel: securityStatus.levelInfo.emoji + ' ' + securityStatus.levelInfo.label,
                     complianceScore: complianceAnalysis.score + '%',
-                    activeAgents: agentsList.filter(a => openclawService.detectRealActivity(a.id, a.workspace).status !== 'inactive').length,
+                    activeAgents: activeAgentCount,
                     totalAgents: agentsList.length
                 },
                 recommendations: [

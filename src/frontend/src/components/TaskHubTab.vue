@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { api } from '@/composables/useApi'
 import { showToast } from '@/composables/useToast'
 import TaskDetailModal from '@/components/TaskDetailModal.vue'
@@ -212,6 +212,10 @@ function toggleDropdown(id: string, e: Event) {
 onMounted(() => {
   fetchStats()
   fetchTasks()
+})
+
+onUnmounted(() => {
+  clearTimeout(searchTimer.value)
 })
 </script>
 

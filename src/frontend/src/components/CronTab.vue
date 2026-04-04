@@ -54,8 +54,10 @@ async function toggleJob(id: string, enabled: boolean): Promise<void> {
     }
   } catch (e) {
     showToast('❌ 操作失敗: ' + (e as Error).message, 'error')
-    // Revert by re-fetching
-    await fetchJobs()
+    // Revert local state immediately, then try re-fetch for full sync
+    const job = jobs.value.find((j) => j.id === id)
+    if (job) job.enabled = !enabled
+    await fetchJobs().catch(() => {})
   }
 }
 
