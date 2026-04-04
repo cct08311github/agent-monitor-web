@@ -1,15 +1,6 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    background: #0f172a;
-    color: #f1f5f9;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-}
+/* body centering removed — Vue SPA uses scoped .login-container instead */
 
 .login-card {
     background: #1e293b;

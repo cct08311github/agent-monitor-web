@@ -12,7 +12,7 @@ const mockFs = {
 };
 jest.mock('fs', () => mockFs);
 
-jest.mock('child_process', () => ({ exec: jest.fn() }));
+jest.mock('child_process', () => ({ exec: jest.fn(), execFile: jest.fn(), spawn: jest.fn() }));
 
 let service;
 
@@ -20,7 +20,7 @@ beforeEach(() => {
     jest.resetModules();
     jest.mock('util', () => ({ promisify: jest.fn(() => mockExecPromise) }));
     jest.mock('fs', () => mockFs);
-    jest.mock('child_process', () => ({ exec: jest.fn() }));
+    jest.mock('child_process', () => ({ exec: jest.fn(), execFile: jest.fn(), spawn: jest.fn() }));
 
     mockExecPromise.mockReset();
     Object.values(mockFs).forEach(fn => typeof fn.mockReset === 'function' && fn.mockReset());
@@ -75,16 +75,14 @@ describe('getOpenClawData', () => {
         expect(result).toBe('');
     });
 
-    it('replaces openclaw with full binary path', async () => {
+    it('calls runArgs with parsed args array', async () => {
         mockExecPromise.mockResolvedValue({ stdout: '"ok"' });
         await service.getOpenClawData('openclaw health');
-        expect(mockExecPromise).toHaveBeenCalledWith(expect.stringContaining('.openclaw/bin/openclaw'));
-    });
-
-    it('passes non-openclaw command as-is (else branch)', async () => {
-        mockExecPromise.mockResolvedValue({ stdout: '"ok"' });
-        await service.getOpenClawData('echo "hello"', false);
-        expect(mockExecPromise).toHaveBeenCalledWith('echo "hello"');
+        expect(mockExecPromise).toHaveBeenCalledWith(
+            expect.stringContaining('.openclaw/bin/openclaw'),
+            ['health'],
+            expect.anything()
+        );
     });
 });
 

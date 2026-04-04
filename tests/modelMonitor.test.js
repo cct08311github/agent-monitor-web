@@ -17,14 +17,25 @@ jest.mock('util', () => {
     };
 });
 
-jest.mock('child_process', () => ({ exec: mockExecFn }));
+// execFile(bin, args, cb) — forward to mockExecFn so setupMock works
+const mockExecFileFn = jest.fn((...a) => {
+    const cb = a[a.length - 1];
+    mockExecFn(a[0], cb);
+});
+
+jest.mock('child_process', () => ({ exec: mockExecFn, execFile: mockExecFileFn, spawn: jest.fn() }));
 
 let monitor;
 
 beforeEach(() => {
     jest.resetModules();
     mockExecFn.mockReset();
-    jest.mock('child_process', () => ({ exec: mockExecFn }));
+    mockExecFileFn.mockReset();
+    mockExecFileFn.mockImplementation((...a) => {
+        const cb = a[a.length - 1];
+        mockExecFn(a[0], cb);
+    });
+    jest.mock('child_process', () => ({ exec: mockExecFn, execFile: mockExecFileFn, spawn: jest.fn() }));
     jest.mock('util', () => {
         const actual = jest.requireActual('util');
         return {

@@ -54,7 +54,7 @@ function localhostOnlyControl(req, res, next) {
 
     if (!isAllowedHost(hostHeader)) {
         logger.warn('control_forbidden_host', { host: hostHeader, origin, ip: getClientIp(req) });
-        return res.status(403).json({ success: false, error: 'forbidden_host', message: 'Restricted', _debug_host: hostHeader, _debug_origin: origin });
+        return res.status(403).json({ success: false, error: 'forbidden_host', message: 'Restricted' });
     }
 
     if (origin) {

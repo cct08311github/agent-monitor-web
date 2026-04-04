@@ -203,18 +203,27 @@ describe('requireAuth — protected routes', () => {
 });
 
 // ── Bearer token auth (iOS / API clients) ────────────────────────────────────
+// Token is no longer in response body (security fix) — extract from Set-Cookie
+function extractTokenFromCookies(res) {
+    const cookies = res.headers['set-cookie'] || [];
+    for (const c of cookies) {
+        const m = c.match(/sid=([^;]+)/);
+        if (m) return m[1];
+    }
+    return null;
+}
+
 describe('Bearer token auth', () => {
     let token;
     beforeEach(async () => {
         const loginRes = await request(app).post('/api/auth/login').send({ username: 'admin', password: 'password123' });
-        token = loginRes.body.token;
+        token = extractTokenFromCookies(loginRes);
     });
 
-    it('login response includes token field', async () => {
+    it('login response does not leak token in body', async () => {
         const res = await request(app).post('/api/auth/login').send({ username: 'admin', password: 'password123' });
-        expect(res.body.token).toBeDefined();
-        expect(typeof res.body.token).toBe('string');
-        expect(res.body.token).toContain('.');
+        expect(res.body.token).toBeUndefined();
+        expect(res.body.success).toBe(true);
     });
 
     it('GET /api/alerts/config returns 200 with Bearer token', async () => {
