@@ -89,7 +89,7 @@ router.get('/agents', agentController.getAgents);
 // Security & Threats
 router.post('/threats/analyze', auth.rateLimit, csrfVerifier, securityController.analyzeThreats);
 router.post('/security/analyze', auth.rateLimit, csrfVerifier, securityController.analyzeSecurity);
-router.get('/learn/search', securityController.searchAndLearn);
+router.get('/learn/search', auth.rateLimit, securityController.searchAndLearn);
 
 // Compliance
 router.post('/compliance/analyze', auth.rateLimit, csrfVerifier, complianceController.analyzeCompliance);

@@ -57,8 +57,8 @@ async function updateTask(req, res) {
         }
 
         const result = repo.updateTask(domain, id, req.body);
-        if (result.noFields) return sendFail(res, 400, 'No fields to update');
-        if (result.notFound) return sendFail(res, 404, '找不到任務');
+        if (result.noFields) return sendFail(res, 400, 'no_fields_to_update');
+        if (result.notFound) return sendFail(res, 404, 'not_found');
 
         return sendOk(res, { task: withParsedTags(result.task) });
     } catch (err) {
@@ -74,7 +74,7 @@ async function deleteTask(req, res) {
     }
     try {
         const deleted = repo.deleteTask(domain, id);
-        if (!deleted) return sendFail(res, 404, '找不到任務');
+        if (!deleted) return sendFail(res, 404, 'not_found');
 
         logger.info('taskhub_task_deleted', { requestId: req.requestId, id, title: deleted.title, domain });
         return sendOk(res, { deleted });
@@ -91,7 +91,7 @@ async function createTask(req, res) {
         return sendFail(res, 400, 'invalid_domain');
     }
     if (!title || !title.trim()) {
-        return sendFail(res, 400, '標題不可空白');
+        return sendFail(res, 400, 'title_required');
     }
 
     try {
