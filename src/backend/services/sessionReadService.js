@@ -34,11 +34,12 @@ function readSessionContent(agentIdInput, sessionIdInput) {
         return { statusCode: 404, body: { success: false, error: 'not_found' } };
     }
 
-    // Symlink guard: ensure resolved path stays within expected sessions dir
+    // Symlink guard: resolve both sides to catch symlinks in any path component
     const sessionsDir = getSessionsDir(agentId);
     try {
+        const realSessionsDir = fs.realpathSync(sessionsDir);
         const realPath = fs.realpathSync(filePath);
-        if (!realPath.startsWith(sessionsDir + path.sep) && realPath !== sessionsDir) {
+        if (!realPath.startsWith(realSessionsDir + path.sep)) {
             return { statusCode: 403, body: { success: false, error: 'forbidden' } };
         }
     } catch (_) {
