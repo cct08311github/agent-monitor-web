@@ -82,7 +82,7 @@ function readGeminiApiKey() {
     try {
         const { envPath } = getOpenClawConfig();
         const raw = fs.readFileSync(envPath, 'utf8');
-        const match = raw.match(/^GEMINI_API_KEY=(.+)$/m);
+        const match = raw.match(/^GEMINI_API_KEY=["']?([^"'\s#]+)["']?/m);
         return match ? match[1].trim() : '';
     } catch (_) {
         return '';

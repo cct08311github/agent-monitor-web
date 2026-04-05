@@ -30,7 +30,7 @@ async function getTasks(req, res) {
     try {
         const { domain = 'all' } = req.query;
         if (domain !== 'all' && !repo.isValidDomain(domain)) {
-            return sendFail(res, 400, `Invalid domain: ${domain}`);
+            return sendFail(res, 400, 'invalid_domain');
         }
 
         const tasks = repo.findTasks(req.query);
@@ -44,16 +44,16 @@ async function getTasks(req, res) {
 async function updateTask(req, res) {
     const { domain, id } = req.params;
     if (!repo.isValidDomain(domain)) {
-        return sendFail(res, 400, `Invalid domain: ${domain}`);
+        return sendFail(res, 400, 'invalid_domain');
     }
 
     try {
         const { status, priority } = req.body;
         if (status && !repo.VALID_STATUSES.includes(status)) {
-            return sendFail(res, 400, `Invalid status: ${status}`);
+            return sendFail(res, 400, 'invalid_status');
         }
         if (priority && !repo.VALID_PRIORITIES.includes(priority)) {
-            return sendFail(res, 400, `Invalid priority: ${priority}`);
+            return sendFail(res, 400, 'invalid_priority');
         }
 
         const result = repo.updateTask(domain, id, req.body);
@@ -70,7 +70,7 @@ async function updateTask(req, res) {
 async function deleteTask(req, res) {
     const { domain, id } = req.params;
     if (!repo.isValidDomain(domain)) {
-        return sendFail(res, 400, `Invalid domain: ${domain}`);
+        return sendFail(res, 400, 'invalid_domain');
     }
     try {
         const deleted = repo.deleteTask(domain, id);
@@ -88,7 +88,7 @@ async function createTask(req, res) {
     const { domain, title } = req.body;
 
     if (!repo.isValidDomain(domain)) {
-        return sendFail(res, 400, `Invalid domain: ${domain}`);
+        return sendFail(res, 400, 'invalid_domain');
     }
     if (!title || !title.trim()) {
         return sendFail(res, 400, '標題不可空白');
