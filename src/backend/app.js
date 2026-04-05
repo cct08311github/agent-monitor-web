@@ -3,6 +3,7 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 const apiRoutes = require('./routes/api');
 const errorHandler = require('./middlewares/errorHandler');
+const responseSanitizer = require('./middlewares/responseSanitizer');
 const requestContext = require('./middlewares/requestContext');
 const requestLogger = require('./middlewares/requestLogger');
 const { securityHeaders } = require('./middlewares/securityHeaders');
@@ -37,6 +38,7 @@ core.use(express.json({ limit: '1mb' })); // Prevent DoS via large payloads
 core.use(cookieParser());
 core.use(requestContext);
 core.use(requestLogger);
+core.use('/api', responseSanitizer);
 core.use('/api', apiRoutes);
 
 // Mount at root and optionally at BASE_PATH
