@@ -7,7 +7,6 @@ const { threatIntel, adaptiveSecurity, complianceSystem } = require('./src/backe
 const gatewayWatchdog = require('./src/backend/services/gatewayWatchdog');
 const dashboardPayloadService = require('./src/backend/services/dashboardPayloadService');
 const sseStreamManager = require('./src/backend/services/sseStreamManager');
-const agentWatcherService = require('./src/backend/services/agentWatcherService');
 const tsdbService = require('./src/backend/services/tsdbService');
 const taskHubRepository = require('./src/backend/repositories/taskHubRepository');
 const { getServerConfig } = require('./src/backend/config');
@@ -55,41 +54,41 @@ server.listen(PORT, '127.0.0.1', () => {
 
 // --- Graceful Shutdown ---
 const SHUTDOWN_TIMEOUT_MS = 10_000;
-let isShuttingDown = false;
+let shutdownCalled = 0;
 
 function gracefulShutdown(signal) {
-  if (isShuttingDown) return;
-  isShuttingDown = true;
+  if (shutdownCalled++ > 0) return; // atomic guard against double-signal
   console.log(`\n🛑 收到 ${signal}，伺服器正在優雅關閉...`);
 
-  // Hard deadline: force exit if cleanup hangs
+  // Hard deadline: force exit if server.close() hangs (e.g. keep-alive connections)
   const forceTimer = setTimeout(() => {
     console.error('⚠️ Shutdown timeout — forcing exit');
-    process.exit(1);
+    process.exit(0);
   }, SHUTDOWN_TIMEOUT_MS);
   forceTimer.unref();
 
-  // 1. Stop accepting new connections
+  // 1. Stop accepting new connections; callback fires after all in-flight requests finish
   server.close(() => {
-    console.log('✅ HTTP server closed (no new connections)');
+    console.log('✅ HTTP server closed');
+
+    // 2. Drain SSE connections — send shutdown event then end()
+    sseStreamManager.closeAll();
+    console.log('✅ SSE connections drained');
+
+    // 3. Stop background services (polling, file watchers, watchdog)
+    dashboardPayloadService.stopGlobalPolling();
+    gatewayWatchdog.stop();
+    console.log('✅ Background services stopped');
+
+    // 4. Close databases (flush WAL)
+    tsdbService.close();
+    taskHubRepository.close();
+    console.log('✅ Databases closed');
+
+    console.log('🏁 Graceful shutdown complete');
+    clearTimeout(forceTimer);
+    process.exit(0);
   });
-
-  // 2. Drain SSE connections — send shutdown event then end()
-  sseStreamManager.closeAll();
-  console.log('✅ SSE connections drained');
-
-  // 3. Stop background services
-  agentWatcherService.stop();
-  gatewayWatchdog.stop();
-  console.log('✅ Background services stopped');
-
-  // 4. Close databases (flush WAL)
-  tsdbService.close();
-  taskHubRepository.close();
-  console.log('✅ Databases closed');
-
-  console.log('🏁 Graceful shutdown complete');
-  process.exit(0);
 }
 
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));

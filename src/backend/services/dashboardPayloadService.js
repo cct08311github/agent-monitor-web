@@ -213,15 +213,18 @@ async function doBroadcast() {
     sseManager.broadcast(sharedPayload);
 }
 
+let pollingTimer = null;
+let watcherDebounceTimer = null;
+
 function startGlobalPolling() {
     if (isPolling) return;
     isPolling = true;
 
     agentWatcherService.start();
-    let watcherDebounceTimer = null;
     agentWatcherService.on('state_update', () => {
         clearTimeout(watcherDebounceTimer);
         watcherDebounceTimer = setTimeout(async () => {
+            if (!isPolling) return;
             invalidateCache(cache.agents);
             invalidateCache(cache.subagents);
             await updateSharedData();
@@ -229,12 +232,24 @@ function startGlobalPolling() {
         }, 300);
     });
 
-    setInterval(async () => {
+    pollingTimer = setInterval(async () => {
         await updateSharedData();
         doBroadcast().catch((e) => logger.error('poller_broadcast_error', { msg: e.message }));
-    }, pollingConfig.pollingIntervalMs).unref();
+    }, pollingConfig.pollingIntervalMs);
+    pollingTimer.unref();
 
     updateSharedData().catch((e) => logger.error('poller_update_failed', { msg: e.message }));
+}
+
+function stopGlobalPolling() {
+    isPolling = false;
+    if (pollingTimer) {
+        clearInterval(pollingTimer);
+        pollingTimer = null;
+    }
+    clearTimeout(watcherDebounceTimer);
+    watcherDebounceTimer = null;
+    agentWatcherService.stop();
 }
 
 function addSseClient(res) {
@@ -271,6 +286,7 @@ async function runOpenclawRead(args) {
 module.exports = {
     updateSharedData,
     startGlobalPolling,
+    stopGlobalPolling,
     addSseClient,
     removeSseClient,
     startSseHeartbeat,
