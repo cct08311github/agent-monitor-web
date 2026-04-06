@@ -58,4 +58,21 @@ function stopHeartbeat() {
     }
 }
 
-module.exports = { addClient, removeClient, broadcast, broadcastAlert, getClientCount, startHeartbeat, stopHeartbeat };
+/**
+ * Gracefully close all SSE connections.
+ * Sends a server-shutdown event so clients can show a maintenance notice
+ * instead of treating the TCP reset as an unexpected disconnect.
+ */
+function closeAll() {
+    stopHeartbeat();
+    const shutdownEvent = `event: server-shutdown\ndata: ${JSON.stringify({ reason: 'server_restart' })}\n\n`;
+    sseClients.forEach((res) => {
+        try {
+            res.write(shutdownEvent);
+            res.end();
+        } catch (_) { /* already gone */ }
+    });
+    sseClients.clear();
+}
+
+module.exports = { addClient, removeClient, broadcast, broadcastAlert, getClientCount, startHeartbeat, stopHeartbeat, closeAll };

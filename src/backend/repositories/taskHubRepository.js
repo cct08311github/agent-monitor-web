@@ -267,6 +267,22 @@ function insertTask(domain, fields) {
     return conn.prepare(`SELECT *, ? as domain FROM ${table} WHERE id = ?`).get(domain, id);
 }
 
+/**
+ * Close the TaskHub database connection, flushing WAL to main file.
+ * Safe to call when db was never opened (lazy init) or already closed.
+ */
+function close() {
+    try {
+        if (db && db.open) {
+            db.close();
+            db = null;
+            logger.info('taskhub_db_closed');
+        }
+    } catch (e) {
+        logger.error('taskhub_db_close_error', { details: logger.toErrorFields(e) });
+    }
+}
+
 module.exports = {
     DOMAIN_TABLES,
     VALID_STATUSES,
@@ -280,4 +296,5 @@ module.exports = {
     updateTask,
     deleteTask,
     insertTask,
+    close,
 };
