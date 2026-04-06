@@ -135,10 +135,26 @@ function getAgentActivitySummary() {
     } catch (e) { /* istanbul ignore next */ return []; }
 }
 
+/**
+ * Close the TSDB database connection, flushing WAL to main file.
+ * Safe to call multiple times.
+ */
+function close() {
+    try {
+        if (db.open) {
+            db.close();
+            logger.info('tsdb_closed');
+        }
+    } catch (e) {
+        logger.error('tsdb_close_error', { details: logger.toErrorFields(e) });
+    }
+}
+
 module.exports = {
     saveSnapshot,
     getSystemHistory,
     getAgentTopTokens,
     getCostHistory,
-    getAgentActivitySummary
+    getAgentActivitySummary,
+    close,
 };

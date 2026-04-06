@@ -1,4 +1,4 @@
-// v2.0.3 - Gateway Watchdog auto-healing
+// v2.1.0 - Graceful Shutdown
 
 const https = require('https');
 const fs = require('fs');
@@ -6,6 +6,10 @@ const app = require('./src/backend/app');
 const { threatIntel, adaptiveSecurity, complianceSystem } = require('./src/backend/security');
 const gatewayWatchdog = require('./src/backend/services/gatewayWatchdog');
 const dashboardPayloadService = require('./src/backend/services/dashboardPayloadService');
+const sseStreamManager = require('./src/backend/services/sseStreamManager');
+const agentWatcherService = require('./src/backend/services/agentWatcherService');
+const tsdbService = require('./src/backend/services/tsdbService');
+const taskHubRepository = require('./src/backend/repositories/taskHubRepository');
 const { getServerConfig } = require('./src/backend/config');
 const { validateStartup } = require('./src/backend/config/startup');
 
@@ -19,22 +23,20 @@ if (!startup.ok) {
   process.exit(1);
 }
 
-// 讀取本地生成的 mkcert 憑證
 const sslOptions = {
   key: fs.readFileSync(serverConfig.certKeyPath),
   cert: fs.readFileSync(serverConfig.certCertPath)
 };
 
-// 改用 https.createServer
-https.createServer(sslOptions, app).listen(PORT, '127.0.0.1', () => {
+const server = https.createServer(sslOptions, app);
+
+server.listen(PORT, '127.0.0.1', () => {
   const securityStatus = adaptiveSecurity.getStatus();
   const complianceStatus = complianceSystem.getStatus();
 
   console.log('🔍 Agent 監控系統運行中... (已啟用加密連線)');
   console.log(`🌐 本地訪問: https://localhost:${PORT}`);
   console.log(`📡 遠端安全訪問: https://mac-mini.tailde842d.ts.net:${PORT} 或 https://100.109.189.69:${PORT}`);
-
-  // -- 下方維持您原本的 log 輸出不變 --
   console.log(`🚀 版本: 3.0.0 (Clean Architecture 修復版)`);
   console.log(`✨ 功能:`);
   console.log(`   • ✅ 真實活動檢測 (含輕量化 Cache)`);
@@ -46,19 +48,49 @@ https.createServer(sslOptions, app).listen(PORT, '127.0.0.1', () => {
   console.log(`🛡️ 當前安全級別: ${securityStatus.levelInfo.emoji} ${securityStatus.levelInfo.label}`);
   console.log(`📋 合規標準: ${complianceStatus.standards.join(', ')}`);
 
-  // Start Gateway Watchdog (auto-healing)
   gatewayWatchdog.start();
   dashboardPayloadService.startGlobalPolling();
   console.log(`🐕 Gateway Watchdog 已啟動 (每 ${gatewayWatchdog.CONFIG.checkIntervalMs / 1000}s 檢查 | 最多修復 ${gatewayWatchdog.CONFIG.maxRepairAttempts} 次)`);
 });
 
-// Graceful shutdown
-process.on('SIGINT', () => {
+// --- Graceful Shutdown ---
+const SHUTDOWN_TIMEOUT_MS = 10_000;
+let isShuttingDown = false;
+
+function gracefulShutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log(`\n🛑 收到 ${signal}，伺服器正在優雅關閉...`);
+
+  // Hard deadline: force exit if cleanup hangs
+  const forceTimer = setTimeout(() => {
+    console.error('⚠️ Shutdown timeout — forcing exit');
+    process.exit(1);
+  }, SHUTDOWN_TIMEOUT_MS);
+  forceTimer.unref();
+
+  // 1. Stop accepting new connections
+  server.close(() => {
+    console.log('✅ HTTP server closed (no new connections)');
+  });
+
+  // 2. Drain SSE connections — send shutdown event then end()
+  sseStreamManager.closeAll();
+  console.log('✅ SSE connections drained');
+
+  // 3. Stop background services
+  agentWatcherService.stop();
   gatewayWatchdog.stop();
-  console.log('\n🛑 伺服器關閉中...');
+  console.log('✅ Background services stopped');
+
+  // 4. Close databases (flush WAL)
+  tsdbService.close();
+  taskHubRepository.close();
+  console.log('✅ Databases closed');
+
+  console.log('🏁 Graceful shutdown complete');
   process.exit(0);
-});
-process.on('SIGTERM', () => {
-  gatewayWatchdog.stop();
-  process.exit(0);
-});
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
