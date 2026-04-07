@@ -3,10 +3,11 @@
 // Fetches initial dashboard payload and maintains SSE connection
 // ---------------------------------------------------------------------------
 
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { api, type ApiRequestError } from '@/composables/useApi'
 import { useSSE } from '@/composables/useSSE'
+import { showToast } from '@/composables/useToast'
 import { appState } from '@/stores/appState'
 import type { Agent } from '@/types/api'
 
@@ -112,7 +113,19 @@ export function useDashboard() {
 
   // ── SSE connection ────────────────────────────────────────────────────────
 
-  const { connect, close, isConnected } = useSSE()
+  const { connect, close, isConnected, isFailed, manualReconnect } = useSSE()
+
+  // Notify the user when SSE has exhausted all reconnect attempts
+  watch(isFailed, (failed) => {
+    if (failed) {
+      showToast('連線中斷，無法自動重連。請點擊以手動重試。', 'error', {
+        duration: 0,
+        retryFn: () => {
+          manualReconnect()
+        },
+      })
+    }
+  })
 
   function startSSE(): void {
     connect('/api/read/stream', {
@@ -168,6 +181,8 @@ export function useDashboard() {
     fetchError,
     lastUpdateTs,
     isConnected,
+    isFailed,
+    manualReconnect,
     costRange,
     getAgentCost,
     totalCost,

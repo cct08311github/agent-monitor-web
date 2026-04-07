@@ -227,8 +227,12 @@ function startGlobalPolling() {
             if (!isPolling) return;
             invalidateCache(cache.agents);
             invalidateCache(cache.subagents);
-            await updateSharedData();
-            doBroadcast().catch((e) => logger.error('poller_broadcast_error', { msg: e.message }));
+            try {
+                await updateSharedData();
+                doBroadcast().catch((e) => logger.error('poller_broadcast_error', { msg: e.message }));
+            } catch (e) {
+                logger.error('watcher_update_failed', { msg: e.message });
+            }
         }, 300);
     });
 
@@ -249,6 +253,7 @@ function stopGlobalPolling() {
     }
     clearTimeout(watcherDebounceTimer);
     watcherDebounceTimer = null;
+    agentWatcherService.removeAllListeners('state_update');
     agentWatcherService.stop();
 }
 
