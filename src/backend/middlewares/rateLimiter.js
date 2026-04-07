@@ -30,20 +30,7 @@ const authLimiter = rateLimit({
     message: { success: false, error: 'rate_limited', message: 'Too many authentication attempts' },
 });
 
-/**
- * Control endpoint rate limit - 30 requests per minute per IP
- * For command execution and control operations
- */
-const controlLimiter = rateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    max: 30,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { success: false, error: 'rate_limited', message: 'Too many control requests' },
-});
-
 module.exports = {
     apiLimiter,
     authLimiter,
-    controlLimiter,
 };

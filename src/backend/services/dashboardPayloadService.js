@@ -1,14 +1,12 @@
 'use strict';
 
 const fs = require('fs');
-const os = require('os');
-const path = require('path');
 const util = require('util');
 const { execFile } = require('child_process');
 
 const execFilePromise = util.promisify(execFile);
 const logger = require('../utils/logger');
-const { getDashboardPollingConfig } = require('../config');
+const { getDashboardPollingConfig, getOpenClawConfig } = require('../config');
 const tsdbService = require('./tsdbService');
 const agentWatcherService = require('./agentWatcherService');
 const alertEngine = require('./alertEngine');
@@ -20,18 +18,18 @@ const { parseAgentsList, detectDetailedActivity, buildSubagentStatus } = require
 const sseManager = require('./sseStreamManager');
 const { createCacheManager } = require('./dashboardCacheManager');
 
-const HOME_DIR = os.homedir();
-const OPENCLAW_ROOT = path.join(HOME_DIR, '.openclaw');
-const DEFAULT_OPENCLAW_BIN = path.join(OPENCLAW_ROOT, 'bin', 'openclaw');
+const _ocConfig = getOpenClawConfig();
+const HOME_DIR = _ocConfig.homeDir;
+const OPENCLAW_ROOT = _ocConfig.root;
 const OPENCLAW_BIN_CANDIDATES = [
     process.env.OPENCLAW_BIN,
-    DEFAULT_OPENCLAW_BIN,
+    _ocConfig.binPath,
     '/opt/homebrew/bin/openclaw',
     '/usr/local/bin/openclaw',
     '/usr/bin/openclaw',
     'openclaw',
 ].filter(Boolean);
-const AGENTS_ROOT = path.join(OPENCLAW_ROOT, 'agents');
+const AGENTS_ROOT = _ocConfig.agentsRoot;
 const SENSITIVE_PATH_PREFIXES = [OPENCLAW_ROOT, HOME_DIR];
 const pollingConfig = getDashboardPollingConfig();
 const TSDB_SNAPSHOT_INTERVAL = pollingConfig.tsdbSnapshotIntervalMs;

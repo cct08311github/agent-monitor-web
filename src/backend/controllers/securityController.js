@@ -8,7 +8,11 @@ class SecurityController {
             const { content, context } = req.body;
 
             if (!content) {
-                return sendFail(res, 400, '缺少內容參數');
+                return sendFail(res, 400, 'missing_content');
+            }
+
+            if (typeof content !== 'string' || content.length > 10_000) {
+                return sendFail(res, 400, 'invalid_content');
             }
 
             const analysis = threatIntel.analyze(content);
@@ -24,7 +28,11 @@ class SecurityController {
             const { content, context } = req.body;
 
             if (!content) {
-                return sendFail(res, 400, '缺少內容參數');
+                return sendFail(res, 400, 'missing_content');
+            }
+
+            if (typeof content !== 'string' || content.length > 10_000) {
+                return sendFail(res, 400, 'invalid_content');
             }
 
             const result = adaptiveSecurity.analyze(content, context || {});
@@ -38,7 +46,11 @@ class SecurityController {
     searchAndLearn(req, res) {
         const query = req.query.q;
         if (!query) {
-            return sendFail(res, 400, '缺少查詢參數');
+            return sendFail(res, 400, 'missing_query');
+        }
+
+        if (typeof query !== 'string' || query.length > 512) {
+            return sendFail(res, 400, 'invalid_query');
         }
 
         const securityAnalysis = adaptiveSecurity.analyze(query, { source: 'learning_query' });

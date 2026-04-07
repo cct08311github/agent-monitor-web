@@ -4,6 +4,9 @@ const logger = require('../utils/logger');
 
 class ComplianceController {
     analyzeCompliance(req, res) {
+        if (!req.body || typeof req.body !== 'object') {
+            return sendFail(res, 400, 'missing_body');
+        }
         try {
             const systemData = req.body;
 

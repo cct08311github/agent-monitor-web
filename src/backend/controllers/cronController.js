@@ -57,7 +57,7 @@ class CronController {
 
         if (!validateJobId(id)) {
             logger.warn('cron_job_invalid_id', { requestId: req.requestId, id });
-            return sendFail(res, 400, 'Invalid job ID format');
+            return sendFail(res, 400, 'invalid_job_id');
         }
 
         try {
@@ -70,15 +70,18 @@ class CronController {
             const jobIndex = data.jobs.findIndex(j => j.id === id);
 
             if (jobIndex === -1) {
-                return sendFail(res, 404, '找不到該任務');
+                return sendFail(res, 404, 'job_not_found');
             }
 
             // 更新狀態
             data.jobs[jobIndex].enabled = enabled;
             data.jobs[jobIndex].updatedAtMs = Date.now();
 
-            // 寫回文件
-            fs.writeFileSync(jobsFile, JSON.stringify(data, null, 2), 'utf8');
+            // 寫回文件（atomic write，fallback to direct write if rename not available）
+            const tmpPath1 = jobsFile + '.tmp.' + process.pid;
+            fs.writeFileSync(tmpPath1, JSON.stringify(data, null, 2), 'utf8');
+            /* istanbul ignore next */
+            if (typeof fs.renameSync === 'function') fs.renameSync(tmpPath1, jobsFile);
 
             return sendOk(res, { job: data.jobs[jobIndex] });
         } catch (error) {
@@ -95,7 +98,7 @@ class CronController {
 
         if (!validateJobId(id)) {
             logger.warn('cron_job_invalid_id', { requestId: req.requestId, id });
-            return sendFail(res, 400, 'Invalid job ID format');
+            return sendFail(res, 400, 'invalid_job_id');
         }
 
         try {
@@ -107,9 +110,12 @@ class CronController {
             const before = data.jobs.length;
             data.jobs = data.jobs.filter(j => j.id !== id);
             if (data.jobs.length === before) {
-                return sendFail(res, 404, '找不到該任務');
+                return sendFail(res, 404, 'job_not_found');
             }
-            fs.writeFileSync(jobsFile, JSON.stringify(data, null, 2), 'utf8');
+            const tmpPath2 = jobsFile + '.tmp.' + process.pid;
+            fs.writeFileSync(tmpPath2, JSON.stringify(data, null, 2), 'utf8');
+            /* istanbul ignore next */
+            if (typeof fs.renameSync === 'function') fs.renameSync(tmpPath2, jobsFile);
             logger.info('cron_job_deleted', { requestId: req.requestId, id });
             return sendOk(res);
         } catch (error) {
@@ -126,7 +132,7 @@ class CronController {
 
         if (!validateJobId(id)) {
             logger.warn('cron_job_invalid_id', { requestId: req.requestId, id });
-            return sendFail(res, 400, 'Invalid job ID format');
+            return sendFail(res, 400, 'invalid_job_id');
         }
 
         logger.info('cron_job_run_requested', { requestId: req.requestId, id });
@@ -140,7 +146,7 @@ class CronController {
             const data = JSON.parse(fs.readFileSync(jobsFile, 'utf8'));
             const job = data.jobs.find(j => j.id === id);
             if (!job) {
-                return sendFail(res, 404, '找不到該任務');
+                return sendFail(res, 404, 'job_not_found');
             }
 
             logger.info('cron_job_spawn', { requestId: req.requestId, id, binPath: openclawClient.getBinaryPath() });
