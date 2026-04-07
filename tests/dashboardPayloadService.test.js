@@ -22,7 +22,9 @@ const mockTsdb = {
 
 const mockAgentWatcher = {
     start: jest.fn(),
+    stop: jest.fn(),
     on: jest.fn(),
+    removeAllListeners: jest.fn(),
 };
 
 const mockAlertEngine = {
@@ -169,7 +171,7 @@ describe('dashboardPayloadService', () => {
         Object.values(mockFs).forEach((fn) => typeof fn.mockReset === 'function' && fn.mockReset());
         Object.values(mockFs.promises).forEach((fn) => fn.mockReset());
         Object.values(mockTsdb).forEach((fn) => fn.mockReset());
-        Object.values(mockAgentWatcher).forEach((fn) => fn.mockReset());
+        Object.values(mockAgentWatcher).forEach((fn) => typeof fn.mockReset === 'function' && fn.mockReset());
         Object.values(mockAlertEngine).forEach((fn) => fn.mockReset());
         Object.values(mockModelMonitor).forEach((fn) => fn.mockReset());
         Object.values(mockLogger).forEach((fn) => fn.mockReset());
@@ -290,6 +292,27 @@ describe('dashboardPayloadService', () => {
         expect(setIntervalSpy).toHaveBeenCalledTimes(1);
 
         setIntervalSpy.mockRestore();
+    });
+
+    it('removes state_update listener in stopGlobalPolling to prevent accumulation on restart', () => {
+        jest.useFakeTimers();
+
+        // First start/stop cycle
+        service.startGlobalPolling();
+        expect(mockAgentWatcher.on).toHaveBeenCalledTimes(1);
+        expect(mockAgentWatcher.on).toHaveBeenCalledWith('state_update', expect.any(Function));
+
+        service.stopGlobalPolling();
+        expect(mockAgentWatcher.removeAllListeners).toHaveBeenCalledWith('state_update');
+        expect(mockAgentWatcher.stop).toHaveBeenCalledTimes(1);
+
+        // Second start should add exactly one listener, not accumulate
+        service.startGlobalPolling();
+        expect(mockAgentWatcher.on).toHaveBeenCalledTimes(2);
+
+        // After the second stop, removeAllListeners should have been called twice total
+        service.stopGlobalPolling();
+        expect(mockAgentWatcher.removeAllListeners).toHaveBeenCalledTimes(2);
     });
 
     it('removes clients explicitly and forwards explicit openclaw reads', async () => {
