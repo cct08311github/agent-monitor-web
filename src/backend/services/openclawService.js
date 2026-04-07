@@ -82,6 +82,9 @@ class OpenClawService {
    */
   detectRealActivity(agentId, workspacePath) {
     try {
+      if (!workspacePath || typeof workspacePath !== 'string') {
+        return { status: 'inactive', emoji: '❌', label: '無工作區', minutesAgo: 9999 };
+      }
       const { root, agentsRoot } = getOpenClawConfig();
       const fullPath = workspacePath.replace('~/.openclaw', root);
 

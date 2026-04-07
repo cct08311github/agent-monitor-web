@@ -73,7 +73,7 @@ if (process.env.NODE_ENV !== 'test') {
     setInterval(() => {
         const now = Date.now();
         for (const [id, s] of sessions) {
-            if (now > s.expiresAt) sessions.delete(id);
+            if (now > s.expiresAt || now > s.createdAt + MAX_ABSOLUTE_SESSION_MS) sessions.delete(id);
         }
     }, 5 * 60 * 1000).unref();
 }

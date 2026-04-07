@@ -32,7 +32,7 @@ async function fetchJobs(): Promise<void> {
       jobs.value = data.jobs
     }
   } catch (e) {
-    console.error('獲取 Cron 任務失敗:', (e as Error).message)
+    showToast('❌ 獲取 Cron 任務失敗: ' + (e as Error).message, 'error')
   } finally {
     loading.value = false
   }

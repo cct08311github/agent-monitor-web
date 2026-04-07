@@ -228,17 +228,18 @@ async function saveAndNotify(report, opusFailed, onProgress) {
 
     // Step 7: Telegram 推播
     onProgress(7, 'Telegram 推播...');
-    const summary = report.split('\n').filter(l => l.startsWith('##')).slice(0, 3).join(' | ');
-    const message = `🤖 自主優化報告已生成 (${date})\n${summary}\n📄 ${filename}`;
     const optimizeConfig = getOptimizeConfig();
-
-    try {
-        await openclawClient.runArgs([
-            'message', 'send', '--channel', optimizeConfig.telegramChannel,
-            '--target', optimizeConfig.telegramTarget, '--message', message
-        ], { timeout: 30_000, binPath: OPENCLAW_PATH });
-    } catch (_) {
-        // Telegram 失敗不中斷流程
+    if (optimizeConfig.telegramTarget) {
+        const summary = report.split('\n').filter(l => l.startsWith('##')).slice(0, 3).join(' | ');
+        const message = `🤖 自主優化報告已生成 (${date})\n${summary}\n📄 ${filename}`;
+        try {
+            await openclawClient.runArgs([
+                'message', 'send', '--channel', optimizeConfig.telegramChannel,
+                '--target', optimizeConfig.telegramTarget, '--message', message
+            ], { timeout: 30_000, binPath: OPENCLAW_PATH });
+        } catch (_) {
+            // Telegram 失敗不中斷流程
+        }
     }
 
     return { filename, filepath };

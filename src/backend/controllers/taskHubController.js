@@ -28,6 +28,10 @@ async function getStats(req, res) {
 
 async function getTasks(req, res) {
     try {
+        if (req.query.search && (typeof req.query.search !== 'string' || req.query.search.length > 200)) {
+            return sendFail(res, 400, 'invalid_search');
+        }
+
         const { domain = 'all' } = req.query;
         if (domain !== 'all' && !repo.isValidDomain(domain)) {
             return sendFail(res, 400, 'invalid_domain');

@@ -233,6 +233,7 @@ router.get('/logs/stream', auth.localhostOnlyControl, /* istanbul ignore next */
     let stdoutBuf = '';
     child.stdout.on('data', (chunk) => {
         stdoutBuf += chunk.toString();
+        if (stdoutBuf.length > 64 * 1024) stdoutBuf = stdoutBuf.slice(-32 * 1024);
         const lines = stdoutBuf.split('\n');
         stdoutBuf = lines.pop(); // keep incomplete last line
         lines.forEach(sendLine);
@@ -241,6 +242,7 @@ router.get('/logs/stream', auth.localhostOnlyControl, /* istanbul ignore next */
     let stderrBuf = '';
     child.stderr.on('data', (chunk) => {
         stderrBuf += chunk.toString();
+        if (stderrBuf.length > 64 * 1024) stderrBuf = stderrBuf.slice(-32 * 1024);
         const lines = stderrBuf.split('\n');
         stderrBuf = lines.pop();
         lines.forEach(sendLine);

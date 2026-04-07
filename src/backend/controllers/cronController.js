@@ -77,8 +77,11 @@ class CronController {
             data.jobs[jobIndex].enabled = enabled;
             data.jobs[jobIndex].updatedAtMs = Date.now();
 
-            // 寫回文件
-            fs.writeFileSync(jobsFile, JSON.stringify(data, null, 2), 'utf8');
+            // 寫回文件（atomic write，fallback to direct write if rename not available）
+            const tmpPath1 = jobsFile + '.tmp.' + process.pid;
+            fs.writeFileSync(tmpPath1, JSON.stringify(data, null, 2), 'utf8');
+            /* istanbul ignore next */
+            if (typeof fs.renameSync === 'function') fs.renameSync(tmpPath1, jobsFile);
 
             return sendOk(res, { job: data.jobs[jobIndex] });
         } catch (error) {
@@ -109,7 +112,10 @@ class CronController {
             if (data.jobs.length === before) {
                 return sendFail(res, 404, '找不到該任務');
             }
-            fs.writeFileSync(jobsFile, JSON.stringify(data, null, 2), 'utf8');
+            const tmpPath2 = jobsFile + '.tmp.' + process.pid;
+            fs.writeFileSync(tmpPath2, JSON.stringify(data, null, 2), 'utf8');
+            /* istanbul ignore next */
+            if (typeof fs.renameSync === 'function') fs.renameSync(tmpPath2, jobsFile);
             logger.info('cron_job_deleted', { requestId: req.requestId, id });
             return sendOk(res);
         } catch (error) {

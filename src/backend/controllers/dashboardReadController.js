@@ -1,4 +1,4 @@
-const { ok, fail } = require('../utils/apiResponse');
+const { ok, fail, sendOk, sendFail } = require('../utils/apiResponse');
 const { getHistoryPayload } = require('../services/historyService');
 const sessionReadService = require('../services/sessionReadService');
 const dashboardPayloadService = require('../services/dashboardPayloadService');
@@ -16,7 +16,7 @@ class DashboardReadController {
             res.json(dashboardPayloadService.getSharedPayload());
         } catch (error) { /* istanbul ignore next */
             logger.error('dashboard_read_error', { handler: 'getDashboard', msg: error.message });
-            res.status(500).json(fail('internal_error'));
+            return sendFail(res, 500, 'internal_error');
         }
     }
 
@@ -25,7 +25,7 @@ class DashboardReadController {
             res.json(getHistoryPayload());
         } catch (error) { /* istanbul ignore next */
             logger.error('dashboard_read_error', { handler: 'getHistory', msg: error.message });
-            res.status(500).json(fail('internal_error'));
+            return sendFail(res, 500, 'internal_error');
         }
     }
 
@@ -55,30 +55,30 @@ class DashboardReadController {
     async getStatus(req, res) {
         try {
             const { stdout, stderr } = await dashboardPayloadService.runOpenclawRead(['status']);
-            res.json(ok({ output: (stdout || '') + (stderr || '') }));
+            return sendOk(res, { output: (stdout || '') + (stderr || '') });
         } catch (error) {
             logger.error('dashboard_read_error', { handler: 'getStatus', msg: error.message });
-            res.status(500).json(fail('internal_error'));
+            return sendFail(res, 500, 'internal_error');
         }
     }
 
     async getModels(req, res) {
         try {
             const { stdout, stderr } = await dashboardPayloadService.runOpenclawRead(['models', 'status']);
-            res.json(ok({ output: (stdout || '') + (stderr || '') }));
+            return sendOk(res, { output: (stdout || '') + (stderr || '') });
         } catch (error) {
             logger.error('dashboard_read_error', { handler: 'getModels', msg: error.message });
-            res.status(500).json(fail('internal_error'));
+            return sendFail(res, 500, 'internal_error');
         }
     }
 
     async getAgents(req, res) {
         try {
             const { stdout, stderr } = await dashboardPayloadService.runOpenclawRead(['agents', 'list']);
-            res.json(ok({ output: (stdout || '') + (stderr || '') }));
+            return sendOk(res, { output: (stdout || '') + (stderr || '') });
         } catch (error) {
             logger.error('dashboard_read_error', { handler: 'getAgents', msg: error.message });
-            res.status(500).json(fail('internal_error'));
+            return sendFail(res, 500, 'internal_error');
         }
     }
 
@@ -88,7 +88,7 @@ class DashboardReadController {
             res.status(result.statusCode).json(result.body);
         } catch (error) {
             logger.error('dashboard_read_error', { handler: 'getSessionContent', msg: error.message });
-            res.status(500).json(fail('internal_error'));
+            return sendFail(res, 500, 'internal_error');
         }
     }
 
@@ -98,7 +98,7 @@ class DashboardReadController {
             res.status(result.statusCode).json(result.body);
         } catch (error) {
             logger.error('dashboard_read_error', { handler: 'getSessions', msg: error.message });
-            res.status(500).json(fail('internal_error'));
+            return sendFail(res, 500, 'internal_error');
         }
     }
 }

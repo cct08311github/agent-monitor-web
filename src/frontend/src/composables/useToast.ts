@@ -14,6 +14,9 @@ const ICONS: Record<string, string> = { info: 'ℹ️', success: '✅', warning:
 const toasts = ref<ToastItem[]>([])
 let nextId = 0
 
+// Track auto-dismiss timer IDs so they can be cleared on manual dismiss
+const timerMap = new Map<number, ReturnType<typeof setTimeout>>()
+
 export function showToast(
   message: string,
   type: 'info' | 'success' | 'warning' | 'error' = 'info',
@@ -24,17 +27,30 @@ export function showToast(
   const item: ToastItem = { id, message, type, duration, retryFn: opts?.retryFn }
   toasts.value.push(item)
   if (duration > 0) {
-    setTimeout(() => dismissToast(id), duration)
+    const timerId = setTimeout(() => {
+      timerMap.delete(id)
+      dismissToast(id)
+    }, duration)
+    timerMap.set(id, timerId)
   }
   return id
 }
 
 export function dismissToast(id: number) {
+  // Clear any pending auto-dismiss timer for this toast
+  const timerId = timerMap.get(id)
+  if (timerId !== undefined) {
+    clearTimeout(timerId)
+    timerMap.delete(id)
+  }
   const idx = toasts.value.findIndex(t => t.id === id)
   if (idx >= 0) toasts.value.splice(idx, 1)
 }
 
 export function dismissAll() {
+  // Clear all pending auto-dismiss timers
+  timerMap.forEach((timerId) => clearTimeout(timerId))
+  timerMap.clear()
   toasts.value = []
 }
 

@@ -1,5 +1,6 @@
 const alertEngine = require('../services/alertEngine');
 const { sendOk, sendFail } = require('../utils/apiResponse');
+const logger = require('../utils/logger');
 
 function getConfig(req, res) {
     return sendOk(res, { config: alertEngine.getConfig() });
@@ -10,7 +11,8 @@ function updateConfig(req, res) {
         const updated = alertEngine.updateConfig(/* istanbul ignore next */ req.body || {});
         return sendOk(res, { config: updated });
     } catch (e) {
-        return sendFail(res, 400, e.message);
+        logger.warn('alert_config_update_invalid', { msg: e.message });
+        return sendFail(res, 400, 'invalid_config');
     }
 }
 

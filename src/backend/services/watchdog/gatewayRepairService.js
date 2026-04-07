@@ -32,7 +32,7 @@ function createRepairService({ state, CONFIG, OPENCLAW_PATH, OPENCLAW_CONFIG_PAT
             const ymd = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
             const logFiles = [
                 path.join(OPENCLAW_LOG_DIR, `openclaw-${ymd}.log`),
-                `/tmp/openclaw-1000/openclaw-${ymd}.log`
+                `/tmp/openclaw-${process.getuid ? process.getuid() : 1000}/openclaw-${ymd}.log`
             ];
 
             let allLines = [];
@@ -62,7 +62,8 @@ function createRepairService({ state, CONFIG, OPENCLAW_PATH, OPENCLAW_CONFIG_PAT
             const { stdout } = await execFilePromise('which', ['gemini'], { timeout: 5_000 }).catch(() => ({ stdout: '' }));
             if (stdout.trim()) return stdout.trim();
 
-            const paths = ['/opt/homebrew/bin/gemini', '/usr/local/bin/gemini', '/Users/openclaw/.local/bin/gemini'];
+            const os = require('os');
+            const paths = ['/opt/homebrew/bin/gemini', '/usr/local/bin/gemini', path.join(os.homedir(), '.local', 'bin', 'gemini')];
             for (const p of paths) {
                 if (fs.existsSync(p)) return p;
             }

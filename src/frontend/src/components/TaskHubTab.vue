@@ -118,7 +118,7 @@ async function fetchStats() {
     if (!data.success) return
     stats.value = data.stats
   } catch (e: any) {
-    console.error('[TaskHubTab] stats error:', e.message)
+    showToast('❌ 統計載入失敗: ' + e.message, 'error')
   }
 }
 
@@ -190,19 +190,26 @@ function onTaskCreated() {
 // ── Dropdown (actions menu) ───────────────────────────────────────────────────
 
 const openDropdownId = ref<string | null>(null)
+let dropdownCloseHandler: (() => void) | null = null
 
 function toggleDropdown(id: string, e: Event) {
   e.stopPropagation()
   if (openDropdownId.value === id) {
     openDropdownId.value = null
   } else {
+    // Clean up any existing handler before registering a new one
+    if (dropdownCloseHandler) {
+      document.removeEventListener('click', dropdownCloseHandler)
+      dropdownCloseHandler = null
+    }
     openDropdownId.value = id
     setTimeout(() => {
-      const close = () => {
+      dropdownCloseHandler = () => {
         openDropdownId.value = null
-        document.removeEventListener('click', close)
+        document.removeEventListener('click', dropdownCloseHandler!)
+        dropdownCloseHandler = null
       }
-      document.addEventListener('click', close)
+      document.addEventListener('click', dropdownCloseHandler)
     }, 0)
   }
 }
@@ -216,6 +223,10 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearTimeout(searchTimer.value)
+  if (dropdownCloseHandler) {
+    document.removeEventListener('click', dropdownCloseHandler)
+    dropdownCloseHandler = null
+  }
 })
 </script>
 
