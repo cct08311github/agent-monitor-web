@@ -4,7 +4,8 @@
 // Features:
 //   - Exponential back-off with ±20% jitter (BASE=1 s, MAX=15 s)
 //   - Page Visibility API: pause when tab hidden, resume when visible
-//   - Auto-reconnect with attempt counter
+//   - Auto-reconnect with attempt counter (max MAX_RECONNECT_ATTEMPTS)
+//   - Enters terminal 'failed' state after max attempts; manualReconnect() to retry
 //   - Cleans up on component unmount via onUnmounted
 //   - Prefixes URLs with the basePath from useApi
 // ---------------------------------------------------------------------------
@@ -15,6 +16,7 @@ import { getBasePath } from '@/composables/useApi'
 const BASE_DELAY = 1000
 const MAX_DELAY = 15_000
 const JITTER_FACTOR = 0.2
+const MAX_RECONNECT_ATTEMPTS = 10
 
 function backoffDelay(attempt: number): number {
   const delay = Math.min(BASE_DELAY * Math.pow(2, attempt), MAX_DELAY)
@@ -52,6 +54,10 @@ export interface SSEHandle {
   isConnected: import('vue').Ref<boolean>
   /** Current reconnect-attempt counter (resets to 0 on successful open). */
   reconnectAttempt: import('vue').Ref<number>
+  /** True when reconnect attempts have been exhausted (terminal state). */
+  isFailed: import('vue').Ref<boolean>
+  /** Reset the failure state and attempt to connect again from scratch. */
+  manualReconnect: () => void
 }
 
 // ---------------------------------------------------------------------------
@@ -61,6 +67,7 @@ export interface SSEHandle {
 export function useSSE(): SSEHandle {
   const isConnected = ref(false)
   const reconnectAttempt = ref(0)
+  const isFailed = ref(false)
 
   let source: EventSource | null = null
   let closed = false
@@ -93,6 +100,10 @@ export function useSSE(): SSEHandle {
 
   function scheduleReconnect(): void {
     if (closed || _currentOptions.autoReconnect === false) return
+    if (reconnectAttempt.value >= MAX_RECONNECT_ATTEMPTS) {
+      isFailed.value = true
+      return
+    }
     clearReconnect()
     const delay = backoffDelay(reconnectAttempt.value)
     reconnectAttempt.value++
@@ -112,6 +123,7 @@ export function useSSE(): SSEHandle {
 
     source.onopen = () => {
       reconnectAttempt.value = 0
+      isFailed.value = false
       isConnected.value = true
       _currentOptions.onOpen?.(source!)
     }
@@ -186,10 +198,19 @@ export function useSSE(): SSEHandle {
     removeVisibilityListener()
   }
 
+  /** Reset failure state and attempt reconnection from the beginning. */
+  function manualReconnect(): void {
+    isFailed.value = false
+    reconnectAttempt.value = 0
+    closed = false
+    clearReconnect()
+    start()
+  }
+
   // Auto-cleanup when the owning component unmounts
   onUnmounted(() => {
     close()
   })
 
-  return { connect, close, isConnected, reconnectAttempt }
+  return { connect, close, isConnected, reconnectAttempt, isFailed, manualReconnect }
 }
