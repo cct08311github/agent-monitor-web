@@ -84,6 +84,14 @@ class OpenClawService {
     try {
       const { root, agentsRoot } = getOpenClawConfig();
       const fullPath = workspacePath.replace('~/.openclaw', root);
+
+      // Path traversal guard
+      const resolvedPath = path.resolve(fullPath);
+      const resolvedRoot = path.resolve(root);
+      if (!resolvedPath.startsWith(resolvedRoot + path.sep) && resolvedPath !== resolvedRoot) {
+        return { status: 'error', emoji: '❌', label: '路徑錯誤', minutesAgo: 9999 };
+      }
+
       let latestModification = 0;
 
       const filesToCheck = [

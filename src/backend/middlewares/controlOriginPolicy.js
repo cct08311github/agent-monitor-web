@@ -1,8 +1,9 @@
 const logger = require('../utils/logger');
 
 const ALLOWED_HOSTS = [
-    'localhost', '127.0.0.1', '[::1]', '::1', '192.168.0.198',
-    'shenghuoguanjiademac-mini.local', 'qiujuntingdeimac.local',
+    'localhost', '127.0.0.1', '[::1]', '::1',
+    // Additional hosts from env (comma-separated)
+    ...(process.env.CONTROL_ALLOWED_HOSTS || '').split(',').map(h => h.trim().toLowerCase()).filter(Boolean),
 ];
 
 const ALLOWED_SUFFIXES = [

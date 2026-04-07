@@ -5,6 +5,7 @@ const mockExecFilePromise = jest.fn();
 const mockExecFile = jest.fn();
 const mockReadFileSync = jest.fn();
 const mockWriteFileSync = jest.fn();
+const mockRenameSync = jest.fn();
 const mockExistsSync = jest.fn().mockReturnValue(true);
 
 jest.mock('util', () => ({
@@ -22,6 +23,7 @@ jest.mock('fs', () => ({
     existsSync: mockExistsSync,
     readFileSync: mockReadFileSync,
     writeFileSync: mockWriteFileSync,
+    renameSync: mockRenameSync,
 }));
 
 let ctrl;
@@ -35,12 +37,14 @@ beforeEach(() => {
         existsSync: mockExistsSync,
         readFileSync: mockReadFileSync,
         writeFileSync: mockWriteFileSync,
+        renameSync: mockRenameSync,
     }));
     ctrl = require('../src/backend/controllers/controlController');
     mockExecFilePromise.mockReset();
     mockExecFile.mockReset();
     mockReadFileSync.mockReset();
     mockWriteFileSync.mockReset();
+    mockRenameSync.mockReset();
     mockExistsSync.mockReturnValue(true);
 });
 

@@ -69,7 +69,9 @@ class ControlController {
                         }
                     }
                     if (found) {
-                        fs.writeFileSync(openclawConfigPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+                        const tmpPath = openclawConfigPath + '.tmp.' + process.pid;
+                        fs.writeFileSync(tmpPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+                        fs.renameSync(tmpPath, openclawConfigPath);
                         return sendOk(res, { output: `Model switched for ${agentId} to ${model}` });
                     }
                     return sendFail(res, 404, 'not_found', { message: `Agent ${agentId} not found in config` });

@@ -35,7 +35,7 @@ server.listen(PORT, '127.0.0.1', () => {
 
   console.log('🔍 Agent 監控系統運行中... (已啟用加密連線)');
   console.log(`🌐 本地訪問: https://localhost:${PORT}`);
-  console.log(`📡 遠端安全訪問: https://mac-mini.tailde842d.ts.net:${PORT} 或 https://100.109.189.69:${PORT}`);
+  console.log(`📡 遠端安全訪問: 透過 Tailscale 或 VPN 連線`);
   console.log(`🚀 版本: 3.0.0 (Clean Architecture 修復版)`);
   console.log(`✨ 功能:`);
   console.log(`   • ✅ 真實活動檢測 (含輕量化 Cache)`);

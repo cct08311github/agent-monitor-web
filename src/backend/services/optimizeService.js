@@ -41,7 +41,6 @@ async function collectData() {
 const TODAY = () => new Date().toISOString().slice(0, 10);
 
 const SYSTEM_SONNET_DRAFT = `你是 agent-monitor-web 的系統分析師。
-專案路徑：${PROJECT_PATH}
 今日日期：{DATE}
 
 根據以下運行數據，識別 3-5 個最值得優化的項目，每項包含：
@@ -53,7 +52,6 @@ const SYSTEM_SONNET_DRAFT = `你是 agent-monitor-web 的系統分析師。
 輸出格式：markdown，以 ## 分節。`;
 
 const SYSTEM_OPUS_REVIEW = `你是獨立技術顧問，負責審查 agent-monitor-web 的優化草案。
-專案路徑：${PROJECT_PATH}
 
 對草案中每個優化項目，指出：
 1. 邏輯不足或假設錯誤之處
@@ -63,7 +61,6 @@ const SYSTEM_OPUS_REVIEW = `你是獨立技術顧問，負責審查 agent-monito
 保持批判立場，不要為草案辯護。每項以 ### 分節。`;
 
 const SYSTEM_OPUS_CODE_REVIEW = `你是資深後端工程師，負責 agent-monitor-web 的 Code Review 與 QA。
-專案路徑：${PROJECT_PATH}
 
 審查以下實際源碼，輸出結構化報告。每個問題格式：
 
@@ -110,7 +107,6 @@ function readSourceFiles() {
 }
 
 const SYSTEM_SONNET_INTEGRATE = `你是 agent-monitor-web 的技術負責人。
-專案路徑：${PROJECT_PATH}
 
 將以下資料整合成最終報告（兩大章節）：
 
@@ -146,6 +142,7 @@ async function callGemini(apiKey, system, userContent, maxTokens = 4096) {
                 { role: 'user', content: userContent },
             ],
         }),
+        signal: AbortSignal.timeout(60_000),
     });
     if (!resp.ok) {
         const errText = await resp.text().catch(() => '');

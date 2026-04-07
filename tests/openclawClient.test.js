@@ -1,19 +1,14 @@
 'use strict';
 
-const mockExecPromise = jest.fn();
 const mockExecFilePromise = jest.fn();
 const mockExecFile = jest.fn();
 const mockSpawn = jest.fn();
 
 jest.mock('util', () => ({
-    promisify: jest.fn((fn) => {
-        if (fn === require('child_process').exec) return mockExecPromise;
-        return mockExecFilePromise;
-    }),
+    promisify: jest.fn(() => mockExecFilePromise),
 }));
 
 jest.mock('child_process', () => ({
-    exec: jest.fn(),
     execFile: mockExecFile,
     spawn: mockSpawn,
 }));
@@ -21,7 +16,6 @@ jest.mock('child_process', () => ({
 describe('openclawClient', () => {
     beforeEach(() => {
         jest.resetModules();
-        mockExecPromise.mockReset();
         mockExecFilePromise.mockReset();
         mockExecFile.mockReset();
         mockSpawn.mockReset();
@@ -30,20 +24,6 @@ describe('openclawClient', () => {
 
     afterEach(() => {
         delete process.env.OPENCLAW_BIN;
-    });
-
-    it('normalizes openclaw shell commands to configured binary path', async () => {
-        const client = require('../src/backend/services/openclawClient');
-        mockExecPromise.mockResolvedValue({ stdout: 'ok', stderr: '' });
-        await client.runCommand('openclaw agents list');
-        expect(mockExecPromise).toHaveBeenCalledWith('/tmp/custom-openclaw agents list');
-    });
-
-    it('passes non-openclaw shell commands as-is', async () => {
-        const client = require('../src/backend/services/openclawClient');
-        mockExecPromise.mockResolvedValue({ stdout: 'ok', stderr: '' });
-        await client.runCommand('echo hello');
-        expect(mockExecPromise).toHaveBeenCalledWith('echo hello');
     });
 
     it('runs execFile against configured binary by default', async () => {

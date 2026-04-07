@@ -96,7 +96,7 @@ function getOptimizeConfig() {
         plansDir: readTrimmedEnv('PLANS_DIR', path.join(PROJECT_ROOT, 'docs', 'plans')),
         geminiApiKey: readGeminiApiKey(),
         telegramChannel: readTrimmedEnv('OPENCLAW_NOTIFY_CHANNEL', 'telegram'),
-        telegramTarget: readTrimmedEnv('OPENCLAW_NOTIFY_TARGET', '-1003873859338'),
+        telegramTarget: readTrimmedEnv('OPENCLAW_NOTIFY_TARGET', ''),
         openclawBinPath: openclaw.binPath,
     };
 }

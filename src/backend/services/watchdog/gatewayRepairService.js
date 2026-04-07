@@ -1,13 +1,12 @@
 'use strict';
 
 const util = require('util');
-const { execFile, exec } = require('child_process');
+const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { fmtTime } = require('./watchdogEventLogger');
 
 const execFilePromise = util.promisify(execFile);
-const execPromise = util.promisify(exec);
 
 function createRepairService({ state, CONFIG, OPENCLAW_PATH, OPENCLAW_CONFIG_PATH, OPENCLAW_LOG_DIR, GATEWAY_PORT, log, checkGatewayHealth, checkOpenClawStatus, sendTelegramNotification }) {
 
@@ -17,7 +16,7 @@ function createRepairService({ state, CONFIG, OPENCLAW_PATH, OPENCLAW_CONFIG_PAT
         try {
             const safePort = parseInt(GATEWAY_PORT, 10);
             if (!Number.isInteger(safePort) || safePort < 1 || safePort > 65535) throw new Error('invalid port');
-            const { stdout: portInfo } = await execPromise(`lsof -i :${safePort} 2>/dev/null || echo "port_not_in_use"`, { timeout: 5_000 });
+            const { stdout: portInfo } = await execFilePromise('lsof', ['-i', `:${safePort}`], { timeout: 5_000 }).catch(() => ({ stdout: 'port_not_in_use' }));
             diag.portInfo = portInfo.trim().slice(0, 300);
         } catch (e) { diag.portInfo = `check_failed: ${e.message}`; }
 
@@ -31,21 +30,28 @@ function createRepairService({ state, CONFIG, OPENCLAW_PATH, OPENCLAW_CONFIG_PAT
         try {
             const d = new Date();
             const ymd = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
-            const logPaths = [
+            const logFiles = [
                 path.join(OPENCLAW_LOG_DIR, `openclaw-${ymd}.log`),
                 `/tmp/openclaw-1000/openclaw-${ymd}.log`
-            ].map(p => `"${p.replace(/"/g, '\\"')}"`).join(' ');
+            ];
 
-            const { stdout: logs } = await execPromise(
-                `cat ${logPaths} 2>/dev/null | tail -100 | grep -i "error\\|fatal\\|invalid\\|failed\\|EADDRINUSE" | tail -30 || true`,
-                { timeout: 5_000 }
-            );
-            diag.recentLogs = logs.trim().slice(0, 1500) || 'No specific errors found in recent logs.';
+            let allLines = [];
+            for (const logFile of logFiles) {
+                try {
+                    const content = await fs.promises.readFile(logFile, 'utf8');
+                    allLines.push(...content.split('\n'));
+                } catch (_) { /* file may not exist */ }
+            }
+
+            const errorLines = allLines
+                .filter(l => /error|fatal|invalid|failed|EADDRINUSE/i.test(l))
+                .slice(-30);
+            diag.recentLogs = errorLines.join('\n').slice(0, 1500) || 'No specific errors found in recent logs.';
         } catch (e) { diag.recentLogs = 'logs_unavailable'; }
 
         try {
-            const { stdout: procs } = await execPromise(`ps aux | grep -i "openclaw" | grep -v grep | head -5`, { timeout: 5_000 });
-            diag.processes = procs.trim().slice(0, 400);
+            const { stdout: procs } = await execFilePromise('ps', ['aux'], { timeout: 5_000 }).catch(() => ({ stdout: 'check_failed' }));
+            diag.processes = procs.split('\n').filter(l => /openclaw/i.test(l)).slice(0, 5).join('\n').slice(0, 400);
         } catch (e) { diag.processes = 'check_failed'; }
 
         return diag;
@@ -53,7 +59,7 @@ function createRepairService({ state, CONFIG, OPENCLAW_PATH, OPENCLAW_CONFIG_PAT
 
     async function findGeminiCli() {
         try {
-            const { stdout } = await execPromise('command -v gemini 2>/dev/null || true');
+            const { stdout } = await execFilePromise('which', ['gemini'], { timeout: 5_000 }).catch(() => ({ stdout: '' }));
             if (stdout.trim()) return stdout.trim();
 
             const paths = ['/opt/homebrew/bin/gemini', '/usr/local/bin/gemini', '/Users/openclaw/.local/bin/gemini'];

@@ -19,7 +19,7 @@ const alertController = require('../controllers/alertController');
 const authController = require('../controllers/authController');
 const { csrfTokenGenerator, csrfVerifier } = require('../middlewares/csrfProtection');
 const { authLimiter } = require('../middlewares/rateLimiter');
-const { validateAgentId, validateSessionId, validateDomain } = require('../middlewares/inputValidation');
+const { validateAgentId, validateSessionId, validateDomain, validateTaskId } = require('../middlewares/inputValidation');
 
 // ── Public Endpoints (no auth required) ───────────────────────────────────────
 router.get('/read/health', (req, res) => sendOk(res, { ts: new Date().toISOString() }));
@@ -71,14 +71,14 @@ router.get('/optimize/run', auth.localhostOnlyControl, auth.rateLimit, optimizeC
 router.get('/taskhub/stats', taskHubController.getStats);
 router.get('/taskhub/tasks', taskHubController.getTasks);
 router.post('/taskhub/tasks', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, taskHubController.createTask);
-router.patch('/taskhub/tasks/:domain/:id', validateDomain, auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, taskHubController.updateTask);
-router.delete('/taskhub/tasks/:domain/:id', validateDomain, auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, taskHubController.deleteTask);
+router.patch('/taskhub/tasks/:domain/:id', validateDomain, validateTaskId, auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, taskHubController.updateTask);
+router.delete('/taskhub/tasks/:domain/:id', validateDomain, validateTaskId, auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, taskHubController.deleteTask);
 
 // Cron Jobs
 router.get('/cron/jobs', cronController.getJobs);
-router.post('/cron/jobs/:id/toggle', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, cronController.toggleJob);
-router.post('/cron/jobs/:id/run', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, cronController.runJob);
-router.delete('/cron/jobs/:id', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, cronController.deleteJob);
+router.post('/cron/jobs/:id/toggle', validateTaskId, auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, cronController.toggleJob);
+router.post('/cron/jobs/:id/run', validateTaskId, auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, cronController.runJob);
+router.delete('/cron/jobs/:id', validateTaskId, auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, cronController.deleteJob);
 
 // Dashboard UI command endpoint — localhost-only, session-auth protected
 router.post('/command', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, controlController.runCommand);
@@ -246,22 +246,29 @@ router.get('/logs/stream', auth.localhostOnlyControl, /* istanbul ignore next */
         lines.forEach(sendLine);
     });
 
-    child.on('close', (code) => {
+    let cleaned = false;
+    function cleanup() {
+        if (cleaned) return;
+        cleaned = true;
+        logsStreamClients--;
         clearInterval(heartbeat);
+        try { child.kill('SIGTERM'); } catch (_) { /* process already exited */ }
+    }
+
+    child.on('close', (code) => {
+        cleanup();
         res.write(`data: ${JSON.stringify({ line: `[openclaw logs exited: code ${code}]`, ts: Date.now() })}\n\n`);
         res.end();
     });
 
     child.on('error', (err) => {
-        clearInterval(heartbeat);
+        cleanup();
         res.write(`data: ${JSON.stringify({ line: `[Error spawning openclaw: ${err.message}]`, ts: Date.now() })}\n\n`);
         res.end();
     });
 
     req.on('close', () => {
-        logsStreamClients--;
-        clearInterval(heartbeat);
-        try { child.kill('SIGTERM'); } catch (_) { /* process already exited */ }
+        cleanup();
     });
 });
 

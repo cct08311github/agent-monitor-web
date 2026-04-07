@@ -14,7 +14,7 @@ beforeEach(() => {
     mockFs.readFileSync.mockReset();
     mockFs.writeFileSync.mockReset();
     jest.mock('fs', () => mockFs);
-    ThreatIntelligence = require('../src/backend/security/threat_intelligence_simple');
+    ThreatIntelligence = require('../src/backend/security/threat_intelligence_fixed');
 });
 
 describe('ThreatIntelligence', () => {

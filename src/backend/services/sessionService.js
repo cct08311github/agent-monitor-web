@@ -37,12 +37,15 @@ function createSession(username) {
     return sign(id);
 }
 
+const MAX_ABSOLUTE_SESSION_MS = 24 * 60 * 60 * 1000; // 24 hours
+
 function validateSession(token) {
     const id = unsign(token);
     if (!id) return null;
     const session = sessions.get(id);
     if (!session) return null;
-    if (Date.now() > session.expiresAt) {
+    const now = Date.now();
+    if (now > session.expiresAt || now > session.createdAt + MAX_ABSOLUTE_SESSION_MS) {
         sessions.delete(id);
         return null;
     }

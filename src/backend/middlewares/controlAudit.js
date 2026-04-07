@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { getProjectRoot } = require('../config');
 const logger = require('../utils/logger');
 
 function getClientIp(req) {
@@ -18,8 +19,8 @@ function tokenHashPrefix(token) {
 
 function appendAuditLog(record) {
     try {
-        const logsDir = path.join(__dirname, '../../../../logs');
-        if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+        const logsDir = path.join(getProjectRoot(), 'logs');
+        if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true, mode: 0o700 });
 
         const date = new Date();
         const y = date.getFullYear();
@@ -27,7 +28,7 @@ function appendAuditLog(record) {
         const d = String(date.getDate()).padStart(2, '0');
         const filePath = path.join(logsDir, `audit-${y}-${m}-${d}.jsonl`);
 
-        fs.appendFileSync(filePath, `${JSON.stringify(record)}\n`, 'utf8');
+        fs.appendFileSync(filePath, `${JSON.stringify(record)}\n`, { encoding: 'utf8', mode: 0o600 });
     } catch (e) {
         logger.error('control_audit_write_failed', { msg: e.message });
     }

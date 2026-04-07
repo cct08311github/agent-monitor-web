@@ -18,17 +18,21 @@ function removeClient(res) {
 function broadcast(data) {
     if (sseClients.size === 0) return;
     const dataStr = `data: ${JSON.stringify(data)}\n\n`;
+    const failed = [];
     sseClients.forEach((res) => {
-        try { res.write(dataStr); } catch (e) { sseClients.delete(res); }
+        try { res.write(dataStr); } catch (e) { failed.push(res); }
     });
+    for (const res of failed) sseClients.delete(res);
 }
 
 function broadcastAlert(alerts) {
     if (sseClients.size === 0 || !alerts || alerts.length === 0) return;
     const alertStr = `event: alert\ndata: ${JSON.stringify({ alerts })}\n\n`;
+    const failed = [];
     sseClients.forEach((client) => {
-        try { client.write(alertStr); } catch (e) { sseClients.delete(client); }
+        try { client.write(alertStr); } catch (e) { failed.push(client); }
     });
+    for (const client of failed) sseClients.delete(client);
 }
 
 function getClientCount() {
@@ -44,9 +48,11 @@ function startHeartbeat() {
     heartbeatTimer = setInterval(() => {
         if (sseClients.size === 0) return;
         const heartbeat = `: heartbeat ${Date.now()}\n\n`;
+        const failed = [];
         sseClients.forEach((res) => {
-            try { res.write(heartbeat); } catch (e) { sseClients.delete(res); }
+            try { res.write(heartbeat); } catch (e) { failed.push(res); }
         });
+        for (const res of failed) sseClients.delete(res);
     }, HEARTBEAT_INTERVAL_MS);
     heartbeatTimer.unref();
 }

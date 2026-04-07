@@ -1,6 +1,5 @@
 // src/backend/middlewares/inputValidation.js
 'use strict';
-const AppError = require('../utils/appError');
 
 /**
  * Input validation middleware
@@ -28,39 +27,6 @@ function sanitizeString(input) {
     if (typeof input !== 'string') return input;
     // Remove null bytes and control characters except newline/tab
     return input.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').slice(0, 10000);
-}
-
-/**
- * Validate and sanitize request body
- * @param {Object} schema - Object defining expected fields and their patterns
- */
-function validateBody(schema) {
-    return (req, res, next) => {
-        const body = req.body || {};
-        const errors = [];
-
-        for (const [field, pattern] of Object.entries(schema)) {
-            const value = body[field];
-            if (value !== undefined && value !== null) {
-                const stringValue = String(value);
-                if (!pattern.test(stringValue)) {
-                    errors.push(`Invalid ${field}`);
-                } else {
-                    req.body[field] = sanitizeString(stringValue);
-                }
-            }
-        }
-
-        if (errors.length > 0) {
-            return res.status(400).json({
-                success: false,
-                error: 'validation_error',
-                details: errors,
-            });
-        }
-
-        next();
-    };
 }
 
 /**
@@ -94,6 +60,17 @@ function validateSessionId(req, res, next) {
 }
 
 /**
+ * Middleware to validate task ID parameter
+ */
+function validateTaskId(req, res, next) {
+    const id = req.params.id;
+    if (!id || typeof id !== 'string' || id.length > 100 || !/^[A-Za-z0-9_-]+$/.test(id)) {
+        return res.status(400).json({ success: false, error: 'invalid_task_id' });
+    }
+    next();
+}
+
+/**
  * Middleware to validate domain parameter
  */
 function validateDomain(req, res, next) {
@@ -109,10 +86,10 @@ function validateDomain(req, res, next) {
 }
 
 module.exports = {
-    validateBody,
     validateAgentId,
     validateSessionId,
     validateDomain,
+    validateTaskId,
     sanitizeString,
     PATTERNS,
 };

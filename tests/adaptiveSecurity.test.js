@@ -1,5 +1,4 @@
 // AdaptiveSecurity class tests
-const ThreatIntelligenceSimple = require('../src/backend/security/threat_intelligence_simple');
 const AdaptiveSecurity = require('../src/backend/security/adaptive_security_simple');
 
 // Create a minimal mock threat intel for direct testing
