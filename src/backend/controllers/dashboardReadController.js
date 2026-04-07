@@ -13,7 +13,7 @@ class DashboardReadController {
             if (dashboardPayloadService.shouldRefreshSharedPayload(5000)) {
                 await dashboardPayloadService.updateSharedData();
             }
-            res.json(dashboardPayloadService.getSharedPayload());
+            return sendOk(res, dashboardPayloadService.getSharedPayload());
         } catch (error) { /* istanbul ignore next */
             logger.error('dashboard_read_error', { handler: 'getDashboard', msg: error.message });
             return sendFail(res, 500, 'internal_error');
@@ -22,7 +22,7 @@ class DashboardReadController {
 
     async getHistory(req, res) {
         try {
-            res.json(getHistoryPayload());
+            return sendOk(res, getHistoryPayload());
         } catch (error) { /* istanbul ignore next */
             logger.error('dashboard_read_error', { handler: 'getHistory', msg: error.message });
             return sendFail(res, 500, 'internal_error');
@@ -31,7 +31,7 @@ class DashboardReadController {
 
     async streamDashboard(req, res) {
         if (!dashboardPayloadService.addSseClient(res)) {
-            return res.status(503).json({ success: false, error: 'sse_capacity_exceeded' });
+            return sendFail(res, 503, 'sse_capacity_exceeded');
         }
 
         res.writeHead(200, {

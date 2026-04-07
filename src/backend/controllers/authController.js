@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const sessionService = require('../services/sessionService');
 const { getAuthConfig } = require('../config');
+const { sendOk, sendFail } = require('../utils/apiResponse');
 
 const COOKIE_NAME = 'sid';
 
@@ -20,7 +21,7 @@ function cookieOptions(ttlHours) {
 async function login(req, res) {
     const { username, password } = req.body || {};
     if (!username || !password) {
-        return res.status(400).json({ success: false, error: 'missing_credentials' });
+        return sendFail(res, 400, 'missing_credentials');
     }
 
     const authConfig = getAuthConfig();
@@ -28,7 +29,7 @@ async function login(req, res) {
     const expectedHash = authConfig.passwordHash;
 
     if (!expectedHash) {
-        return res.status(503).json({ success: false, error: 'auth_not_configured' });
+        return sendFail(res, 503, 'auth_not_configured');
     }
 
     // Compare username in constant time and always run bcrypt to prevent
@@ -39,12 +40,12 @@ async function login(req, res) {
 
     const valid = await bcrypt.compare(password, expectedHash);
     if (!usernameOk || !valid) {
-        return res.status(401).json({ success: false, error: 'invalid_credentials' });
+        return sendFail(res, 401, 'invalid_credentials');
     }
 
     const token = sessionService.createSession(username);
     res.cookie(COOKIE_NAME, token, cookieOptions(authConfig.sessionTtlHours));
-    return res.json({ success: true, username });
+    return sendOk(res, { username });
 }
 
 function logout(req, res) {
@@ -52,7 +53,7 @@ function logout(req, res) {
     if (token) sessionService.destroySession(token);
     res.clearCookie(COOKIE_NAME, { path: '/', httpOnly: true, secure: true, sameSite: 'Strict' });
     res.clearCookie('_csrfSecret', { path: '/', httpOnly: false, secure: true, sameSite: 'Strict' });
-    return res.json({ success: true });
+    return sendOk(res);
 }
 
 function me(req, res) {
@@ -64,10 +65,10 @@ function me(req, res) {
             token = authHeader.slice(7);
         }
     }
-    if (!token) return res.status(401).json({ success: false, error: 'unauthenticated' });
+    if (!token) return sendFail(res, 401, 'unauthenticated');
     const session = sessionService.validateSession(token);
-    if (!session) return res.status(401).json({ success: false, error: 'unauthenticated' });
-    return res.json({ success: true, username: session.username });
+    if (!session) return sendFail(res, 401, 'unauthenticated');
+    return sendOk(res, { username: session.username });
 }
 
 module.exports = { login, logout, me };

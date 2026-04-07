@@ -57,7 +57,7 @@ class CronController {
 
         if (!validateJobId(id)) {
             logger.warn('cron_job_invalid_id', { requestId: req.requestId, id });
-            return sendFail(res, 400, 'Invalid job ID format');
+            return sendFail(res, 400, 'invalid_job_id');
         }
 
         try {
@@ -70,7 +70,7 @@ class CronController {
             const jobIndex = data.jobs.findIndex(j => j.id === id);
 
             if (jobIndex === -1) {
-                return sendFail(res, 404, '找不到該任務');
+                return sendFail(res, 404, 'job_not_found');
             }
 
             // 更新狀態
@@ -98,7 +98,7 @@ class CronController {
 
         if (!validateJobId(id)) {
             logger.warn('cron_job_invalid_id', { requestId: req.requestId, id });
-            return sendFail(res, 400, 'Invalid job ID format');
+            return sendFail(res, 400, 'invalid_job_id');
         }
 
         try {
@@ -110,7 +110,7 @@ class CronController {
             const before = data.jobs.length;
             data.jobs = data.jobs.filter(j => j.id !== id);
             if (data.jobs.length === before) {
-                return sendFail(res, 404, '找不到該任務');
+                return sendFail(res, 404, 'job_not_found');
             }
             const tmpPath2 = jobsFile + '.tmp.' + process.pid;
             fs.writeFileSync(tmpPath2, JSON.stringify(data, null, 2), 'utf8');
@@ -132,7 +132,7 @@ class CronController {
 
         if (!validateJobId(id)) {
             logger.warn('cron_job_invalid_id', { requestId: req.requestId, id });
-            return sendFail(res, 400, 'Invalid job ID format');
+            return sendFail(res, 400, 'invalid_job_id');
         }
 
         logger.info('cron_job_run_requested', { requestId: req.requestId, id });
@@ -146,7 +146,7 @@ class CronController {
             const data = JSON.parse(fs.readFileSync(jobsFile, 'utf8'));
             const job = data.jobs.find(j => j.id === id);
             if (!job) {
-                return sendFail(res, 404, '找不到該任務');
+                return sendFail(res, 404, 'job_not_found');
             }
 
             logger.info('cron_job_spawn', { requestId: req.requestId, id, binPath: openclawClient.getBinaryPath() });
