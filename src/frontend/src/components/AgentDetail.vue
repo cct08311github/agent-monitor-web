@@ -4,6 +4,7 @@ import { api } from '@/composables/useApi'
 import { appState } from '@/stores/appState'
 import { formatTokens, formatTWD, getAgentEmoji, getStatusInfo } from '@/utils/format'
 import SessionViewer from '@/components/SessionViewer.vue'
+import { showToast } from '@/composables/useToast'
 
 const props = defineProps<{
   agentId: string
@@ -25,10 +26,12 @@ interface SessionSummary {
 
 const sessions = ref<SessionSummary[]>([])
 const sessionsLoading = ref(true)
+const sessionsError = ref(false)
 const activeSessionId = ref('')
 
 async function loadSessions() {
   sessionsLoading.value = true
+  sessionsError.value = false
   try {
     const data = (await api.get(
       `/api/agents/${encodeURIComponent(props.agentId)}/sessions`
@@ -36,6 +39,8 @@ async function loadSessions() {
     sessions.value = data?.sessions ?? []
   } catch {
     sessions.value = []
+    sessionsError.value = true
+    showToast('Session 列表載入失敗', 'error')
   } finally {
     sessionsLoading.value = false
   }
@@ -184,6 +189,10 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
       <div class="detail-card">
         <div class="detail-card-title">Sessions</div>
         <div v-if="sessionsLoading" style="color:var(--text-muted);font-size:12px;padding:4px 0">載入中…</div>
+        <div v-else-if="sessionsError" style="color:var(--error);font-size:12px;padding:4px 0">
+          ⚠️ 載入失敗
+          <span style="cursor:pointer;text-decoration:underline;margin-left:4px" @click="loadSessions">重試</span>
+        </div>
         <div v-else-if="sessions.length === 0" style="color:var(--text-muted);font-size:12px">無 session 記錄</div>
         <div v-else>
           <div
