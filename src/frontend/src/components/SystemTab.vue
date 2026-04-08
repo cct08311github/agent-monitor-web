@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { api } from '@/composables/useApi'
 import { formatTokens, formatTWD } from '@/utils/format'
 import { appState } from '@/stores/appState'
+import { showToast } from '@/composables/useToast'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -48,6 +49,7 @@ const sysHistoryData = ref<HistoryPoint[]>([])
 const costHistoryData = ref<CostHistoryPoint[]>([])
 const tokenSpendersData = ref<TopSpender[]>([])
 const modelUsageData = ref<ModelUsageItem[]>([])
+const historyError = ref(false)
 
 // ---------------------------------------------------------------------------
 // Computed: system resource metrics from appState
@@ -324,6 +326,7 @@ function redrawCharts(): void {
 
 async function fetchHistory(): Promise<void> {
   try {
+    historyError.value = false
     const data = (await api.get('/api/read/history')) as {
       success: boolean
       history?: HistoryPoint[]
@@ -346,7 +349,8 @@ async function fetchHistory(): Promise<void> {
     // Draw after data arrives
     redrawCharts()
   } catch {
-    // Silent — charts stay empty
+    historyError.value = true
+    showToast('歷史資料載入失敗', 'error')
   }
 }
 
@@ -431,6 +435,10 @@ watch(tokenChartRef, (el) => {
           <h2>📈 趨勢</h2>
         </div>
         <canvas ref="sysChartRef" style="width: 100%; height: 180px" />
+        <div v-if="historyError && sysHistoryData.length === 0" class="chart-error-state">
+          ⚠️ 資料載入失敗
+          <button class="ctrl-btn" style="margin-left:8px;font-size:12px" @click="fetchHistory">重試</button>
+        </div>
       </div>
 
       <!-- Right column: cost + token + model usage -->
