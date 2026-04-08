@@ -49,6 +49,55 @@ const columns = [
   { label: '操作', sortKey: null },
 ]
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface TaskHubTask {
+  id: string | number
+  title: string
+  status: string
+  priority: string
+  domain: string
+  tags: string[]
+  notes?: string
+  due_date?: string
+  project?: string
+  github_repo?: string
+  github_issue_id?: string | number
+  created_at?: string
+  updated_at?: string
+}
+
+interface TaskHubDomainStats {
+  total: number
+  active: number
+  by_status: Record<string, number>
+}
+
+interface TaskHubStats {
+  domains: Record<string, TaskHubDomainStats>
+  total_active: number
+}
+
+interface TaskHubStatsResponse {
+  success: boolean
+  stats: TaskHubStats
+  error?: string
+}
+
+interface TaskHubTasksResponse {
+  success: boolean
+  tasks: TaskHubTask[]
+  total: number
+  error?: string
+}
+
+interface TaskHubMutationResponse {
+  success: boolean
+  task?: TaskHubTask
+  deleted?: Record<string, unknown>
+  error?: string
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 
 const domain         = ref('all')
@@ -56,13 +105,13 @@ const statusFilter   = ref('')
 const priorityFilter = ref('')
 const searchQuery    = ref('')
 const searchTimer    = ref<ReturnType<typeof setTimeout>>()
-const tasks          = ref<any[]>([])
+const tasks          = ref<TaskHubTask[]>([])
 const loading        = ref(false)
 const sortCol        = ref<string | null>(null)
 const sortDir        = ref<'asc' | 'desc'>('asc')
-const stats          = ref<any>(null)
+const stats          = ref<TaskHubStats | null>(null)
 
-const editingTask    = ref<any>(null)
+const editingTask    = ref<TaskHubTask | null>(null)
 const showAddModal   = ref(false)
 
 // ── Computed ──────────────────────────────────────────────────────────────────
@@ -114,11 +163,11 @@ function debounceSearch() {
 
 async function fetchStats() {
   try {
-    const data = await api.get('/api/taskhub/stats') as any
+    const data = await api.get('/api/taskhub/stats') as TaskHubStatsResponse
     if (!data.success) return
     stats.value = data.stats
-  } catch (e: any) {
-    showToast('❌ 統計載入失敗: ' + e.message, 'error')
+  } catch (e) {
+    showToast('❌ 統計載入失敗: ' + (e instanceof Error ? e.message : String(e)), 'error')
   }
 }
 
@@ -131,53 +180,53 @@ async function fetchTasks() {
     const q = searchQuery.value.trim()
     if (q) params.set('search', q)
 
-    const data = await api.get('/api/taskhub/tasks?' + params.toString()) as any
+    const data = await api.get('/api/taskhub/tasks?' + params.toString()) as TaskHubTasksResponse
     if (!data.success) throw new Error(data.error)
     tasks.value = data.tasks
-  } catch (e: any) {
-    showToast('❌ 載入失敗: ' + e.message, 'error')
+  } catch (e) {
+    showToast('❌ 載入失敗: ' + (e instanceof Error ? e.message : String(e)), 'error')
   } finally {
     loading.value = false
   }
 }
 
-async function quickUpdateStatus(taskDomain: string, id: string, newStatus: string) {
+async function quickUpdateStatus(taskDomain: string, id: string | number, newStatus: string) {
   showToast('更新狀態...', 'info')
   try {
-    const data = await api.patch(`/api/taskhub/tasks/${taskDomain}/${id}`, { status: newStatus }) as any
+    const data = await api.patch(`/api/taskhub/tasks/${taskDomain}/${id}`, { status: newStatus }) as TaskHubMutationResponse
     if (!data.success) throw new Error(data.error)
     const idx = tasks.value.findIndex((t) => t.id === id)
-    if (idx >= 0) tasks.value[idx] = data.task
+    if (idx >= 0 && data.task) tasks.value[idx] = data.task
     fetchStats()
-  } catch (e: any) {
-    showToast('❌ 更新失敗: ' + e.message, 'error')
+  } catch (e) {
+    showToast('❌ 更新失敗: ' + (e instanceof Error ? e.message : String(e)), 'error')
   }
 }
 
-async function onSaveTask(taskDomain: string, id: string, body: Record<string, unknown>) {
+async function onSaveTask(taskDomain: string, id: string | number, body: Record<string, unknown>) {
   try {
-    const data = await api.patch(`/api/taskhub/tasks/${taskDomain}/${id}`, body) as any
+    const data = await api.patch(`/api/taskhub/tasks/${taskDomain}/${id}`, body) as TaskHubMutationResponse
     if (!data.success) throw new Error(data.error)
     showToast('✅ 已儲存', 'success')
     const idx = tasks.value.findIndex((t) => t.id === id)
-    if (idx >= 0) tasks.value[idx] = data.task
+    if (idx >= 0 && data.task) tasks.value[idx] = data.task
     editingTask.value = null
     fetchStats()
-  } catch (e: any) {
-    showToast('❌ 儲存失敗: ' + e.message, 'error')
+  } catch (e) {
+    showToast('❌ 儲存失敗: ' + (e instanceof Error ? e.message : String(e)), 'error')
   }
 }
 
-async function onDeleteTask(taskDomain: string, id: string) {
+async function onDeleteTask(taskDomain: string, id: string | number) {
   try {
-    const data = await api.del(`/api/taskhub/tasks/${taskDomain}/${id}`) as any
+    const data = await api.del(`/api/taskhub/tasks/${taskDomain}/${id}`) as TaskHubMutationResponse
     if (!data.success) throw new Error(data.error)
     showToast('✅ 任務已刪除', 'success')
     tasks.value = tasks.value.filter((t) => !(t.id === id && t.domain === taskDomain))
     editingTask.value = null
     fetchStats()
-  } catch (e: any) {
-    showToast('❌ 刪除失敗: ' + e.message, 'error')
+  } catch (e) {
+    showToast('❌ 刪除失敗: ' + (e instanceof Error ? e.message : String(e)), 'error')
   }
 }
 
@@ -189,10 +238,10 @@ function onTaskCreated() {
 
 // ── Dropdown (actions menu) ───────────────────────────────────────────────────
 
-const openDropdownId = ref<string | null>(null)
+const openDropdownId = ref<string | number | null>(null)
 let dropdownCloseHandler: (() => void) | null = null
 
-function toggleDropdown(id: string, e: Event) {
+function toggleDropdown(id: string | number, e: Event) {
   e.stopPropagation()
   if (openDropdownId.value === id) {
     openDropdownId.value = null

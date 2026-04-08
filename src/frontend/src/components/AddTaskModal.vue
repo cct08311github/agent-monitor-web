@@ -26,6 +26,12 @@ const due_date = ref('')
 const project  = ref('')
 const notes    = ref('')
 
+interface CreateTaskResponse {
+  success: boolean
+  task?: Record<string, unknown>
+  error?: string
+}
+
 const submitting = ref(false)
 
 watch(() => props.defaultDomain, (d) => {
@@ -48,12 +54,12 @@ async function handleSubmit() {
     if (notes.value)     body.notes    = notes.value
     if (project.value)   body.project  = project.value
 
-    const data = await api.post('/api/taskhub/tasks', body) as any
+    const data = await api.post('/api/taskhub/tasks', body) as CreateTaskResponse
     if (!data.success) throw new Error(data.error)
     showToast('✅ 任務已建立', 'success')
     emit('created')
-  } catch (e: any) {
-    showToast('❌ 建立失敗: ' + e.message, 'error')
+  } catch (e) {
+    showToast('❌ 建立失敗: ' + (e instanceof Error ? e.message : String(e)), 'error')
   } finally {
     submitting.value = false
   }
