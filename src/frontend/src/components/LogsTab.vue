@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onUnmounted, watch } from 'vue'
 import { useSSE } from '@/composables/useSSE'
+import { showToast } from '@/composables/useToast'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -27,7 +28,37 @@ interface LogEntry {
 // ---------------------------------------------------------------------------
 
 const sse = useSSE()
+
+/**
+ * `streaming` tracks user intent — true between "start" and "stop" clicks,
+ * regardless of whether the underlying connection is currently open or
+ * mid-reconnect. Use `sse.isConnected` for actual socket state.
+ */
 const streaming = ref(false)
+
+// ---------------------------------------------------------------------------
+// Connection status (4 states)
+// ---------------------------------------------------------------------------
+
+type ConnectionStatus = 'idle' | 'live' | 'reconnecting' | 'failed'
+
+// Expose useSSE refs at script root so template auto-unwraps them.
+// (Refs nested under a plain object like `sse` are NOT auto-unwrapped.)
+const reconnectAttempt = sse.reconnectAttempt
+
+const connectionStatus = computed<ConnectionStatus>(() => {
+  if (!streaming.value) return 'idle'
+  if (sse.isFailed.value) return 'failed'
+  if (sse.isConnected.value) return 'live'
+  return 'reconnecting'
+})
+
+const STATUS_LABELS: Record<ConnectionStatus, string> = {
+  idle: '● 已停止',
+  live: '● 即時監看中',
+  reconnecting: '● 重新連線中',
+  failed: '● 連線中斷',
+}
 
 // ---------------------------------------------------------------------------
 // Log state
@@ -160,6 +191,9 @@ function toggleStream(): void {
 }
 
 function startStream(): void {
+  // Mark intent first so the status badge flips to "reconnecting" immediately
+  streaming.value = true
+
   const el = terminalRef.value
   if (el) {
     // Show connecting indicator
@@ -167,29 +201,60 @@ function startStream(): void {
   }
 
   sse.connect('/api/logs/stream', {
-    autoReconnect: false,
-    onOpen() {
-      streaming.value = true
-    },
+    autoReconnect: true,
     onMessage(event: MessageEvent) {
       try {
         const parsed = JSON.parse(event.data as string) as { line?: string; ts?: number }
         if (parsed.line) appendLine(parsed.line)
       } catch {
-        // Malformed message — ignore
+        // Malformed SSE frame — ignore
       }
     },
-    onError() {
-      appendLine('[連線中斷，請重新開始監看]')
-      stopStream()
+    onReconnecting(attempt: number, delayMs: number) {
+      // Inject a [WARN] line so detectLineLevel picks it up and styles it.
+      // useSSE has already closed the previous EventSource and scheduled
+      // the next attempt; we just narrate it to the user here.
+      appendLine(`[WARN] 連線中斷，${Math.round(delayMs / 1000)}s 後重試（第 ${attempt} 次）`)
+    },
+    onResumed() {
+      appendLine('[INFO] 分頁恢復可見，重新建立連線')
     },
   })
 }
 
+/**
+ * Called by the user "stop" button. Closing useSSE marks the handle as
+ * terminal — only manualReconnect() (or a fresh connect()) can revive it.
+ */
 function stopStream(): void {
   sse.close()
   streaming.value = false
 }
+
+/**
+ * Triggered from the failed-state retry button or the toast retry action.
+ * Reuses useSSE.manualReconnect which resets attempt counters and re-runs
+ * start() with the previously-supplied options.
+ */
+function retryStream(): void {
+  appendLine('[INFO] 手動重新連線…')
+  sse.manualReconnect()
+}
+
+// ---------------------------------------------------------------------------
+// Watch terminal failure → notify the user once and offer a retry action.
+// ---------------------------------------------------------------------------
+
+watch(
+  () => sse.isFailed.value,
+  (failed) => {
+    if (!failed || !streaming.value) return
+    appendLine('[ERROR] 重連次數已達上限，請手動重試或重新開始監看')
+    showToast('日誌串流連線中斷，重連已達上限', 'error', {
+      retryFn: () => retryStream(),
+    })
+  },
+)
 
 function clearLog(): void {
   logBuffer.value = [{ line: '日誌已清除', level: 'info', cls: 'info' }]
@@ -258,10 +323,30 @@ onUnmounted(() => {
     </div>
 
     <!-- Status bar -->
-    <div style="padding:4px 0">
-      <span :class="['oc-log-badge', { live: streaming }]">
-        {{ streaming ? '● 監看中' : '● 已停止' }}
+    <div style="padding:4px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span
+        :class="[
+          'oc-log-badge',
+          {
+            live: connectionStatus === 'live',
+            reconnecting: connectionStatus === 'reconnecting',
+            failed: connectionStatus === 'failed',
+          },
+        ]"
+      >
+        {{ STATUS_LABELS[connectionStatus] }}
+        <template v-if="connectionStatus === 'reconnecting' && reconnectAttempt > 0">
+          （第 {{ reconnectAttempt }} 次）
+        </template>
       </span>
+      <button
+        v-if="connectionStatus === 'failed'"
+        class="ctrl-btn"
+        style="font-size:11px;padding:2px 8px"
+        @click="retryStream"
+      >
+        🔄 重試連線
+      </button>
     </div>
 
     <!-- Terminal -->

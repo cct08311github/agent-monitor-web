@@ -553,3 +553,17 @@ select.cost-range-selector {
     border-radius: 3px;
     transition: width 0.3s ease;
 }
+
+/* ── LOG STATUS BADGE — RECONNECTING / FAILED states ── */
+.oc-log-badge.reconnecting {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--yellow, #f59e0b);
+    border-color: var(--yellow, #f59e0b);
+    animation: badgePulse 1s ease-in-out infinite;
+}
+
+.oc-log-badge.failed {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--red, #ef4444);
+    border-color: var(--red, #ef4444);
+}
