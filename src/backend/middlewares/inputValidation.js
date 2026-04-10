@@ -34,7 +34,8 @@ function sanitizeString(input) {
  */
 function validateAgentId(req, res, next) {
     const { agentId } = req.params;
-    if (agentId && !PATTERNS.id.test(agentId)) {
+    // M1: reject empty string (agentId !== undefined covers both present+empty and present+invalid)
+    if (agentId !== undefined && !PATTERNS.id.test(agentId)) {
         return res.status(400).json({
             success: false,
             error: 'validation_error',
@@ -49,7 +50,8 @@ function validateAgentId(req, res, next) {
  */
 function validateSessionId(req, res, next) {
     const { sessionId } = req.params;
-    if (sessionId && !PATTERNS.id.test(sessionId)) {
+    // M1: reject empty string (sessionId !== undefined covers both present+empty and present+invalid)
+    if (sessionId !== undefined && !PATTERNS.id.test(sessionId)) {
         return res.status(400).json({
             success: false,
             error: 'validation_error',

@@ -76,6 +76,9 @@ export function useSSE(): SSEHandle {
   let visibilityHandler: (() => void) | null = null
   let _currentUrl = ''
   let _currentOptions: SSEOptions = {}
+  // M2: tracks whether the next open is a visibility-resume, so onResumed fires
+  // only after the connection actually opens (not before start() is called)
+  let _resuming = false
 
   // ---- Internal helpers ---------------------------------------------------
 
@@ -119,12 +122,18 @@ export function useSSE(): SSEHandle {
     const fullUrl =
       basePath && _currentUrl.startsWith('/') ? basePath + _currentUrl : _currentUrl
 
-    source = new EventSource(fullUrl)
+    // H4: include credentials (cookies) so the server-side session auth is satisfied
+    source = new EventSource(fullUrl, { withCredentials: true })
 
     source.onopen = () => {
       reconnectAttempt.value = 0
       isFailed.value = false
       isConnected.value = true
+      // M2: fire onResumed after connection confirms open (not before)
+      if (_resuming) {
+        _resuming = false
+        _currentOptions.onResumed?.()
+      }
       _currentOptions.onOpen?.(source!)
     }
 
@@ -181,8 +190,9 @@ export function useSSE(): SSEHandle {
         } else if (pausedByVisibility && !closed) {
           pausedByVisibility = false
           reconnectAttempt.value = 0
+          // M2: set flag so onResumed fires in onopen (after connection confirms)
+          _resuming = true
           start()
-          _currentOptions.onResumed?.()
         }
       }
       document.addEventListener('visibilitychange', visibilityHandler)

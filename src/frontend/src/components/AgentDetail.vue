@@ -59,11 +59,10 @@ const agent = computed(() => {
   return agents.find((a) => a.id === props.agentId) ?? null
 })
 
-// Extended agent fields that backend may send beyond the typed interface
-type AgentExt = typeof agent.value & Record<string, unknown>
-
-function agentExt(): AgentExt {
-  return (agent.value ?? {}) as AgentExt
+// M4: use Record<string, unknown> to safely access extended fields the typed
+// Agent interface doesn't declare, without an unsafe intersection with nullable
+function agentExt(): Record<string, unknown> {
+  return (agent.value ?? {}) as Record<string, unknown>
 }
 
 function getAgentCostTWD(): string {

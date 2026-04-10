@@ -71,7 +71,9 @@ describe('optimizeController.run', () => {
             });
 
         expect(res.body).toContain('event: error');
-        expect(res.body).toContain('DB error');
+        // H1: error message is sanitized — raw error details are not exposed to clients
+        expect(res.body).toContain('優化執行失敗，請稍後再試');
+        expect(res.body).not.toContain('DB error');
     });
 
     it('resets isRunning to false after error so subsequent requests succeed', async () => {

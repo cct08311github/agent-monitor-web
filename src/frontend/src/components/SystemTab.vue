@@ -447,11 +447,21 @@ watch(tokenChartRef, (el) => {
           <h2>💰 費用分析</h2>
         </div>
         <canvas ref="costChartRef" style="width: 100%; height: 160px" />
+        <!-- H5: show retry for cost chart data failure -->
+        <div v-if="historyError && costHistoryData.length === 0" class="chart-error-state">
+          ⚠️ 費用資料載入失敗
+          <button class="ctrl-btn" style="margin-left:8px;font-size:12px" @click="fetchHistory">重試</button>
+        </div>
 
         <div class="section-header" style="margin-top: 16px">
           <h2>🏆 Token 消耗排行</h2>
         </div>
         <canvas ref="tokenChartRef" style="width: 100%; height: 200px" />
+        <!-- H5: show retry for token spenders data failure -->
+        <div v-if="historyError && tokenSpendersData.length === 0" class="chart-error-state">
+          ⚠️ Token 排行資料載入失敗
+          <button class="ctrl-btn" style="margin-left:8px;font-size:12px" @click="fetchHistory">重試</button>
+        </div>
 
         <div class="section-header" style="margin-top: 16px">
           <h2>🤖 模型使用明細</h2>
