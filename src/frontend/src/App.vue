@@ -25,7 +25,7 @@ async function handleLogout() {
   router.push({ name: 'login' })
 }
 
-type DesktopTab = 'monitor' | 'system' | 'logs' | 'chat'
+type DesktopTab = 'monitor' | 'system' | 'logs' | 'chat' | 'optimize'
 
 function switchTab(tab: DesktopTab) {
   // When switching away from detail, reset detail state
@@ -80,6 +80,12 @@ const activeDesktopTab = computed<DesktopTab>(() => {
             :aria-selected="activeDesktopTab === 'chat'"
             @click="switchTab('chat')"
           >💬 聊天室</button>
+          <button
+            :class="['desktop-tab', { active: activeDesktopTab === 'optimize' }]"
+            role="tab"
+            :aria-selected="activeDesktopTab === 'optimize'"
+            @click="switchTab('optimize')"
+          >🧠 優化</button>
         </div>
       </div>
       <div class="header-right">
