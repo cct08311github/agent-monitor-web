@@ -65,7 +65,10 @@ function truncateText(text: string): string {
         <div v-if="loading" style="color:var(--text-muted);text-align:center;padding:24px">載入中…</div>
 
         <!-- Error -->
-        <div v-else-if="error" style="color:var(--text-muted);text-align:center;padding:24px">載入失敗</div>
+        <div v-else-if="error" style="color:var(--text-muted);text-align:center;padding:24px">
+          ⚠️ 載入失敗<br />
+          <a href="#" @click.prevent="fetchMessages" style="color:var(--blue, #5a5aeb);font-size:13px;margin-top:8px;display:inline-block">重試</a>
+        </div>
 
         <!-- Empty -->
         <div v-else-if="messages.length === 0" style="color:var(--text-muted);text-align:center;padding:24px">無訊息記錄</div>
