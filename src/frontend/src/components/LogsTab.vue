@@ -17,11 +17,16 @@ const SCROLL_THRESHOLD = 50
 type LogLevel = 'error' | 'warn' | 'info'
 
 interface LogEntry {
+  /** M3: stable monotonic id so Vue's :key is stable across buffer shifts */
+  id: number
   line: string
   level: LogLevel
   /** Extra CSS class derived from line content (err / warn / info) */
   cls: string
 }
+
+// M3: monotonic counter for stable entry IDs
+let _entrySeq = 0
 
 // ---------------------------------------------------------------------------
 // SSE handle
@@ -161,7 +166,7 @@ function scrollToBottom(): void {
 function appendLine(line: string): void {
   const level = detectLineLevel(line)
   const cls = deriveLineCls(line)
-  logBuffer.value.push({ line, level, cls })
+  logBuffer.value.push({ id: ++_entrySeq, line, level, cls })
   if (logBuffer.value.length > LOG_BUFFER_MAX) {
     logBuffer.value.shift()
   }
@@ -197,7 +202,7 @@ function startStream(): void {
   const el = terminalRef.value
   if (el) {
     // Show connecting indicator
-    logBuffer.value = [{ line: '連接中...', level: 'info', cls: 'info' }]
+    logBuffer.value = [{ id: ++_entrySeq, line: '連接中...', level: 'info', cls: 'info' }]
   }
 
   sse.connect('/api/logs/stream', {
@@ -257,7 +262,7 @@ watch(
 )
 
 function clearLog(): void {
-  logBuffer.value = [{ line: '日誌已清除', level: 'info', cls: 'info' }]
+  logBuffer.value = [{ id: ++_entrySeq, line: '日誌已清除', level: 'info', cls: 'info' }]
   hasNewMessages.value = false
 }
 
@@ -356,8 +361,8 @@ onUnmounted(() => {
       @scroll="onScroll"
     >
       <div
-        v-for="(entry, i) in visibleLines"
-        :key="i"
+        v-for="entry in visibleLines"
+        :key="entry.id"
         :class="['log-line', entry.level, 'oc-log-line', entry.cls]"
       >
         <template

@@ -64,12 +64,14 @@ describe('validateAgentId', () => {
         expect(res.status).not.toHaveBeenCalled();
     });
 
-    it('calls next() for empty string agentId (falsy value passes through)', () => {
+    it('returns 400 for empty string agentId (empty string is invalid per PATTERNS.id)', () => {
         const req = mockReq({ params: { agentId: '' } });
         const res = mockRes();
         const next = jest.fn();
         validateAgentId(req, res, next);
-        expect(next).toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: 'validation_error' }));
+        expect(next).not.toHaveBeenCalled();
     });
 });
 
@@ -113,12 +115,14 @@ describe('validateSessionId', () => {
         expect(res.status).not.toHaveBeenCalled();
     });
 
-    it('calls next() for empty string sessionId (falsy value passes through)', () => {
+    it('returns 400 for empty string sessionId (empty string is invalid per PATTERNS.id)', () => {
         const req = mockReq({ params: { sessionId: '' } });
         const res = mockRes();
         const next = jest.fn();
         validateSessionId(req, res, next);
-        expect(next).toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: 'validation_error' }));
+        expect(next).not.toHaveBeenCalled();
     });
 });
 
