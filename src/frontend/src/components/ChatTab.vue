@@ -170,5 +170,8 @@ async function send(): Promise<void> {
         {{ appState.isMobile ? '↑' : '發送' }}
       </button>
     </div>
+    <div :class="['chat-char-counter', { warn: inputText.length > 1800 }]">
+      {{ inputText.length }} / 2000
+    </div>
   </div>
 </template>
