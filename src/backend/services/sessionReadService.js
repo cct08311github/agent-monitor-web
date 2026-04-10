@@ -81,6 +81,13 @@ function readSessions(agentIdInput) {
         return { statusCode: 200, body: ok({ sessions: [] }) };
     }
 
+    let resolvedSessionsDir;
+    try {
+        resolvedSessionsDir = fs.realpathSync(sessionsDir);
+    } catch (_) {
+        return { statusCode: 200, body: ok({ sessions: [] }) };
+    }
+
     const files = fs.readdirSync(sessionsDir)
         .filter((f) => f.endsWith('.jsonl'))
         .sort()
@@ -89,6 +96,15 @@ function readSessions(agentIdInput) {
 
     const sessions = files.map((f) => {
         const filePath = path.join(sessionsDir, f);
+        // Symlink guard: prevent directory traversal via symlinks
+        try {
+            const realPath = fs.realpathSync(filePath);
+            if (!realPath.startsWith(resolvedSessionsDir + path.sep)) {
+                return { id: f.replace('.jsonl', ''), messageCount: 0, lastTs: null };
+            }
+        } catch (_) {
+            return { id: f.replace('.jsonl', ''), messageCount: 0, lastTs: null };
+        }
         let messageCount = 0;
         let lastTs = null;
         try {

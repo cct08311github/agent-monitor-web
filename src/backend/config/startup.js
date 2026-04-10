@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const { getServerConfig, getAuthConfig, getOpenClawConfig } = require('./index');
+const logger = require('../utils/logger');
 
 function checkReadableFile(filePath, label, errors) {
     if (!fs.existsSync(filePath)) {
@@ -17,6 +18,10 @@ function checkReadableFile(filePath, label, errors) {
 }
 
 function validateStartup() {
+    if (process.env.AUTH_DISABLED === 'true' && process.env.NODE_ENV === 'production') {
+        logger.warn('auth_disabled_in_production', { message: 'AUTH_DISABLED=true in production is a critical security risk' });
+    }
+
     const errors = [];
     const server = getServerConfig();
     const auth = getAuthConfig();
