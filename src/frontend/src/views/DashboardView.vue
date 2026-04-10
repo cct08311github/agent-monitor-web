@@ -5,6 +5,7 @@ import AgentDetail from '@/components/AgentDetail.vue'
 import SystemTab from '@/components/SystemTab.vue'
 import LogsTab from '@/components/LogsTab.vue'
 import ChatTab from '@/components/ChatTab.vue'
+import OptimizeTab from '@/components/OptimizeTab.vue'
 import ChatModal from '@/components/ChatModal.vue'
 import ModelSwitchModal from '@/components/ModelSwitchModal.vue'
 import { appState } from '@/stores/appState'
@@ -72,6 +73,9 @@ function openModelSwitch(agentId: string, model: string) {
 
       <!-- Chat Tab -->
       <ChatTab v-show="appState.currentDesktopTab === 'chat'" />
+
+      <!-- Optimize Tab -->
+      <OptimizeTab v-show="appState.currentDesktopTab === 'optimize'" />
     </main>
 
     <!-- Chat Modal (from agent card actions) -->
