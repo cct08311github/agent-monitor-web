@@ -230,7 +230,8 @@ async function saveAndNotify(report, opusFailed, onProgress) {
     onProgress(7, 'Telegram 推播...');
     const optimizeConfig = getOptimizeConfig();
     if (optimizeConfig.telegramTarget) {
-        const summary = report.split('\n').filter(l => l.startsWith('##')).slice(0, 3).join(' | ');
+        const rawSummary = report.split('\n').filter(l => l.startsWith('##')).slice(0, 3).join(' | ');
+        const summary = rawSummary.replace(/[\x00-\x1F]/g, ' ').slice(0, 200);
         const message = `🤖 自主優化報告已生成 (${date})\n${summary}\n📄 ${filename}`;
         try {
             await openclawClient.runArgs([

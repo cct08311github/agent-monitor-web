@@ -6,22 +6,22 @@ const { validateStartup } = require('../config/startup');
 
 function checkFileDependency(filePath, label, required = true) {
     if (!filePath) {
-        return { name: label, status: required ? 'missing' : 'disabled', path: filePath || null };
+        return { name: label, status: required ? 'missing' : 'disabled' };
     }
 
     if (!filePath.startsWith('/')) {
-        return { name: label, status: 'configured', path: filePath };
+        return { name: label, status: 'configured' };
     }
 
     if (!fs.existsSync(filePath)) {
-        return { name: label, status: required ? 'missing' : 'degraded', path: filePath };
+        return { name: label, status: required ? 'missing' : 'degraded' };
     }
 
     try {
         fs.accessSync(filePath, fs.constants.R_OK);
-        return { name: label, status: 'ready', path: filePath };
+        return { name: label, status: 'ready' };
     } catch (_) {
-        return { name: label, status: 'unreadable', path: filePath };
+        return { name: label, status: 'unreadable' };
     }
 }
 
@@ -40,7 +40,6 @@ function getDependencyHealth() {
         auth: {
             name: 'auth',
             status: auth.authDisabled || auth.passwordHash ? 'ready' : 'missing',
-            authDisabled: auth.authDisabled,
         },
     };
 }

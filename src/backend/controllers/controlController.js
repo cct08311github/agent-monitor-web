@@ -52,7 +52,7 @@ class ControlController {
                 /* istanbul ignore next */
                 const model = typeof body.model === 'string' ? body.model.trim() : '';
 
-                if (!agentId || !model || !/^[A-Za-z0-9_-]+$/.test(agentId) || !/^[A-Za-z0-9._/-]+$/.test(model)) {
+                if (!agentId || !model || agentId.length > 64 || model.length > 256 || !/^[A-Za-z0-9_-]+$/.test(agentId) || !/^[A-Za-z0-9._/-]+$/.test(model)) {
                     return sendFail(res, 400, 'bad_request', { message: 'Invalid format.' });
                 }
 

@@ -175,7 +175,7 @@ router.post('/plugins/:name/toggle', auth.localhostOnlyControl, auth.rateLimit, 
 let logsStreamClients = 0;
 const MAX_LOGS_STREAM_CLIENTS = 5;
 /* istanbul ignore next */
-router.get('/logs/stream', auth.localhostOnlyControl, /* istanbul ignore next */ (req, res) => {
+router.get('/logs/stream', auth.requireAuth, auth.localhostOnlyControl, /* istanbul ignore next */ (req, res) => {
     if (logsStreamClients >= MAX_LOGS_STREAM_CLIENTS) {
         return res.status(503).json({ success: false, error: 'logs_stream_capacity_exceeded' });
     }

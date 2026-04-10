@@ -22,6 +22,9 @@ const cspDirectives = {
     fontSrc: ["'self'", 'https://fonts.gstatic.com'],
     objectSrc: ["'none'"],
     frameAncestors: ["'none'"],
+    connectSrc: ["'self'"],
+    baseUri: ["'self'"],
+    formAction: ["'self'"],
     upgradeInsecureRequests: [],
 };
 
