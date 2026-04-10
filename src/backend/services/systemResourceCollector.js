@@ -32,44 +32,47 @@ async function getSystemResources() {
         const totalMem = os.totalmem();
         let freeMem = os.freemem();
 
-        if (os.platform() === 'darwin') {
-            try {
-                const { stdout } = await execFilePromise('vm_stat');
-                const psMatch = stdout.match(/page size of (\d+) bytes/);
-                const pageSize = psMatch ? parseInt(psMatch[1], 10) : 4096;
-                const getVal = (key) => {
-                    const match = stdout.match(new RegExp(`${key}:\\s+(\\d+)`));
-                    return match ? parseInt(match[1], 10) * pageSize : 0;
-                };
-                const active = getVal('Pages active');
-                const wired = getVal('Pages wired down');
-                const occupied = getVal('Pages occupied by compressor');
-                const usedMem = active + wired + occupied;
-                if (usedMem > 0) freeMem = Math.max(0, totalMem - usedMem);
-            } catch (e) {
-                // vm_stat is optional best-effort enrichment on macOS.
-            }
-        } else if (os.platform() === 'linux') {
-            try {
-                const { stdout } = await execFilePromise('free', ['-b']);
-                const memMatch = stdout.match(/Mem:\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+(\d+)/);
-                if (memMatch) freeMem = parseInt(memMatch[1], 10);
-            } catch (e) {
-                // free(1) is optional best-effort enrichment on Linux.
-            }
-        }
+        // Run platform-specific memory enrichment and disk check in parallel
+        const [memResult, diskResult] = await Promise.all([
+            (async () => {
+                if (os.platform() === 'darwin') {
+                    try {
+                        const { stdout } = await execFilePromise('vm_stat');
+                        const psMatch = stdout.match(/page size of (\d+) bytes/);
+                        const pageSize = psMatch ? parseInt(psMatch[1], 10) : 4096;
+                        const getVal = (key) => {
+                            const match = stdout.match(new RegExp(`${key}:\\s+(\\d+)`));
+                            return match ? parseInt(match[1], 10) * pageSize : 0;
+                        };
+                        const active = getVal('Pages active');
+                        const wired = getVal('Pages wired down');
+                        const occupied = getVal('Pages occupied by compressor');
+                        const usedMem = active + wired + occupied;
+                        if (usedMem > 0) return Math.max(0, totalMem - usedMem);
+                    } catch (e) { /* vm_stat optional */ }
+                } else if (os.platform() === 'linux') {
+                    try {
+                        const { stdout } = await execFilePromise('free', ['-b']);
+                        const memMatch = stdout.match(/Mem:\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+(\d+)/);
+                        if (memMatch) return parseInt(memMatch[1], 10);
+                    } catch (e) { /* free optional */ }
+                }
+                return null;
+            })(),
+            (async () => {
+                try {
+                    const { stdout } = await execFilePromise('df', ['-h', '/']);
+                    const lastLine = stdout.trim().split('\n').pop();
+                    const match = lastLine.match(/(\d+)%/);
+                    if (match) return match[1];
+                } catch (e) { /* df optional */ }
+                return '0';
+            })(),
+        ]);
 
+        if (memResult !== null) freeMem = memResult;
         const memUsage = ((totalMem - freeMem) / totalMem * 100).toFixed(1);
-
-        let diskUsage = '0';
-        try {
-            const { stdout } = await execFilePromise('df', ['-h', '/']);
-            const lastLine = stdout.trim().split('\n').pop();
-            const match = lastLine.match(/(\d+)%/);
-            if (match) diskUsage = match[1];
-        } catch (e) {
-            // Disk usage is non-critical; preserve payload generation if df fails.
-        }
+        const diskUsage = diskResult;
 
         const uptimeSeconds = os.uptime();
         const hours = Math.floor(uptimeSeconds / 3600);

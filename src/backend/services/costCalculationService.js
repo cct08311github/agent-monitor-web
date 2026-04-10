@@ -58,7 +58,8 @@ function isThisWeek(ms) {
     const now = new Date();
     const day = now.getDay();
     const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-    const startOfWeek = new Date(now.setDate(diff));
+    const startOfWeek = new Date(now.getTime());
+    startOfWeek.setDate(diff);
     startOfWeek.setHours(0, 0, 0, 0);
     return d >= startOfWeek;
 }
