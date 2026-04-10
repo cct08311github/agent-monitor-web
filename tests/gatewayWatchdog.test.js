@@ -21,6 +21,9 @@ jest.mock('fs', () => ({
     mkdirSync: jest.fn(),
     appendFileSync: jest.fn(),
     writeFileSync: jest.fn(),
+    promises: {
+        appendFile: jest.fn().mockResolvedValue(undefined),
+    },
 }));
 
 const mockHttpRequest = jest.fn();
@@ -44,6 +47,9 @@ beforeEach(() => {
         mkdirSync: jest.fn(),
         appendFileSync: jest.fn(),
         writeFileSync: jest.fn(),
+        promises: {
+            appendFile: jest.fn().mockResolvedValue(undefined),
+        },
     }));
     jest.mock('http', () => ({ request: mockHttpRequest }));
 
@@ -170,8 +176,8 @@ describe('logging', () => {
         expect(fs.mkdirSync).toHaveBeenCalled();
     });
 
-    it('appendFileSync called for log entries', () => {
+    it('appendFile called for log entries', () => {
         watchdog.start();
-        expect(fs.appendFileSync).toHaveBeenCalled();
+        expect(fs.promises.appendFile).toHaveBeenCalled();
     });
 });

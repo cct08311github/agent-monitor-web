@@ -115,6 +115,7 @@ function createRepairService({ state, CONFIG, OPENCLAW_PATH, OPENCLAW_CONFIG_PAT
                     repairRecord.success = true;
                     repairRecord.steps.push({ action: 'initial_restart_success' });
                     state.repairHistory.push(repairRecord);
+                    if (state.repairHistory.length > 20) state.repairHistory.shift();
                     await sendTelegramNotification('repair_success', { attempt, reason, repairRecord, sreOutput: '簡單重啟即恢復正常。' });
                     return true;
                 }

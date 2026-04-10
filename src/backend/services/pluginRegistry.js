@@ -70,14 +70,16 @@ function registerPlugin(plugin) {
         routes: typeof plugin.routes === 'function' ? [plugin.routes] : (Array.isArray(plugin.routes) ? plugin.routes : []),
         _registeredAt: Date.now(),
         _internal: plugin._internal || false,
+        onRegister: typeof plugin.onRegister === 'function' ? plugin.onRegister : null,
+        onUnregister: typeof plugin.onUnregister === 'function' ? plugin.onUnregister : null,
     };
 
     plugins.set(plugin.name, normalizedPlugin);
 
     // Call plugin's onRegister if provided
-    if (typeof plugin.onRegister === 'function') {
+    if (typeof normalizedPlugin.onRegister === 'function') {
         try {
-            plugin.onRegister(normalizedPlugin);
+            normalizedPlugin.onRegister(normalizedPlugin);
         } catch (err) {
             logger.error('plugin_on_register_error', { name: plugin.name, error: err.message });
         }

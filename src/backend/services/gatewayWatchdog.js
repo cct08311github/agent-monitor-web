@@ -115,8 +115,10 @@ async function healthCheckLoop() {
         }
 
         // Phase 1: Checks
-        const health = await checkGatewayHealth();
-        const ocStatus = await checkOpenClawStatus();
+        const [health, ocStatus] = await Promise.all([
+            checkGatewayHealth(),
+            checkOpenClawStatus(),
+        ]);
 
         if (health.healthy && ocStatus.healthy) {
             if (state.currentStatus !== 'healthy') {

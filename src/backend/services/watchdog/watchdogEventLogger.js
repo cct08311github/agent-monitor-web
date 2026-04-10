@@ -41,7 +41,11 @@ function createEventLogger({ state, CONFIG }) {
             const d = new Date();
             const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
             const logFile = path.join(CONFIG.logDir, `watchdog-${dateStr}.jsonl`);
-            fs.appendFileSync(logFile, JSON.stringify(entry) + '\n', 'utf8');
+            fs.promises.appendFile(logFile, JSON.stringify(entry) + '\n', 'utf8').catch(writeErr => {
+                logger.error('gateway_watchdog_log_async_write_failed', {
+                    details: logger.toErrorFields(writeErr),
+                });
+            });
         } catch (e) {
             logger.error('gateway_watchdog_log_write_failed', {
                 details: logger.toErrorFields(e),

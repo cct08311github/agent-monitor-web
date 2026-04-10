@@ -10,7 +10,7 @@ function parseAgentsList(text) {
     const lines = text.split('\n');
     let currentAgent = null;
     for (const line of lines) {
-        const agentMatch = line.match(/^- (\w+)(?:\s+\(([^)]+)\))?/);
+        const agentMatch = line.match(/^- ([\w-]+)(?:\s+\(([^)]+)\))?/);
         if (agentMatch) {
             if (currentAgent) agents.push(currentAgent);
             currentAgent = { id: agentMatch[1], name: agentMatch[2] || agentMatch[1], workspace: '', model: '' };
