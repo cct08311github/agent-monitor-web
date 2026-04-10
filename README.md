@@ -50,7 +50,7 @@ npm start
 
 ```bash
 npm test
-# 440 tests, 35 suites — jest --forceExit --detectOpenHandles
+# 600+ tests, 43+ suites — jest --forceExit --detectOpenHandles
 ```
 
 ## Configuration
@@ -78,33 +78,31 @@ src/
 │   ├── middlewares/    # session/control auth, origin policy, rate limit, audit, error handler, request context/logger
 │   ├── security/       # threatIntel, adaptiveSecurity, compliance
 │   └── services/       # 12 services (dashboard, history, session, openclaw, health, optimize, alert, watchdog, tsdb, etc.)
-└── frontend/
-    └── public/
-        ├── index.html
-        ├── css/        # style.css, theme.css, taskhub.css
-        └── js/
-            ├── state.js                # 前端共享狀態容器
-            ├── stream-manager.js       # SSE / EventSource 共用封裝
-            ├── api-client.js           # fetch / JSON / API error 共用封裝
-            ├── navigation.js           # tab / summary card 切換
-            ├── detail-view.js          # agent detail / session modal
-            ├── error-center.js         # dashboard error banner / SRE flow
-            ├── command-actions.js      # 控制指令 / output modal
-            ├── watchdog-ui.js          # watchdog UI / control flows
-            ├── auth-ui.js              # auth redirect / logout / 401 handling
-            ├── optimize-runner.js      # optimize SSE / progress UI
-            ├── dashboard-runtime.js    # dashboard SSE / connection status
-            ├── bootstrap.js            # DOMContentLoaded bootstrap
-            ├── alert-config.js         # alert config modal / alert detection
-            ├── dashboard-render.js     # dashboard agent/subagent rendering
-            ├── theme-manager.js        # dark/light theme toggle
-            ├── app.js                  # shared utilities / data update glue
-            └── modules/
-                ├── charts.js           # drawSparkline / drawBarChart / drawHBarChart
-                ├── logs.js
-                ├── chat.js
-                ├── cron.js
-                └── taskhub.js
+└── frontend/           # Vue 3 + Vite + TypeScript
+    ├── index.html
+    ├── vite.config.ts
+    └── src/
+        ├── App.vue
+        ├── router.ts
+        ├── composables/    # useApi, useSSE, useAuth, useTheme, useDashboard, useKeyboardShortcuts, useConfirm, useToast
+        ├── types/          # TypeScript 型別定義
+        ├── views/          # LoginView, DashboardView
+        └── components/     # 25 Vue 3 SFC 組件
+            ├── MonitorTab.vue      # Agent 監控主畫面（Focus + Periphery 佈局）
+            ├── AgentCard.vue       # Agent 卡片
+            ├── AgentFocus.vue      # 活動中 Agent 展示區
+            ├── AgentPeriphery.vue  # 閒置 Agent 收納區
+            ├── AgentDetail.vue     # Agent 詳情面板
+            ├── AgentMinimap.vue    # Agent 快速導覽
+            ├── SessionViewer.vue   # Session 對話檢視器
+            ├── SystemTab.vue       # 費用統計 / 系統資源
+            ├── LogsTab.vue         # SSE 即時 log 串流
+            ├── ChatTab.vue         # Agent 對話
+            ├── OptimizeTab.vue     # 自主優化 pipeline
+            ├── CronTab.vue         # Cron 管理
+            ├── TaskHubTab.vue      # 任務管理
+            └── ...                 # ConfirmDialog, ToastContainer, modals
+dist/                   # Vite 建置輸出（Express 靜態檔）
 tests/                  # Jest 測試，對應 src/backend/ 結構
 ```
 
@@ -158,5 +156,5 @@ commit 格式：`feat(sN): <description>`（N = sprint 編號）
 
 ---
 
-**最後更新**：2026-03-09
-**狀態**：Sprint 2 完成，優化期
+**最後更新**：2026-04-11
+**狀態**：Vue 3 遷移完成，安全掃描 R1-R25 完成，品質強化期
