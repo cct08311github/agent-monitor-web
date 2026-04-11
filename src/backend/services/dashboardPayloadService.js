@@ -59,7 +59,7 @@ async function resolveOpenclawBin() {
     for (const cand of OPENCLAW_BIN_CANDIDATES) {
         if (cand.startsWith('/') && !fs.existsSync(cand)) continue;
         try {
-            const { stdout, stderr } = await execFilePromise(cand, ['--version']);
+            const { stdout, stderr } = await execFilePromise(cand, ['--version'], { timeout: 5_000 });
             const out = ((stdout || '') + (stderr || '')).trim();
             if (out) {
                 RESOLVED_OPENCLAW_BIN = cand;
@@ -95,7 +95,7 @@ async function buildDashboardPayload() {
 
     if (!isFresh(cache.agents)) {
         fetches.push(
-            execFilePromise(ocBin, ['agents', 'list']).catch(() => ({ stdout: '' }))
+            execFilePromise(ocBin, ['agents', 'list'], { timeout: 15_000 }).catch(() => ({ stdout: '' }))
                 .then(async (agentsResult) => {
                     const agentList = parseAgentsList(agentsResult.stdout || '');
                     const agents = await Promise.all(
@@ -117,7 +117,7 @@ async function buildDashboardPayload() {
 
     if (!isFresh(cache.cron)) {
         fetches.push(
-            execFilePromise(ocBin, ['cron', 'list', '--json']).catch(() => ({ stdout: '{"jobs":[]}' }))
+            execFilePromise(ocBin, ['cron', 'list', '--json'], { timeout: 15_000 }).catch(() => ({ stdout: '{"jobs":[]}' }))
                 .then((cronResult) => {
                     let cronJobs = [];
                     try {
@@ -146,7 +146,7 @@ async function buildDashboardPayload() {
     const [openclawVersionResult, exchangeRate] = await Promise.all([
         cachedOcVersion
             ? Promise.resolve({ stdout: cachedOcVersion, stderr: '' })
-            : execFilePromise(ocBin, ['--version']).catch(() => ({ stdout: '' })),
+            : execFilePromise(ocBin, ['--version'], { timeout: 5_000 }).catch(() => ({ stdout: '' })),
         getExchangeRate(),
         ...fetches,
     ]);
@@ -283,7 +283,7 @@ function shouldRefreshSharedPayload(maxAgeMs = 5000) {
 
 async function runOpenclawRead(args) {
     const ocBin = await resolveOpenclawBin();
-    return execFilePromise(ocBin, args);
+    return execFilePromise(ocBin, args, { timeout: 15_000 });
 }
 
 module.exports = {

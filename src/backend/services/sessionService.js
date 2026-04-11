@@ -4,6 +4,8 @@ const crypto = require('crypto');
 const { getAuthConfig } = require('../config');
 
 const sessions = new Map(); // sessionId → { username, expiresAt, lastAccessAt }
+const MAX_SESSIONS = 1000;
+const MAX_SESSIONS_PER_USER = 5;
 
 function getSecret() {
     return getAuthConfig().sessionSecret;
@@ -31,6 +33,15 @@ function unsign(token) {
 }
 
 function createSession(username) {
+    // Global cap — evict oldest session if at ceiling
+    if (sessions.size >= MAX_SESSIONS) {
+        let gOldestId = null, gOldestTs = Infinity;
+        for (const [id, s] of sessions) {
+            if (s.createdAt < gOldestTs) { gOldestTs = s.createdAt; gOldestId = id; }
+        }
+        if (gOldestId) sessions.delete(gOldestId);
+    }
+
     const id = crypto.randomBytes(32).toString('hex');
     const now = Date.now();
     sessions.set(id, { username, createdAt: now, lastAccessAt: now, expiresAt: now + getTtlMs() });
@@ -78,6 +89,12 @@ if (process.env.NODE_ENV !== 'test') {
     }, 5 * 60 * 1000).unref();
 }
 
+function destroySessionsForUser(username) {
+    for (const [id, s] of sessions) {
+        if (s.username === username) sessions.delete(id);
+    }
+}
+
 function _clearSessions() { sessions.clear(); }
 
-module.exports = { createSession, validateSession, touchSession, destroySession, _sessions: sessions, _clearSessions };
+module.exports = { createSession, validateSession, touchSession, destroySession, destroySessionsForUser, _sessions: sessions, _clearSessions };

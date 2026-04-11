@@ -329,7 +329,7 @@ describe('dashboardPayloadService', () => {
         const result = await service.runOpenclawRead(['status']);
 
         expect(result).toEqual({ stdout: '', stderr: '' });
-        expect(mockExecFilePromise).toHaveBeenLastCalledWith('/tmp/home/.openclaw/bin/openclaw', ['status']);
+        expect(mockExecFilePromise).toHaveBeenLastCalledWith('/tmp/home/.openclaw/bin/openclaw', ['status'], { timeout: 15_000 });
     });
 
     it('warns when agent activity cannot be read but still returns the fallback detail', async () => {
