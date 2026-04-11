@@ -50,7 +50,10 @@ const cleanupAgentsStmt = db.prepare(`DELETE FROM agent_metrics WHERE timestamp 
 
 const selectSystemHistoryStmt = db.prepare('SELECT timestamp, cpu, memory, disk, total_agents, active_agents FROM system_metrics ORDER BY timestamp DESC LIMIT ?');
 const selectAgentTopTokensStmt = db.prepare(`
-    SELECT agent_id, input_tokens, output_tokens, (input_tokens + output_tokens) as total
+    SELECT agent_id,
+           SUM(input_tokens) as input_tokens,
+           SUM(output_tokens) as output_tokens,
+           SUM(input_tokens + output_tokens) as total
     FROM agent_metrics
     WHERE timestamp >= datetime('now', '-5 minutes')
     GROUP BY agent_id

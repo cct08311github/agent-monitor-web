@@ -14,7 +14,7 @@ describe('healthService', () => {
     it('returns alive payload for liveness', () => {
         const payload = healthService.getLivenessPayload();
         expect(payload.status).toBe('alive');
-        expect(payload.pid).toBe(process.pid);
+        expect(payload).not.toHaveProperty('pid');
         expect(typeof payload.uptimeSec).toBe('number');
     });
 

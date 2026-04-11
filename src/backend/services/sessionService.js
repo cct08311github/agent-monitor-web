@@ -33,6 +33,18 @@ function unsign(token) {
 }
 
 function createSession(username) {
+    // Per-user cap — evict oldest session for this user if at per-user ceiling
+    const userSessions = [];
+    for (const [id, s] of sessions) {
+        if (s.username === username) userSessions.push({ id, createdAt: s.createdAt });
+    }
+    if (userSessions.length >= MAX_SESSIONS_PER_USER) {
+        userSessions.sort((a, b) => a.createdAt - b.createdAt);
+        for (let i = 0; i <= userSessions.length - MAX_SESSIONS_PER_USER; i++) {
+            sessions.delete(userSessions[i].id);
+        }
+    }
+
     // Global cap — evict oldest session if at ceiling
     if (sessions.size >= MAX_SESSIONS) {
         let gOldestId = null, gOldestTs = Infinity;

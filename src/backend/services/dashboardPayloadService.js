@@ -255,8 +255,8 @@ function stopGlobalPolling() {
     agentWatcherService.stop();
 }
 
-function addSseClient(res) {
-    return sseManager.addClient(res);
+function addSseClient(res, ip) {
+    return sseManager.addClient(res, ip);
 }
 
 function removeSseClient(res) {

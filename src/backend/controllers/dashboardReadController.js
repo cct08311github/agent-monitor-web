@@ -30,7 +30,8 @@ class DashboardReadController {
     }
 
     async streamDashboard(req, res) {
-        if (!dashboardPayloadService.addSseClient(res)) {
+        const clientIp = req.ip;
+        if (!dashboardPayloadService.addSseClient(res, clientIp)) {
             return sendFail(res, 503, 'sse_capacity_exceeded');
         }
 
