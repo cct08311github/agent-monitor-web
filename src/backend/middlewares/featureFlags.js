@@ -71,9 +71,11 @@ function updateFlag(name, updates) {
         }
     }
 
+    const { enabled, description } = updates;
     flags[name] = {
         ...flags[name],
-        ...updates,
+        ...(typeof enabled === 'boolean' ? { enabled } : {}),
+        ...(typeof description === 'string' ? { description } : {}),
         name,
     };
 

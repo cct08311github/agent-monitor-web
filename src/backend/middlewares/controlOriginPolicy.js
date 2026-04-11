@@ -7,8 +7,7 @@ const ALLOWED_HOSTS = [
 ];
 
 const ALLOWED_SUFFIXES = [
-    '.ts.net',      // Tailscale
-    '.local',        // mDNS/Bonjour
+    '.ts.net',      // Tailscale — safe because Tailscale controls *.ts.net
 ];
 
 const ALLOWED_PREFIXES = [

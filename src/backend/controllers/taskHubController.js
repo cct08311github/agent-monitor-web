@@ -80,7 +80,7 @@ async function deleteTask(req, res) {
         const deleted = repo.deleteTask(domain, id);
         if (!deleted) return sendFail(res, 404, 'not_found');
 
-        logger.info('taskhub_task_deleted', { requestId: req.requestId, id, title: deleted.title, domain });
+        logger.info('taskhub_task_deleted', { requestId: req.requestId, id, title: (deleted.title || '').replace(/[\x00-\x1F\x7F]/g, ''), domain });
         return sendOk(res, { deleted });
     } catch (err) {
         logger.error('taskhub_delete_task_error', { requestId: req.requestId, details: logger.toErrorFields(err) });
@@ -96,6 +96,12 @@ async function createTask(req, res) {
     }
     if (!title || !title.trim()) {
         return sendFail(res, 400, 'title_required');
+    }
+    if (title.length > 500) {
+        return sendFail(res, 400, 'title_too_long');
+    }
+    if (req.body.notes && req.body.notes.length > 10000) {
+        return sendFail(res, 400, 'notes_too_long');
     }
 
     try {
