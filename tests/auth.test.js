@@ -73,16 +73,20 @@ describe('localhostOnlyControl', () => {
         expect(next).toHaveBeenCalled();
     });
 
-    it('allows *.local mDNS hostname', () => {
+    it('blocks *.local mDNS hostname (removed from allowlist)', () => {
         const req = mockReq({ headers: { host: 'macbook.local:3000' } });
-        auth.localhostOnlyControl(req, mockRes(), next);
-        expect(next).toHaveBeenCalled();
+        const res = mockRes();
+        auth.localhostOnlyControl(req, res, next);
+        expect(res.status).toHaveBeenCalledWith(403);
+        expect(next).not.toHaveBeenCalled();
     });
 
-    it('allows known mac hostnames', () => {
+    it('blocks known mac hostnames ending in .local', () => {
         const req = mockReq({ headers: { host: 'shenghuoguanjiademac-mini.local' } });
-        auth.localhostOnlyControl(req, mockRes(), next);
-        expect(next).toHaveBeenCalled();
+        const res = mockRes();
+        auth.localhostOnlyControl(req, res, next);
+        expect(res.status).toHaveBeenCalledWith(403);
+        expect(next).not.toHaveBeenCalled();
     });
 
     it('blocks external host', () => {

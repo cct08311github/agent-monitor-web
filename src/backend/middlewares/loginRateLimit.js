@@ -2,6 +2,14 @@ const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const loginFailures = new Map();
 
+// Sweep stale entries every 5 minutes
+setInterval(() => {
+    const now = Date.now();
+    for (const [ip, record] of loginFailures) {
+        if (now >= record.resetAt) loginFailures.delete(ip);
+    }
+}, 5 * 60 * 1000).unref();
+
 function getClientIp(req) {
     return (req.ip || req.connection?.remoteAddress || '').toString();
 }
