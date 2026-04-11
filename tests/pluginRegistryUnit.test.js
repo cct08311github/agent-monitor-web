@@ -232,17 +232,12 @@ describe('unregisterPlugin', () => {
         expect(logger.warn).toHaveBeenCalledWith('plugin_cannot_unregister_internal', { name: 'core' });
     });
 
-    it('onUnregister on the input plugin is not preserved in the normalized object (dead code path)', () => {
-        // The normalizedPlugin stored in the registry does not copy onUnregister from the
-        // raw input, so plugin.onUnregister is always undefined after registration.
-        // This test documents that the stored plugin has no onUnregister method.
+    it('calls onUnregister callback when plugin is unregistered', () => {
         const onUnregister = jest.fn();
         registry.registerPlugin({ name: 'ou', onUnregister });
-        expect(registry.getPlugin('ou').onUnregister).toBeUndefined();
-        // Unregistering still succeeds
+        expect(registry.getPlugin('ou').onUnregister).toBe(onUnregister);
         expect(registry.unregisterPlugin('ou')).toBe(true);
-        // onUnregister callback on the raw input is never invoked
-        expect(onUnregister).not.toHaveBeenCalled();
+        expect(onUnregister).toHaveBeenCalledWith(expect.objectContaining({ name: 'ou' }));
     });
 
     it('calls beforeUnregister handlers', () => {
