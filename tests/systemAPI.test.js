@@ -48,7 +48,7 @@ describe('System Health & Summary APIs', () => {
         expect(res.statusCode).toEqual(200);
         expect(res.body).toHaveProperty('success', true);
         expect(res.body).toHaveProperty('status', 'alive');
-        expect(res.body).toHaveProperty('pid');
+        expect(res.body).not.toHaveProperty('pid');
         expect(res.body).toHaveProperty('uptimeSec');
     });
 

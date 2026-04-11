@@ -55,7 +55,6 @@ function getLivenessPayload() {
     return {
         status: 'alive',
         ts: new Date().toISOString(),
-        pid: process.pid,
         uptimeSec: Math.floor(process.uptime()),
     };
 }

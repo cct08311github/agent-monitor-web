@@ -12,7 +12,7 @@
 // Updates <meta name="theme-color"> for mobile browsers.
 // ---------------------------------------------------------------------------
 
-import { ref, computed, watchEffect, onMounted, onUnmounted } from 'vue'
+import { shallowRef, computed, watchEffect, triggerRef, onMounted, onUnmounted } from 'vue'
 
 export type ThemeMode = 'light' | 'dark' | 'auto'
 
@@ -43,7 +43,8 @@ function systemPrefersDark(): boolean {
 }
 
 // Singleton reactive refs — one instance across all usages
-const currentTheme = ref<ThemeMode>(loadStoredTheme())
+// shallowRef for primitive string — enables triggerRef() for OS preference changes
+const currentTheme = shallowRef<ThemeMode>(loadStoredTheme())
 
 const effectiveTheme = computed<'light' | 'dark'>(() =>
   currentTheme.value === 'auto'
@@ -84,17 +85,11 @@ if (typeof window !== 'undefined') {
   _sysMediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
   _sysChangeHandler = () => {
     if (currentTheme.value === 'auto') {
-      // Force the computed to re-evaluate by briefly toggling — Vue tracks the
-      // ref, not the MediaQueryList, so we write the same value to flush.
-      const prev = currentTheme.value
-      currentTheme.value = 'light' // temp
-      currentTheme.value = prev
-      // Directly apply so there's no single-frame flash
-      document.documentElement.setAttribute('data-theme', effectiveTheme.value)
-      updateThemeColor(effectiveTheme.value)
+      // triggerRef forces the computed to re-evaluate without toggling the value
+      triggerRef(currentTheme)
     }
   }
-  _sysMediaQuery.addEventListener('change', _sysChangeHandler)
+  // Listener is managed by onMounted/onUnmounted — no module-scope registration
 }
 
 // ---------------------------------------------------------------------------
@@ -105,6 +100,10 @@ let _themeUsers = 0
 
 export function useTheme() {
   onMounted(() => {
+    // Re-attach system preference listener when first user mounts
+    if (_themeUsers === 0 && _sysMediaQuery && _sysChangeHandler) {
+      _sysMediaQuery.addEventListener('change', _sysChangeHandler)
+    }
     _themeUsers++
   })
 

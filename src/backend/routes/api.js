@@ -123,17 +123,21 @@ router.post('/watchdog/repair', auth.localhostOnlyControl, auth.rateLimit, csrfV
     }
 });
 
-router.post('/watchdog/toggle', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, (req, res) => {
-    const enabled = req.body?.enabled;
-    if (typeof enabled !== 'boolean') {
-        throw new AppError(400, 'invalid_enabled', 'enabled must be boolean');
+router.post('/watchdog/toggle', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, (req, res, next) => {
+    try {
+        const enabled = req.body?.enabled;
+        if (typeof enabled !== 'boolean') {
+            return next(new AppError(400, 'invalid_enabled', 'enabled must be boolean'));
+        }
+        if (enabled) {
+            gatewayWatchdog.start();
+        } else {
+            gatewayWatchdog.stop();
+        }
+        return sendOk(res, { watchdog: gatewayWatchdog.getStatus() });
+    } catch (e) {
+        return next(e);
     }
-    if (enabled) {
-        gatewayWatchdog.start();
-    } else {
-        gatewayWatchdog.stop();
-    }
-    return sendOk(res, { watchdog: gatewayWatchdog.getStatus() });
 });
 
 // Feature Flags (localhost-only for security)
@@ -141,18 +145,22 @@ router.get('/flags', auth.localhostOnlyControl, (req, res) => {
     return sendOk(res, auth.getStats());
 });
 
-router.patch('/flags/:name', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, (req, res) => {
-    const { name } = req.params;
-    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(name)) throw new AppError(400, 'invalid_flag_name', 'Invalid flag name');
-    const { enabled, description } = req.body || {};
-    if (typeof enabled !== 'boolean') {
-        throw new AppError(400, 'invalid_flag_update', 'enabled must be boolean');
+router.patch('/flags/:name', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, (req, res, next) => {
+    try {
+        const { name } = req.params;
+        if (!/^[a-zA-Z0-9_-]{1,64}$/.test(name)) return next(new AppError(400, 'invalid_flag_name', 'Invalid flag name'));
+        const { enabled, description } = req.body || {};
+        if (typeof enabled !== 'boolean') {
+            return next(new AppError(400, 'invalid_flag_update', 'enabled must be boolean'));
+        }
+        const updated = auth.updateFlag(name, { enabled, description });
+        if (!updated) {
+            return next(new AppError(404, 'flag_not_found', `Feature flag '${name}' not found`));
+        }
+        return sendOk(res, { flag: auth.getFlag(name) });
+    } catch (e) {
+        return next(e);
     }
-    const updated = auth.updateFlag(name, { enabled, description });
-    if (!updated) {
-        throw new AppError(404, 'flag_not_found', `Feature flag '${name}' not found`);
-    }
-    return sendOk(res, { flag: auth.getFlag(name) });
 });
 
 // Plugin Registry (localhost-only for security)
@@ -161,21 +169,25 @@ router.get('/plugins', auth.localhostOnlyControl, (req, res) => {
     return sendOk(res, pluginRegistry.getStats());
 });
 
-router.post('/plugins/:name/toggle', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, (req, res) => {
-    const { name } = req.params;
-    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(name)) throw new AppError(400, 'invalid_plugin_name', 'Invalid plugin name');
-    const pluginRegistry = require('../services/pluginRegistry');
-    const plugin = pluginRegistry.getPlugin(name);
-    if (!plugin) {
-        throw new AppError(404, 'plugin_not_found', `Plugin '${name}' not found`);
+router.post('/plugins/:name/toggle', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, (req, res, next) => {
+    try {
+        const { name } = req.params;
+        if (!/^[a-zA-Z0-9_-]{1,64}$/.test(name)) return next(new AppError(400, 'invalid_plugin_name', 'Invalid plugin name'));
+        const pluginRegistry = require('../services/pluginRegistry');
+        const plugin = pluginRegistry.getPlugin(name);
+        if (!plugin) {
+            return next(new AppError(404, 'plugin_not_found', `Plugin '${name}' not found`));
+        }
+        const enabled = plugin.enabled;
+        if (enabled) {
+            pluginRegistry.disablePlugin(name);
+        } else {
+            pluginRegistry.enablePlugin(name);
+        }
+        return sendOk(res, { plugin: pluginRegistry.getPlugin(name) });
+    } catch (e) {
+        return next(e);
     }
-    const enabled = plugin.enabled;
-    if (enabled) {
-        pluginRegistry.disablePlugin(name);
-    } else {
-        pluginRegistry.enablePlugin(name);
-    }
-    return sendOk(res, { plugin: pluginRegistry.getPlugin(name) });
 });
 
 // OpenClaw Logs Streaming (SSE)
@@ -268,14 +280,18 @@ router.get('/logs/stream', auth.requireAuth, auth.localhostOnlyControl, /* istan
 
     child.on('close', (code) => {
         cleanup();
-        res.write(`data: ${JSON.stringify({ line: `[openclaw logs exited: code ${code}]`, ts: Date.now() })}\n\n`);
-        res.end();
+        try {
+            res.write(`data: ${JSON.stringify({ line: `[openclaw logs exited: code ${code}]`, ts: Date.now() })}\n\n`);
+            res.end();
+        } catch (_) { /* client already disconnected */ }
     });
 
     child.on('error', (err) => {
         cleanup();
-        res.write(`data: ${JSON.stringify({ line: `[Error spawning openclaw: ${err.message}]`, ts: Date.now() })}\n\n`);
-        res.end();
+        try {
+            res.write(`data: ${JSON.stringify({ line: `[Error spawning openclaw: ${err.message}]`, ts: Date.now() })}\n\n`);
+            res.end();
+        } catch (_) { /* client already disconnected */ }
     });
 
     req.on('close', () => {
