@@ -66,16 +66,16 @@ function openModelSwitch(agentId: string, model: string) {
       />
 
       <!-- System Tab -->
-      <SystemTab v-show="appState.currentDesktopTab === 'system'" />
+      <SystemTab v-if="appState.currentDesktopTab === 'system'" />
 
       <!-- Logs Tab -->
-      <LogsTab v-show="appState.currentDesktopTab === 'logs'" />
+      <LogsTab v-if="appState.currentDesktopTab === 'logs'" />
 
       <!-- Chat Tab -->
-      <ChatTab v-show="appState.currentDesktopTab === 'chat'" />
+      <ChatTab v-if="appState.currentDesktopTab === 'chat'" />
 
       <!-- Optimize Tab -->
-      <OptimizeTab v-show="appState.currentDesktopTab === 'optimize'" />
+      <OptimizeTab v-if="appState.currentDesktopTab === 'optimize'" />
     </main>
 
     <!-- Chat Modal (from agent card actions) -->

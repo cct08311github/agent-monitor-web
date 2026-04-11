@@ -12,6 +12,7 @@ const db = new Database(path.join(dbPath, 'tsdb.sqlite'), {
 });
 
 db.pragma('journal_mode = WAL');
+db.pragma('synchronous = NORMAL');
 
 // Initialize schema
 db.exec(`

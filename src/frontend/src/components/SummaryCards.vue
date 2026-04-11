@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { DashboardPayload } from '@/types/api'
 import type { CostRange } from '@/composables/useDashboard'
 import { formatTWD } from '@/utils/format'
 import { appState } from '@/stores/appState'
 
-defineProps<{
+const props = defineProps<{
   activeTab: string
   dashboard: DashboardPayload | null
   totalCost: number
@@ -14,6 +15,12 @@ defineProps<{
 defineEmits<{
   (e: 'update:costRange', value: CostRange): void
 }>()
+
+const activeAgentCount = computed(() =>
+  props.dashboard?.agents?.filter(a => a.status === 'active_executing' || a.status === 'active_recent').length ?? 0
+)
+const totalAgentCount = computed(() => props.dashboard?.agents?.length ?? 0)
+const enabledCronCount = computed(() => props.dashboard?.cron?.filter(c => c.enabled).length ?? 0)
 </script>
 
 <template>
@@ -22,8 +29,8 @@ defineEmits<{
     <div class="summary-card">
       <div class="summary-label">活躍 Agent</div>
       <div class="summary-value">
-        {{ dashboard?.agents?.filter(a => a.status === 'active_executing' || a.status === 'active_recent').length ?? 0 }}
-        <span style="font-size:14px;color:var(--text-muted);font-weight:400">/ {{ dashboard?.agents?.length ?? 0 }}</span>
+        {{ activeAgentCount }}
+        <span style="font-size:14px;color:var(--text-muted);font-weight:400">/ {{ totalAgentCount }}</span>
       </div>
     </div>
 
@@ -52,7 +59,7 @@ defineEmits<{
     <div class="summary-card">
       <div class="summary-label">Cron 任務</div>
       <div class="summary-value">
-        {{ dashboard?.cron?.filter(c => c.enabled).length ?? 0 }}
+        {{ enabledCronCount }}
         <span style="font-size:14px;color:var(--text-muted);font-weight:400">啟用</span>
       </div>
     </div>
