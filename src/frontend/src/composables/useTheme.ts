@@ -12,7 +12,7 @@
 // Updates <meta name="theme-color"> for mobile browsers.
 // ---------------------------------------------------------------------------
 
-import { ref, computed, watchEffect, onUnmounted } from 'vue'
+import { ref, computed, watchEffect, onMounted, onUnmounted } from 'vue'
 
 export type ThemeMode = 'light' | 'dark' | 'auto'
 
@@ -101,14 +101,18 @@ if (typeof window !== 'undefined') {
 // Composable
 // ---------------------------------------------------------------------------
 
+let _themeUsers = 0
+
 export function useTheme() {
-  // Clean up the global OS-preference listener when the last component using
-  // useTheme unmounts.  In practice this is module-level, but we register it
-  // inside onUnmounted so unit tests can clean up properly.
+  onMounted(() => {
+    _themeUsers++
+  })
+
   onUnmounted(() => {
-    // Only remove if both references are still intact (they always should be)
-    if (_sysMediaQuery && _sysChangeHandler) {
+    _themeUsers--
+    if (_themeUsers <= 0 && _sysMediaQuery && _sysChangeHandler) {
       _sysMediaQuery.removeEventListener('change', _sysChangeHandler)
+      _themeUsers = 0
     }
   })
 
@@ -123,10 +127,5 @@ export function useTheme() {
     currentTheme.value = theme
   }
 
-  return {
-    currentTheme,
-    effectiveTheme,
-    cycleTheme,
-    setTheme,
-  }
+  return { currentTheme, effectiveTheme, cycleTheme, setTheme }
 }
