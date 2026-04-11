@@ -6,6 +6,5 @@ module.exports = {
     ...require('./loginRateLimit'),
     ...require('./sessionAuth'),
     ...require('./rateLimiter'),
-    ...require('./asyncHandler'),
     ...require('./featureFlags'),
 };

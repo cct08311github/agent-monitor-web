@@ -25,7 +25,7 @@ function unsign(token) {
     const expected = crypto.createHmac('sha256', getSecret()).update(id).digest('hex');
     const sigBuf = Buffer.from(sig, 'hex');
     const expBuf = Buffer.from(expected, 'hex');
-    if (sigBuf.length !== 32 || expBuf.length !== 32) return null;
+    if (sig.length !== 64 || sigBuf.length !== 32 || expBuf.length !== 32) return null;
     if (!crypto.timingSafeEqual(sigBuf, expBuf)) return null;
     return id;
 }

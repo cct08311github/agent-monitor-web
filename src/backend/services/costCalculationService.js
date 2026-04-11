@@ -78,9 +78,10 @@ async function getExchangeRate() {
     try {
         const res = await fetch('https://open.er-api.com/v6/latest/USD');
         const data = await res.json();
-        if (data && data.rates && data.rates.TWD) {
-            exchangeRateCache = { rate: data.rates.TWD, lastFetch: now };
-            return data.rates.TWD;
+        const rate = Number(data?.rates?.TWD);
+        if (Number.isFinite(rate) && rate > 0) {
+            exchangeRateCache = { rate, lastFetch: now };
+            return rate;
         }
     } catch (e) {
         logger.error('exchange_rate_fetch_failed', { msg: e.message });
