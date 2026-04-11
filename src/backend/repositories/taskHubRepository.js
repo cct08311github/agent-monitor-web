@@ -44,6 +44,7 @@ function getDb() {
         const { dbPath } = getTaskHubConfig();
         db = new Database(dbPath, { readonly: false, fileMustExist: true });
         db.pragma('journal_mode = WAL');
+        db.pragma('synchronous = NORMAL');
         db.pragma('foreign_keys = ON');
         logger.info('taskhub_db_connected', { dbPath });
         return db;

@@ -359,10 +359,14 @@ async function fetchHistory(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 let resizeObserver: ResizeObserver | null = null
+let _resizeTimer: ReturnType<typeof setTimeout> | null = null
 
 function setupResizeObserver(): void {
   if (!window.ResizeObserver) return
-  resizeObserver = new ResizeObserver(() => redrawCharts())
+  resizeObserver = new ResizeObserver(() => {
+    if (_resizeTimer) clearTimeout(_resizeTimer)
+    _resizeTimer = setTimeout(() => redrawCharts(), 16)
+  })
   if (sysChartRef.value) resizeObserver.observe(sysChartRef.value)
   if (costChartRef.value) resizeObserver.observe(costChartRef.value)
   if (tokenChartRef.value) resizeObserver.observe(tokenChartRef.value)
@@ -390,6 +394,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (_resizeTimer) { clearTimeout(_resizeTimer); _resizeTimer = null }
   resizeObserver?.disconnect()
   themeObserver?.disconnect()
 })

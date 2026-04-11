@@ -168,7 +168,7 @@ function appendLine(line: string): void {
   const cls = deriveLineCls(line)
   logBuffer.value.push({ id: ++_entrySeq, line, level, cls })
   if (logBuffer.value.length > LOG_BUFFER_MAX) {
-    logBuffer.value.shift()
+    logBuffer.value.splice(0, logBuffer.value.length - LOG_BUFFER_MAX)
   }
 
   // Only trigger scroll logic if line passes current filter
