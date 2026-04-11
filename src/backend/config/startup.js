@@ -21,6 +21,9 @@ function validateStartup() {
     if (process.env.AUTH_DISABLED === 'true' && process.env.NODE_ENV === 'production') {
         logger.warn('auth_disabled_in_production', { message: 'AUTH_DISABLED=true in production is a critical security risk' });
     }
+    if (!process.env.AUTH_DISABLED && !process.env.HUD_CONTROL_TOKEN) {
+        logger.warn('control_token_missing', { message: 'HUD_CONTROL_TOKEN not set; control endpoints will reject all requests' });
+    }
 
     const errors = [];
     const server = getServerConfig();

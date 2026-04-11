@@ -91,6 +91,6 @@ describe('backend config', () => {
         jest.resetModules();
 
         const config = require('../src/backend/config');
-        expect(() => config.getAuthConfig()).toThrow('AUTH_SESSION_SECRET environment variable is required in production');
+        expect(() => config.getAuthConfig()).toThrow('AUTH_SESSION_SECRET must be at least 32 characters');
     });
 });

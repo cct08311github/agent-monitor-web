@@ -13,7 +13,7 @@ describe('sessionService', () => {
     let sessionService;
     beforeEach(() => {
         jest.resetModules();
-        process.env.AUTH_SESSION_SECRET = 'test-secret';
+        process.env.AUTH_SESSION_SECRET = 'test-secret-for-unit-tests-xxxxxxxxx';
         process.env.AUTH_SESSION_TTL_HOURS = '8';
         sessionService = require('../src/backend/services/sessionService');
         sessionService._clearSessions();
@@ -93,7 +93,7 @@ beforeEach(async () => {
     const bcrypt = require('bcryptjs');
     bcryptHash = await bcrypt.hash('password123', 1);
     process.env.AUTH_PASSWORD_HASH = bcryptHash;
-    process.env.AUTH_SESSION_SECRET = 'test-secret';
+    process.env.AUTH_SESSION_SECRET = 'test-secret-for-unit-tests-xxxxxxxxx';
     app = require('../src/backend/app');
 });
 

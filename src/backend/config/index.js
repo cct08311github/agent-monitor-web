@@ -51,8 +51,8 @@ function getAuthConfig() {
     // Require secure session secret when auth is enabled (production mode)
     // When AUTH_DISABLED='true', allow fallback secret for testing convenience
     if (!authDisabled) {
-        if (!sessionSecret || !sessionSecret.trim()) {
-            throw new Error('AUTH_SESSION_SECRET environment variable is required in production');
+        if (!sessionSecret || sessionSecret.trim().length < 32) {
+            throw new Error('AUTH_SESSION_SECRET must be at least 32 characters');
         }
         return {
             authDisabled: false,

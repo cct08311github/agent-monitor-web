@@ -103,6 +103,9 @@ async function createTask(req, res) {
     if (req.body.notes && req.body.notes.length > 10000) {
         return sendFail(res, 400, 'notes_too_long');
     }
+    if (req.body.github_repo && !/^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/.test(req.body.github_repo)) {
+        return sendFail(res, 400, 'invalid_github_repo');
+    }
 
     try {
         // Extract only the task fields (not domain which is a path parameter)

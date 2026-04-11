@@ -486,7 +486,7 @@ describe('sessionService branch coverage', () => {
         });
     });
     afterEach(() => {
-        process.env.AUTH_SESSION_SECRET = 'test-secret';
+        process.env.AUTH_SESSION_SECRET = 'test-secret-for-unit-tests-xxxxxxxxx';
     });
 
     it('getSecret() falls back to hardcoded dev-secret when env not set', () => {
@@ -515,7 +515,7 @@ describe('requireAuth', () => {
 
     beforeEach(() => {
         sessionService._clearSessions();
-        process.env.AUTH_SESSION_SECRET = 'test-secret';
+        process.env.AUTH_SESSION_SECRET = 'test-secret-for-unit-tests-xxxxxxxxx';
         delete process.env.AUTH_DISABLED;
     });
 
