@@ -149,7 +149,11 @@ async function callGemini(apiKey, system, userContent, maxTokens = 4096) {
         throw new Error(`Gemini API error ${resp.status}: ${errText}`);
     }
     const json = await resp.json();
-    return json.choices[0].message.content;
+    const content = json.choices?.[0]?.message?.content;
+    if (!content) {
+        throw new Error(`Gemini returned no content (keys: ${Object.keys(json).join(',')})`);
+    }
+    return content;
 }
 
 async function runPipeline(data, onProgress) {

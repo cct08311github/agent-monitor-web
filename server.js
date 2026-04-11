@@ -11,6 +11,7 @@ const tsdbService = require('./src/backend/services/tsdbService');
 const taskHubRepository = require('./src/backend/repositories/taskHubRepository');
 const { getServerConfig } = require('./src/backend/config');
 const { validateStartup } = require('./src/backend/config/startup');
+const apiRouter = require('./src/backend/routes/api');
 
 const serverConfig = getServerConfig();
 const PORT = serverConfig.port;
@@ -73,6 +74,7 @@ function gracefulShutdown(signal) {
 
     // 2. Drain SSE connections — send shutdown event then end()
     sseStreamManager.closeAll();
+    apiRouter.closeAllLogStreams();
     console.log('✅ SSE connections drained');
 
     // 3. Stop background services (polling, file watchers, watchdog)

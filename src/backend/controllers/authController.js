@@ -43,6 +43,7 @@ async function login(req, res) {
         return sendFail(res, 401, 'invalid_credentials');
     }
 
+    sessionService.destroySessionsForUser(username);
     const token = sessionService.createSession(username);
     res.cookie(COOKIE_NAME, token, cookieOptions(authConfig.sessionTtlHours));
     return sendOk(res, { username });

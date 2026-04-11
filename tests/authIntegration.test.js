@@ -172,7 +172,11 @@ describe('GET /api/auth/me and POST /api/auth/logout', () => {
     });
 
     it('POST /api/auth/logout succeeds', async () => {
-        const res = await request(app).post('/api/auth/logout').set('Cookie', cookie);
+        // Must include _csrfSecret cookie to pass the logout CSRF guard
+        const cookieWithCsrf = Array.isArray(cookie)
+            ? [...cookie, '_csrfSecret=dummy']
+            : [cookie, '_csrfSecret=dummy'].filter(Boolean);
+        const res = await request(app).post('/api/auth/logout').set('Cookie', cookieWithCsrf);
         expect(res.statusCode).toBe(200);
         expect(res.body.success).toBe(true);
     });
@@ -321,10 +325,19 @@ describe('authController — branch coverage', () => {
         process.env.AUTH_SESSION_TTL_HOURS = saved;
     });
 
-    it('logout without a sid cookie still returns 200', async () => {
-        // Tests the !token branch in logout (token is undefined)
+    it('logout without a sid cookie returns 403 when _csrfSecret is absent', async () => {
+        // The CSRF guard on logout blocks requests with no _csrfSecret cookie
         const res = await request(app)
             .post('/api/auth/logout');
+        expect(res.statusCode).toBe(403);
+        expect(res.body.error).toBe('csrf_missing');
+    });
+
+    it('logout without a sid cookie but with _csrfSecret still returns 200', async () => {
+        // _csrfSecret present — CSRF guard passes, logout clears nothing but succeeds
+        const res = await request(app)
+            .post('/api/auth/logout')
+            .set('Cookie', '_csrfSecret=dummy');
         expect(res.statusCode).toBe(200);
         expect(res.body.success).toBe(true);
     });

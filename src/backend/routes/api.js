@@ -26,7 +26,15 @@ router.get('/read/health', (req, res) => sendOk(res, { ts: new Date().toISOStrin
 
 // Auth endpoints — must be public (before requireAuth)
 router.post('/auth/login', authLimiter, auth.loginRateLimit, authController.login);
-router.post('/auth/logout', authController.logout);
+// Logout stays before requireAuth so expired-session users can still clear cookies.
+// Lightweight CSRF: require _csrfSecret cookie presence (not full token validation).
+// Real CSRF protection is SameSite=Strict on the sid cookie.
+router.post('/auth/logout', (req, res, next) => {
+    if (!req.cookies?._csrfSecret && process.env.AUTH_DISABLED !== 'true') {
+        return res.status(403).json({ success: false, error: 'csrf_missing' });
+    }
+    next();
+}, authController.logout);
 router.get('/auth/me', authController.me);
 
 // Legacy Control Endpoints (have own bearer-token auth, must be before requireAuth)
@@ -172,14 +180,14 @@ router.post('/plugins/:name/toggle', auth.localhostOnlyControl, auth.rateLimit, 
 
 // OpenClaw Logs Streaming (SSE)
 // Streams `openclaw logs --follow` output as Server-Sent Events
-let logsStreamClients = 0;
+const activeLogStreams = new Map(); // res → child
 const MAX_LOGS_STREAM_CLIENTS = 5;
 /* istanbul ignore next */
 router.get('/logs/stream', auth.requireAuth, auth.localhostOnlyControl, /* istanbul ignore next */ (req, res) => {
-    if (logsStreamClients >= MAX_LOGS_STREAM_CLIENTS) {
+    if (activeLogStreams.size >= MAX_LOGS_STREAM_CLIENTS) {
         return res.status(503).json({ success: false, error: 'logs_stream_capacity_exceeded' });
     }
-    logsStreamClients++;
+    activeLogStreams.set(res, null); // child assigned after spawn
     const { binPath } = getOpenClawConfig();
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -199,6 +207,7 @@ router.get('/logs/stream', auth.requireAuth, auth.localhostOnlyControl, /* istan
         env: { ...process.env, FORCE_COLOR: '0' },
         stdio: ['ignore', 'pipe', 'pipe']
     });
+    activeLogStreams.set(res, child);
 
     // Suppress large cron-jobs JSON dumps that start with a { ... "jobs": [...] ... }
     // block and can span hundreds of lines.
@@ -252,7 +261,7 @@ router.get('/logs/stream', auth.requireAuth, auth.localhostOnlyControl, /* istan
     function cleanup() {
         if (cleaned) return;
         cleaned = true;
-        logsStreamClients--;
+        activeLogStreams.delete(res);
         clearInterval(heartbeat);
         try { child.kill('SIGTERM'); } catch (_) { /* process already exited */ }
     }
@@ -273,5 +282,14 @@ router.get('/logs/stream', auth.requireAuth, auth.localhostOnlyControl, /* istan
         cleanup();
     });
 });
+
+/* istanbul ignore next */
+router.closeAllLogStreams = function closeAllLogStreams() {
+    for (const [res, child] of activeLogStreams) {
+        try { if (child) child.kill('SIGTERM'); } catch (_) {}
+        try { res.end(); } catch (_) {}
+    }
+    activeLogStreams.clear();
+};
 
 module.exports = router;
