@@ -124,11 +124,13 @@ function deriveLineCls(line: string): string {
 /** Format epoch ms → HH:mm:ss for log line prefix */
 function formatTs(ts: number): string {
   const d = new Date(ts)
-  return (
-    String(d.getHours()).padStart(2, '0') + ':' +
-    String(d.getMinutes()).padStart(2, '0') + ':' +
-    String(d.getSeconds()).padStart(2, '0')
-  )
+  if (Number.isNaN(d.getTime())) return '--:--:--'
+  return d.toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
 }
 
 function lineMatchesFilter(line: string): boolean {
@@ -318,7 +320,13 @@ function resumeFromPause(): void {
   if (logBuffer.value.length > LOG_BUFFER_MAX) {
     logBuffer.value.splice(0, logBuffer.value.length - LOG_BUFFER_MAX)
   }
-  nextTick(scrollToBottom)
+  nextTick(() => {
+    if (!userScrolledUp.value) {
+      scrollToBottom()
+    } else {
+      hasNewMessages.value = true
+    }
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -334,6 +342,9 @@ function exportLogs(): void {
     showToast('沒有可匯出的日誌', 'info')
     return
   }
+  if (paused.value && pauseQueue.value.length > 0) {
+    showToast(`暫停中有 ${pauseQueue.value.length} 行尚未納入匯出`, 'info')
+  }
   const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/plain;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const now = new Date()
@@ -343,7 +354,9 @@ function exportLogs(): void {
   a.href = url
   a.download = filename
   a.click()
-  URL.revokeObjectURL(url)
+  // Firefox processes blob URL asynchronously after click; defer revoke
+  // so the download doesn't race with URL invalidation.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000)
   showToast(`已匯出 ${lines.length} 行日誌`, 'success')
 }
 
