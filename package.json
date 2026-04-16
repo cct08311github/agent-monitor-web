@@ -10,6 +10,8 @@
     "build": "vue-tsc --noEmit && vite build",
     "preview:vue": "vite preview",
     "test": "jest --forceExit --detectOpenHandles",
+    "test:frontend": "vitest run",
+    "test:frontend:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed"
@@ -29,12 +31,15 @@
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@vitejs/plugin-vue": "^6.0.5",
+    "@vue/test-utils": "^2.4.6",
     "@vue/tsconfig": "^0.9.1",
+    "happy-dom": "^20.9.0",
     "jest": "^30.2.0",
     "nodemon": "^3.0.1",
     "supertest": "^7.2.2",
     "typescript": "^6.0.2",
     "vite": "^8.0.3",
+    "vitest": "^4.1.4",
     "vue-tsc": "^3.2.6"
   },
   "keywords": [
@@ -52,7 +57,8 @@
     ],
     "testPathIgnorePatterns": [
       "/node_modules/",
-      "/tests/e2e/"
+      "/tests/e2e/",
+      "/src/frontend/"
     ],
     "transformIgnorePatterns": [
       "node_modules/(?!chokidar)"
