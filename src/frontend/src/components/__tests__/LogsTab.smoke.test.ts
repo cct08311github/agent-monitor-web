@@ -18,11 +18,6 @@ vi.mock('@/composables/useToast', () => ({
   showToast: vi.fn(),
 }))
 
-// Stub useApi — avoids basePath resolution
-vi.mock('@/composables/useApi', () => ({
-  getBasePath: () => '',
-}))
-
 import LogsTab from '../LogsTab.vue'
 
 describe('LogsTab (smoke)', () => {
@@ -31,13 +26,7 @@ describe('LogsTab (smoke)', () => {
   })
 
   it('mounts without throwing', () => {
-    const wrapper = mount(LogsTab, {
-      global: {
-        stubs: {
-          teleport: true,
-        },
-      },
-    })
+    const wrapper = mount(LogsTab)
     expect(wrapper.exists()).toBe(true)
     wrapper.unmount()
   })
