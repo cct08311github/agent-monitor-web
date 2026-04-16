@@ -23,6 +23,8 @@ interface LogEntry {
   level: LogLevel
   /** Extra CSS class derived from line content (err / warn / info) */
   cls: string
+  /** Timestamp from SSE payload or client-side fallback (epoch ms) */
+  ts: number
 }
 
 // M3: monotonic counter for stable entry IDs
@@ -76,6 +78,16 @@ const warnOnly = ref(false)
 const userScrolledUp = ref(false)
 const hasNewMessages = ref(false)
 
+/**
+ * Paused mode: SSE stays connected but new lines are queued, not displayed.
+ * Resume flushes the queue into the visible buffer.
+ */
+const paused = ref(false)
+const pauseQueue = ref<LogEntry[]>([])
+
+/** Whether to show HH:mm:ss timestamp prefix on each log line */
+const showTimestamp = ref(true)
+
 // ---------------------------------------------------------------------------
 // DOM ref
 // ---------------------------------------------------------------------------
@@ -107,6 +119,16 @@ function deriveLineCls(line: string): string {
   if (lower.includes('warn') || lower.includes('[warn]')) return 'warn'
   if (lower.includes('info') || lower.includes('[info]')) return 'info'
   return ''
+}
+
+/** Format epoch ms → HH:mm:ss for log line prefix */
+function formatTs(ts: number): string {
+  const d = new Date(ts)
+  return (
+    String(d.getHours()).padStart(2, '0') + ':' +
+    String(d.getMinutes()).padStart(2, '0') + ':' +
+    String(d.getSeconds()).padStart(2, '0')
+  )
 }
 
 function lineMatchesFilter(line: string): boolean {
@@ -163,10 +185,22 @@ function scrollToBottom(): void {
 // Append a new line to the buffer
 // ---------------------------------------------------------------------------
 
-function appendLine(line: string): void {
+function appendLine(line: string, ts?: number): void {
   const level = detectLineLevel(line)
   const cls = deriveLineCls(line)
-  logBuffer.value.push({ id: ++_entrySeq, line, level, cls })
+  const entry: LogEntry = { id: ++_entrySeq, line, level, cls, ts: ts ?? Date.now() }
+
+  // When paused, queue entries instead of appending to visible buffer
+  if (paused.value) {
+    pauseQueue.value.push(entry)
+    // Cap the queue to avoid unbounded growth during long pauses
+    if (pauseQueue.value.length > LOG_BUFFER_MAX) {
+      pauseQueue.value.splice(0, pauseQueue.value.length - LOG_BUFFER_MAX)
+    }
+    return
+  }
+
+  logBuffer.value.push(entry)
   if (logBuffer.value.length > LOG_BUFFER_MAX) {
     logBuffer.value.splice(0, logBuffer.value.length - LOG_BUFFER_MAX)
   }
@@ -202,7 +236,7 @@ function startStream(): void {
   const el = terminalRef.value
   if (el) {
     // Show connecting indicator
-    logBuffer.value = [{ id: ++_entrySeq, line: '連接中...', level: 'info', cls: 'info' }]
+    logBuffer.value = [{ id: ++_entrySeq, line: '連接中...', level: 'info', cls: 'info', ts: Date.now() }]
   }
 
   sse.connect('/api/logs/stream', {
@@ -210,7 +244,7 @@ function startStream(): void {
     onMessage(event: MessageEvent) {
       try {
         const parsed = JSON.parse(event.data as string) as { line?: string; ts?: number }
-        if (parsed.line) appendLine(parsed.line)
+        if (parsed.line) appendLine(parsed.line, parsed.ts)
       } catch {
         // Malformed SSE frame — ignore
       }
@@ -261,8 +295,61 @@ watch(
   },
 )
 
+// ---------------------------------------------------------------------------
+// Pause / resume
+// ---------------------------------------------------------------------------
+
+function togglePause(): void {
+  if (paused.value) {
+    resumeFromPause()
+  } else {
+    paused.value = true
+  }
+}
+
+function resumeFromPause(): void {
+  paused.value = false
+  // Flush queued entries into the visible buffer
+  const queued = pauseQueue.value.splice(0)
+  for (const entry of queued) {
+    logBuffer.value.push(entry)
+  }
+  // Trim buffer if it grew past max
+  if (logBuffer.value.length > LOG_BUFFER_MAX) {
+    logBuffer.value.splice(0, logBuffer.value.length - LOG_BUFFER_MAX)
+  }
+  nextTick(scrollToBottom)
+}
+
+// ---------------------------------------------------------------------------
+// Export / download
+// ---------------------------------------------------------------------------
+
+function exportLogs(): void {
+  const lines = visibleLines.value.map((entry) => {
+    const prefix = showTimestamp.value ? `[${formatTs(entry.ts)}] ` : ''
+    return prefix + entry.line
+  })
+  if (lines.length === 0) {
+    showToast('沒有可匯出的日誌', 'info')
+    return
+  }
+  const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/plain;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const now = new Date()
+  const pad2 = (n: number) => String(n).padStart(2, '0')
+  const filename = `openclaw-logs-${now.getFullYear()}${pad2(now.getMonth() + 1)}${pad2(now.getDate())}-${pad2(now.getHours())}${pad2(now.getMinutes())}${pad2(now.getSeconds())}.log`
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+  showToast(`已匯出 ${lines.length} 行日誌`, 'success')
+}
+
 function clearLog(): void {
-  logBuffer.value = [{ id: ++_entrySeq, line: '日誌已清除', level: 'info', cls: 'info' }]
+  logBuffer.value = [{ id: ++_entrySeq, line: '日誌已清除', level: 'info', cls: 'info', ts: Date.now() }]
+  pauseQueue.value = []
   hasNewMessages.value = false
 }
 
@@ -305,7 +392,22 @@ onUnmounted(() => {
         <button class="ctrl-btn" @click="toggleStream">
           {{ streaming ? '⏹ 停止監看' : '▶ 開始監看' }}
         </button>
+        <button
+          v-if="streaming"
+          :class="['ctrl-btn', { 'ctrl-btn-active': paused }]"
+          @click="togglePause"
+        >
+          {{ paused ? '▶ 繼續' : '⏸ 暫停' }}
+        </button>
         <button class="ctrl-btn" @click="clearLog">🗑 清除</button>
+        <button class="ctrl-btn" @click="exportLogs">💾 匯出</button>
+        <button
+          :class="['ctrl-btn', { 'ctrl-btn-active': showTimestamp }]"
+          @click="showTimestamp = !showTimestamp"
+          title="切換時間戳顯示"
+        >
+          🕐
+        </button>
         <input
           v-model="filterText"
           class="log-search-input"
@@ -352,6 +454,9 @@ onUnmounted(() => {
       >
         🔄 重試連線
       </button>
+      <span v-if="paused" class="oc-log-badge" style="background:var(--color-warn,#f59e0b);color:#000">
+        ⏸ 已暫停（{{ pauseQueue.length }} 行待處理）
+      </span>
     </div>
 
     <!-- Terminal -->
@@ -365,6 +470,7 @@ onUnmounted(() => {
         :key="entry.id"
         :class="['log-line', entry.level, 'oc-log-line', entry.cls]"
       >
+        <span v-if="showTimestamp" class="oc-log-ts">{{ formatTs(entry.ts) }}</span>
         <template
           v-for="(seg, si) in buildSegments(entry.line, filterText)"
           :key="si"
