@@ -2,6 +2,7 @@
 import { ref, computed, nextTick, onUnmounted, watch } from 'vue'
 import { useSSE } from '@/composables/useSSE'
 import { showToast } from '@/composables/useToast'
+import { formatTs } from '@/lib/time'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -121,17 +122,6 @@ function deriveLineCls(line: string): string {
   return ''
 }
 
-/** Format epoch ms → HH:mm:ss for log line prefix */
-function formatTs(ts: number): string {
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return '--:--:--'
-  return d.toLocaleTimeString('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  })
-}
 
 function lineMatchesFilter(line: string): boolean {
   const level = detectLineLevel(line)
