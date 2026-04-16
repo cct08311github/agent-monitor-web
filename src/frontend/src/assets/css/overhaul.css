@@ -567,3 +567,20 @@ select.cost-range-selector {
     color: var(--red, #ef4444);
     border-color: var(--red, #ef4444);
 }
+
+/* ── LOG TIMESTAMP PREFIX ── */
+.oc-log-ts {
+    color: var(--text-muted, #6b7280);
+    opacity: 0.7;
+    font-size: 0.85em;
+    margin-right: 8px;
+    user-select: all;
+    white-space: nowrap;
+}
+
+/* ── CTRL BUTTON ACTIVE STATE (pause, timestamp toggle) ── */
+.ctrl-btn.ctrl-btn-active {
+    background: var(--accent, #3b82f6);
+    color: #fff;
+    border-color: var(--accent, #3b82f6);
+}
