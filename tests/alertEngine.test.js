@@ -116,15 +116,18 @@ describe('AlertEngine', () => {
             expect(second.some(a => a.rule === 'cost_today_high')).toBe(false);
         });
 
-        it('resets latch when cost drops below threshold', () => {
-            alertEngine.evaluate({ sys, agents: [{ costs: { today: 10 } }] });   // fires + latch=true
-            alertEngine.evaluate({ sys, agents: [{ costs: { today: 2 } }] });    // below → latch=false
-            // latch is now false; internal state allows next crossing to fire
-            // (cooldown still active 5 min — can't re-fire immediately in same test)
-            // Verify latch reset by inspecting subsequent above-threshold does not set cooldown again
-            // (indirect verification: total fire count so far is 1)
-            const count = alertEngine.getRecent().filter(a => a.rule === 'cost_today_high').length;
-            expect(count).toBe(1);
+        it('fires again after latch reset + cooldown expired (re-crossing)', () => {
+            jest.useFakeTimers();
+            jest.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+            try {
+                alertEngine.evaluate({ sys, agents: [{ costs: { today: 10 } }] });  // fire #1 + latch=true
+                alertEngine.evaluate({ sys, agents: [{ costs: { today: 2 } }] });   // drop → latch=false
+                jest.advanceTimersByTime(6 * 60 * 1000);                             // past 5min cooldown
+                const third = alertEngine.evaluate({ sys, agents: [{ costs: { today: 10 } }] });
+                expect(third.some(a => a.rule === 'cost_today_high')).toBe(true);
+            } finally {
+                jest.useRealTimers();
+            }
         });
 
         it('does not fire when disabled', () => {

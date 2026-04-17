@@ -95,7 +95,7 @@ function evaluate(payload) {
         if (todayCost > threshold && !costRuleState.cost_today_high) {
             if (canFire('cost_today_high')) {
                 fired.push(fire('cost_today_high',
-                    `今日累積成本 $${todayCost.toFixed(2)} USD — 超過閾值 $${threshold}`,
+                    `今日累積成本 $${todayCost.toFixed(2)} USD — 超過閾值 $${threshold.toFixed(2)}`,
                     'warning',
                     { todayCost, threshold }));
                 costRuleState.cost_today_high = true;
