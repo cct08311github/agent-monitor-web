@@ -2223,6 +2223,15 @@ input:checked+.toggle-slider:before {
         flex: 1 1 100%;
         min-width: 0;
     }
+    /* WCAG 2.5.5 — boost tap targets on mobile */
+    .ctrl-btn {
+        padding: 10px 14px;
+        min-height: 40px;
+    }
+    .log-filter-btn {
+        padding: 8px 12px;
+        min-height: 36px;
+    }
 }
 .log-line.error { color: var(--red, #e74c3c); }
 .log-line.warn  { color: var(--orange, #e67e22); }
