@@ -584,3 +584,33 @@ select.cost-range-selector {
     color: #fff;
     border-color: var(--accent, #3b82f6);
 }
+
+/* ── DATA FRESHNESS INDICATOR ── */
+.freshness-indicator {
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.freshness-indicator.loading {
+    color: var(--text-muted, #6b7280);
+}
+
+.freshness-indicator.fresh {
+    color: var(--green, #10b981);
+}
+
+.freshness-indicator.warning {
+    color: var(--yellow, #f59e0b);
+}
+
+.freshness-indicator.stale {
+    color: var(--red, #ef4444);
+    animation: freshness-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes freshness-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
