@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { appState } from '@/stores/appState'
 import { useDashboard } from '@/composables/useDashboard'
+import { formatFreshnessLabel } from '@/lib/freshness'
 import AgentMinimap from '@/components/AgentMinimap.vue'
 import AgentFocus from '@/components/AgentFocus.vue'
 import AgentPeriphery from '@/components/AgentPeriphery.vue'
@@ -34,6 +35,8 @@ const {
   costRange,
   getAgentCost,
   totalCost,
+  dataAge,
+  freshness,
 } = useDashboard()
 
 // ── Search ───────────────────────────────────────────────────────────────────
@@ -78,6 +81,8 @@ const connectionLabel = computed(() => {
 })
 
 const connectionClass = computed(() => connectionStatus.value)
+
+const freshnessLabel = computed(() => formatFreshnessLabel(freshness.value, dataAge.value))
 </script>
 
 <template>
@@ -123,6 +128,9 @@ const connectionClass = computed(() => connectionStatus.value)
       <!-- Connection status indicator -->
       <span :class="['connection-status', connectionClass]" style="margin-left: auto">
         {{ connectionLabel }}
+      </span>
+      <span :class="['freshness-indicator', freshness]" style="margin-left: 8px; font-size: 12px">
+        {{ freshnessLabel }}
       </span>
     </div>
 

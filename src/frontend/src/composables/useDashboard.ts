@@ -10,6 +10,7 @@ import { useSSE } from '@/composables/useSSE'
 import { showToast } from '@/composables/useToast'
 import { appState } from '@/stores/appState'
 import type { Agent } from '@/types/api'
+import { computeFreshness } from '@/lib/freshness'
 
 export type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting'
 export type CostRange = 'today' | 'week' | 'month' | 'all'
@@ -20,6 +21,16 @@ export function useDashboard() {
   const connectionStatus = ref<ConnectionStatus>('disconnected')
   const fetchError = ref<string | null>(null)
   const lastUpdateTs = ref(0)
+
+  const now = ref(Date.now())
+  let freshnessTicker: ReturnType<typeof setInterval> | null = null
+
+  const dataAge = computed<number | null>(() => {
+    if (lastUpdateTs.value === 0) return null
+    return Math.max(0, Math.floor((now.value - lastUpdateTs.value) / 1000))
+  })
+
+  const freshness = computed(() => computeFreshness(dataAge.value))
 
   // ── Agent list (sorted by priority) ──────────────────────────────────────
 
@@ -164,10 +175,17 @@ export function useDashboard() {
   onMounted(() => {
     fetchDashboard(true)
     startSSE()
+    freshnessTicker = setInterval(() => {
+      now.value = Date.now()
+    }, 1000)
   })
 
   onUnmounted(() => {
     close()
+    if (freshnessTicker !== null) {
+      clearInterval(freshnessTicker)
+      freshnessTicker = null
+    }
   })
 
   return {
@@ -187,5 +205,7 @@ export function useDashboard() {
     getAgentCost,
     totalCost,
     fetchDashboard,
+    dataAge,
+    freshness,
   }
 }
