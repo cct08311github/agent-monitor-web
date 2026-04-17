@@ -636,3 +636,11 @@ select.cost-range-selector {
     white-space: nowrap;
     cursor: help;
 }
+
+@media (max-width: 599px) {
+    .cron-error-inline {
+        white-space: normal;
+        word-break: break-word;
+        max-height: 4.2em;
+    }
+}
