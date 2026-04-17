@@ -9,6 +9,7 @@ const DEFAULT_CONFIG = {
         cpu_critical:      { enabled: true, threshold: 95,  severity: 'critical', label: 'CPU 危急' },
         memory_high:       { enabled: true, threshold: 85,  severity: 'warning',  label: '記憶體偏高' },
         no_active_agents:  { enabled: true, threshold: 0,   severity: 'critical', label: 'Agent 全部離線' },
+        cost_today_high:   { enabled: true, threshold: 5,   severity: 'warning',  label: '今日成本偏高 (USD)' },
     }
 };
 
@@ -19,6 +20,9 @@ let config = loadConfig();
 let cooldowns = {};
 let alertsBuffer = [];
 let prevActiveCount = -1;
+// Hysteresis latch for monotonically-increasing rules (cost_today_high).
+// Avoids re-firing every cooldown window while still above threshold.
+let costRuleState = {};
 
 function loadConfig() {
     try {
@@ -84,6 +88,23 @@ function evaluate(payload) {
         fired.push(fire('memory_high', `記憶體 ${memory.toFixed(1)}% — 超過閾值 ${rules.memory_high.threshold}%`, 'warning', { memory }));
     }
 
+    // Cost alert — hysteresis: fire once per crossing, reset when below threshold
+    if (rules.cost_today_high?.enabled) {
+        const todayCost = agents.reduce((sum, a) => sum + (a.costs?.today || 0), 0);
+        const threshold = rules.cost_today_high.threshold;
+        if (todayCost > threshold && !costRuleState.cost_today_high) {
+            if (canFire('cost_today_high')) {
+                fired.push(fire('cost_today_high',
+                    `今日累積成本 $${todayCost.toFixed(2)} USD — 超過閾值 $${threshold.toFixed(2)}`,
+                    'warning',
+                    { todayCost, threshold }));
+                costRuleState.cost_today_high = true;
+            }
+        } else if (todayCost <= threshold && costRuleState.cost_today_high) {
+            costRuleState.cost_today_high = false;
+        }
+    }
+
     const activeNow = agents.filter(a => /* istanbul ignore next */ a.status?.includes('active')).length;
     if (prevActiveCount > 0 && activeNow === 0 && rules.no_active_agents?.enabled && canFire('no_active_agents')) {
         fired.push(fire('no_active_agents', '所有 Agent 已離線', 'critical', { prev: prevActiveCount }));
@@ -99,6 +120,7 @@ function resetForTesting() {
     cooldowns = {};
     alertsBuffer = [];
     prevActiveCount = -1;
+    costRuleState = {};
     config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
     try { if (fs.existsSync(CONFIG_PATH)) fs.unlinkSync(CONFIG_PATH); } catch (e) { /* ignore */ }
 }
