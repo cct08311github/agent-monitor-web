@@ -2,6 +2,7 @@
 import { ref, computed, nextTick, onUnmounted, watch } from 'vue'
 import { useSSE } from '@/composables/useSSE'
 import { showToast } from '@/composables/useToast'
+import { useDebouncedRef } from '@/composables/useDebouncedRef'
 import { formatTs } from '@/lib/time'
 
 // ---------------------------------------------------------------------------
@@ -74,6 +75,9 @@ const STATUS_LABELS: Record<ConnectionStatus, string> = {
 
 const logBuffer = ref<LogEntry[]>([])
 const filterText = ref('')
+// Debounced mirror — filter/highlight only recompute after 200ms quiescence,
+// so rapid typing does not trigger O(N) re-filter per keystroke on a 500-entry buffer.
+const debouncedFilter = useDebouncedRef(filterText, 200)
 const errorOnly = ref(false)
 const warnOnly = ref(false)
 const userScrolledUp = ref(false)
@@ -127,7 +131,7 @@ function lineMatchesFilter(line: string): boolean {
   const level = detectLineLevel(line)
   if (errorOnly.value && level !== 'error') return false
   if (warnOnly.value && level !== 'error' && level !== 'warn') return false
-  if (filterText.value && !line.toLowerCase().includes(filterText.value.toLowerCase())) return false
+  if (debouncedFilter.value && !line.toLowerCase().includes(debouncedFilter.value.toLowerCase())) return false
   return true
 }
 
@@ -475,7 +479,7 @@ onUnmounted(() => {
       >
         <span v-if="showTimestamp" class="oc-log-ts">{{ formatTs(entry.ts) }}</span>
         <template
-          v-for="(seg, si) in buildSegments(entry.line, filterText)"
+          v-for="(seg, si) in buildSegments(entry.line, debouncedFilter)"
           :key="si"
         >
           <mark v-if="seg.highlight">{{ seg.text }}</mark>
