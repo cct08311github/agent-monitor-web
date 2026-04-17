@@ -642,6 +642,5 @@ select.cost-range-selector {
         white-space: normal;
         word-break: break-word;
         max-height: 4.2em;
-        text-overflow: unset;
     }
 }
