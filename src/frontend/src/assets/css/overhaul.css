@@ -620,3 +620,19 @@ select.cost-range-selector {
         animation: none;
     }
 }
+
+/* ── CRON ERROR INLINE ── */
+.cron-error-inline {
+    margin-top: 4px;
+    padding: 4px 8px;
+    background: rgba(239, 68, 68, 0.08);
+    border-left: 3px solid var(--red, #ef4444);
+    color: var(--red, #ef4444);
+    font-size: 11px;
+    font-style: italic;
+    font-family: ui-monospace, SFMono-Regular, 'SF Mono', Monaco, 'Cascadia Code', monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: help;
+}

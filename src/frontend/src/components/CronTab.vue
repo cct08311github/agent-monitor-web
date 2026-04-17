@@ -5,6 +5,7 @@ import { showToast } from '@/composables/useToast'
 import { confirm } from '@/composables/useConfirm'
 import { fmtTime } from '@/utils/format'
 import type { CronJob } from '@/types/api'
+import { formatCronError } from '@/lib/cronError'
 
 // ---------------------------------------------------------------------------
 // State
@@ -219,6 +220,15 @@ function formatNextRun(ms: number | undefined): string {
               <span class="agent-status-dot" />
               {{ getStatusText(job.state?.lastStatus) }}
             </span>
+          </div>
+
+          <!-- lastError inline display (only when status is error AND lastError exists) -->
+          <div
+            v-if="job.state?.lastStatus === 'error' && job.state?.lastError"
+            class="cron-error-inline"
+            :title="formatCronError(job.state.lastError, 300)"
+          >
+            {{ formatCronError(job.state.lastError) }}
           </div>
 
           <!-- Last run row -->

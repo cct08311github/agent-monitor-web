@@ -28,6 +28,7 @@ export interface CronJob {
     lastRunAtMs?: number
     nextRunAtMs?: number
     lastStatus?: string // 'ok' | 'error' | 'unknown'
+    lastError?: string
   }
 }
 
