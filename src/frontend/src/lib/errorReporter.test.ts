@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { formatError, shouldSuppressDuplicate } from './errorReporter'
 
 describe('formatError', () => {
@@ -150,5 +150,18 @@ describe('shouldSuppressDuplicate', () => {
     // Trigger pruning by calling with a new key (causes size > 100 check)
     shouldSuppressDuplicate('trigger-key', now, windowMs, recent)
     expect(recent.size).toBeLessThanOrEqual(100)
+  })
+})
+
+describe('installErrorHandlers (smoke)', () => {
+  it('sets app.config.errorHandler and registers window listeners', async () => {
+    const { installErrorHandlers } = await import('./errorReporter')
+    const addSpy = vi.spyOn(window, 'addEventListener')
+    const fakeApp = { config: { errorHandler: undefined as unknown } } as unknown as import('vue').App
+    installErrorHandlers(fakeApp)
+    expect(typeof (fakeApp.config as { errorHandler: unknown }).errorHandler).toBe('function')
+    expect(addSpy).toHaveBeenCalledWith('error', expect.any(Function))
+    expect(addSpy).toHaveBeenCalledWith('unhandledrejection', expect.any(Function))
+    addSpy.mockRestore()
   })
 })

@@ -1,5 +1,5 @@
 import type { App } from 'vue'
-import { showToast } from '@/composables/useToast'
+import { showToast, useToast } from '@/composables/useToast'
 
 export interface ErrorInfo {
   message: string
@@ -69,6 +69,8 @@ export function shouldSuppressDuplicate(
 }
 
 const DEDUPE_WINDOW_MS = 1000
+/** Max concurrent sticky error toasts — prevents UI lockup from render-loop floods. */
+const MAX_ACTIVE_ERROR_TOASTS = 5
 const recentErrors = new Map<string, number>()
 
 export function reportError(err: unknown, context: string): void {
@@ -78,6 +80,13 @@ export function reportError(err: unknown, context: string): void {
     return
   }
   console.error(`[${context}]`, info.type, info.message, err)
+  // Cap active error toasts — sticky toasts (duration=0) can stack indefinitely
+  // during a render loop and render the UI unusable.
+  const { toasts } = useToast()
+  const activeErrorCount = toasts.value.filter((t) => t.type === 'error').length
+  if (activeErrorCount >= MAX_ACTIVE_ERROR_TOASTS) {
+    return
+  }
   showToast(`系統錯誤：${info.message}`, 'error')
 }
 
