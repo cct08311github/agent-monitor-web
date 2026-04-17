@@ -2214,6 +2214,16 @@ input:checked+.toggle-slider:before {
 .log-filter-btn.active-warn {
     background: rgba(245,158,11,.2); color: #f59e0b; border-color: #f59e0b;
 }
+@media (max-width: 599px) {
+    .log-filter-bar {
+        flex-wrap: wrap;
+        row-gap: 6px;
+    }
+    .log-search-input {
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+}
 .log-line.error { color: var(--red, #e74c3c); }
 .log-line.warn  { color: var(--orange, #e67e22); }
 mark { background: rgba(255, 200, 0, 0.35); color: inherit; border-radius: 2px; }
