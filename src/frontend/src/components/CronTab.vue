@@ -226,7 +226,7 @@ function formatNextRun(ms: number | undefined): string {
           <div
             v-if="job.state?.lastStatus === 'error' && job.state?.lastError"
             class="cron-error-inline"
-            :title="job.state.lastError"
+            :title="formatCronError(job.state.lastError, 300)"
           >
             {{ formatCronError(job.state.lastError) }}
           </div>

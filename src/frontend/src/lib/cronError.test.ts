@@ -14,6 +14,10 @@ describe('formatCronError', () => {
     expect(formatCronError('')).toBe('')
   })
 
+  it('returns empty string for whitespace-only input', () => {
+    expect(formatCronError('   \n\t  ')).toBe('')
+  })
+
   it('returns short single-line input unchanged', () => {
     expect(formatCronError('Command failed')).toBe('Command failed')
   })
