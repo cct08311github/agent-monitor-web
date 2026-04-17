@@ -190,22 +190,23 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
         <div v-if="sessionsLoading" style="color:var(--text-muted);font-size:12px;padding:4px 0">載入中…</div>
         <div v-else-if="sessionsError" style="color:var(--error);font-size:12px;padding:4px 0">
           ⚠️ 載入失敗
-          <span style="cursor:pointer;text-decoration:underline;margin-left:4px" @click="loadSessions">重試</span>
+          <button type="button" class="btn-reset" style="text-decoration:underline;margin-left:4px;color:inherit" @click="loadSessions">重試</button>
         </div>
         <div v-else-if="sessions.length === 0" style="color:var(--text-muted);font-size:12px">無 session 記錄</div>
         <div v-else>
-          <div
+          <button
             v-for="s in sessions"
             :key="s.id"
-            class="detail-row"
-            style="cursor:pointer;border-radius:4px;padding:2px 4px;margin:-2px -4px"
+            type="button"
+            class="btn-reset detail-row"
+            style="display:flex;width:100%;border-radius:4px;padding:2px 4px;margin:-2px -4px"
             @click="openSession(s.id)"
           >
             <span class="detail-row-label" style="font-family:monospace;font-size:11px">{{ s.id.slice(-16) }}</span>
             <span class="detail-row-value" style="color:var(--text-muted);font-size:11px">
               {{ s.messageCount }} 則{{ s.lastTs ? ' · ' + s.lastTs.slice(0, 10) : '' }}
             </span>
-          </div>
+          </button>
         </div>
       </div>
     </div>

@@ -621,6 +621,17 @@ select.cost-range-selector {
     }
 }
 
+/* ── UNSTYLED BUTTON ── native button semantics + :focus-visible, no default styling */
+.btn-reset {
+    all: unset;
+    box-sizing: border-box;
+    cursor: pointer;
+}
+.btn-reset:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
 /* ── CRON ERROR INLINE ── */
 .cron-error-inline {
     margin-top: 4px;
