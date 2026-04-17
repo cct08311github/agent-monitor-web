@@ -479,7 +479,7 @@ onUnmounted(() => {
       >
         <span v-if="showTimestamp" class="oc-log-ts">{{ formatTs(entry.ts) }}</span>
         <template
-          v-for="(seg, si) in buildSegments(entry.line, debouncedFilter.value)"
+          v-for="(seg, si) in buildSegments(entry.line, debouncedFilter)"
           :key="si"
         >
           <mark v-if="seg.highlight">{{ seg.text }}</mark>
