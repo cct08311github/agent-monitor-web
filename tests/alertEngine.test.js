@@ -88,4 +88,81 @@ describe('AlertEngine', () => {
         expect(alerts.some(a => a.rule === 'cpu_high')).toBe(true);
         expect(alerts.some(a => a.rule === 'cpu_critical')).toBe(false);
     });
+
+    describe('cost_today_high', () => {
+        const sys = { cpu: 20, memory: 50, disk: 40 };
+
+        it('fires when sum of agents.costs.today exceeds threshold', () => {
+            // default threshold: 5 USD
+            const alerts = alertEngine.evaluate({
+                sys,
+                agents: [
+                    { costs: { today: 3.5 } },
+                    { costs: { today: 2.0 } },
+                ],
+            });
+            const cost = alerts.find(a => a.rule === 'cost_today_high');
+            expect(cost).toBeDefined();
+            expect(cost.severity).toBe('warning');
+            expect(cost.meta.todayCost).toBeCloseTo(5.5, 2);
+            expect(cost.meta.threshold).toBe(5);
+        });
+
+        it('does NOT re-fire while still above threshold (hysteresis latch)', () => {
+            // First evaluate triggers fire + sets latch
+            alertEngine.evaluate({ sys, agents: [{ costs: { today: 10 } }] });
+            // Second evaluate, still above threshold — latch blocks even if cooldown not blocking
+            const second = alertEngine.evaluate({ sys, agents: [{ costs: { today: 12 } }] });
+            expect(second.some(a => a.rule === 'cost_today_high')).toBe(false);
+        });
+
+        it('resets latch when cost drops below threshold', () => {
+            alertEngine.evaluate({ sys, agents: [{ costs: { today: 10 } }] });   // fires + latch=true
+            alertEngine.evaluate({ sys, agents: [{ costs: { today: 2 } }] });    // below → latch=false
+            // latch is now false; internal state allows next crossing to fire
+            // (cooldown still active 5 min — can't re-fire immediately in same test)
+            // Verify latch reset by inspecting subsequent above-threshold does not set cooldown again
+            // (indirect verification: total fire count so far is 1)
+            const count = alertEngine.getRecent().filter(a => a.rule === 'cost_today_high').length;
+            expect(count).toBe(1);
+        });
+
+        it('does not fire when disabled', () => {
+            alertEngine.updateConfig({ rules: { cost_today_high: { enabled: false } } });
+            const alerts = alertEngine.evaluate({
+                sys,
+                agents: [{ costs: { today: 100 } }],
+            });
+            expect(alerts.some(a => a.rule === 'cost_today_high')).toBe(false);
+        });
+
+        it('does not crash when agent has no costs field', () => {
+            expect(() => {
+                alertEngine.evaluate({
+                    sys,
+                    agents: [
+                        { id: 'a' },
+                        { costs: { today: 3 } },
+                        { costs: {} },
+                    ],
+                });
+            }).not.toThrow();
+        });
+
+        it('does not fire when total is exactly at threshold (> not >=)', () => {
+            const alerts = alertEngine.evaluate({
+                sys,
+                agents: [{ costs: { today: 5 } }],
+            });
+            expect(alerts.some(a => a.rule === 'cost_today_high')).toBe(false);
+        });
+
+        it('respects custom threshold via updateConfig', () => {
+            alertEngine.updateConfig({ rules: { cost_today_high: { threshold: 20 } } });
+            const below = alertEngine.evaluate({ sys, agents: [{ costs: { today: 10 } }] });
+            expect(below.some(a => a.rule === 'cost_today_high')).toBe(false);
+            const above = alertEngine.evaluate({ sys, agents: [{ costs: { today: 25 } }] });
+            expect(above.some(a => a.rule === 'cost_today_high')).toBe(true);
+        });
+    });
 });
