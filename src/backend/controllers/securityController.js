@@ -18,7 +18,7 @@ class SecurityController {
             const analysis = threatIntel.analyze(content);
             return sendOk(res, analysis);
         } catch (error) { /* istanbul ignore next */
-            logger.error('security_analyze_threats_error', { details: logger.toErrorFields(error) });
+            logger.error('security_analyze_threats_error', { requestId: req.requestId, details: logger.toErrorFields(error) });
             return sendFail(res, 500, 'internal_error');
         }
     }
@@ -38,7 +38,7 @@ class SecurityController {
             const result = adaptiveSecurity.analyze(content, context || {});
             return sendOk(res, result);
         } catch (error) { /* istanbul ignore next */
-            logger.error('security_analyze_security_error', { details: logger.toErrorFields(error) });
+            logger.error('security_analyze_security_error', { requestId: req.requestId, details: logger.toErrorFields(error) });
             return sendFail(res, 500, 'internal_error');
         }
     }

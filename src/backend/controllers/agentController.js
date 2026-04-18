@@ -42,7 +42,7 @@ class AgentController {
             });
 
         } catch (error) { /* istanbul ignore next */
-            logger.error('agent_get_agents_error', { details: logger.toErrorFields(error) });
+            logger.error('agent_get_agents_error', { requestId: req.requestId, details: logger.toErrorFields(error) });
             return sendFail(res, 500, 'internal_error');
         }
     }
