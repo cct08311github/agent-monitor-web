@@ -118,3 +118,75 @@ describe('createFocusTrap', () => {
     expect(event.defaultPrevented).toBe(false)
   })
 })
+
+describe('createFocusTrap — nested traps', () => {
+  it('only topmost trap handles Escape when nested', () => {
+    const outerDialog = document.createElement('div')
+    const outerBtn = document.createElement('button')
+    outerDialog.appendChild(outerBtn)
+    document.body.appendChild(outerDialog)
+
+    const innerDialog = document.createElement('div')
+    const innerBtn = document.createElement('button')
+    innerDialog.appendChild(innerBtn)
+    document.body.appendChild(innerDialog)
+
+    const outerEscape = vi.fn()
+    const innerEscape = vi.fn()
+    const outer = createFocusTrap()
+    const inner = createFocusTrap()
+
+    outer.activate(outerDialog, outerEscape)
+    inner.activate(innerDialog, innerEscape)
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    expect(innerEscape).toHaveBeenCalledTimes(1)
+    expect(outerEscape).not.toHaveBeenCalled()
+
+    inner.deactivate()
+    // Now outer is topmost; Escape routes to outer
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    expect(outerEscape).toHaveBeenCalledTimes(1)
+
+    outer.deactivate()
+    outerDialog.remove()
+    innerDialog.remove()
+  })
+
+  it('outer trap Tab handling resumes after inner deactivates', () => {
+    const outerDialog = document.createElement('div')
+    const o1 = document.createElement('button')
+    const o2 = document.createElement('button')
+    outerDialog.appendChild(o1); outerDialog.appendChild(o2)
+    document.body.appendChild(outerDialog)
+
+    const innerDialog = document.createElement('div')
+    const innerBtn = document.createElement('button')
+    innerDialog.appendChild(innerBtn)
+    document.body.appendChild(innerDialog)
+
+    const outer = createFocusTrap()
+    const inner = createFocusTrap()
+
+    outer.activate(outerDialog)
+    inner.activate(innerDialog)
+
+    // While inner is active, outer does NOT trap Tab on its boundary
+    o2.focus()
+    const blocked = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+    document.dispatchEvent(blocked)
+    expect(blocked.defaultPrevented).toBe(false) // outer handler ignored
+
+    // After inner deactivates, outer's Tab trap works
+    inner.deactivate()
+    o2.focus()
+    const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+    document.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(o1)
+
+    outer.deactivate()
+    outerDialog.remove()
+    innerDialog.remove()
+  })
+})
