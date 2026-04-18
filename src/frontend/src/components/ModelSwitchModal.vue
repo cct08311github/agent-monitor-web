@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { api } from '@/composables/useApi'
 import { showToast } from '@/composables/useToast'
 import { confirm as showConfirm } from '@/composables/useConfirm'
+import { createFocusTrap } from '@/lib/focusTrap'
 
 // ---------------------------------------------------------------------------
 // Props & emits
@@ -80,11 +81,19 @@ async function confirm(): Promise<void> {
     switching.value = false
   }
 }
+
+// Focus trap — WCAG 2.4.3 focus order
+const dialogRef = ref<HTMLDivElement | null>(null)
+const trap = createFocusTrap()
+onMounted(() => {
+  if (dialogRef.value) trap.activate(dialogRef.value, () => emit('close'))
+})
+onBeforeUnmount(() => { trap.deactivate() })
 </script>
 
 <template>
   <div class="modal-overlay" @click.self="$emit('close')">
-    <div class="modal-content" style="max-width: 400px">
+    <div ref="dialogRef" class="modal-content" role="dialog" aria-modal="true" style="max-width: 400px">
       <!-- Header -->
       <div class="modal-header">
         <span>🔄 切換模型</span>

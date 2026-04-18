@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { api } from '@/composables/useApi'
 import { showToast } from '@/composables/useToast'
+import { createFocusTrap } from '@/lib/focusTrap'
 import { getAgentEmoji } from '@/utils/format'
 
 // ---------------------------------------------------------------------------
@@ -100,21 +101,38 @@ async function send(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Focus trap — WCAG 2.4.3 focus order
+// ---------------------------------------------------------------------------
+
+const dialogRef = ref<HTMLDivElement | null>(null)
+const trap = createFocusTrap()
+
+// ---------------------------------------------------------------------------
 // Lifecycle — auto-send "hi" on open
 // ---------------------------------------------------------------------------
 
 onMounted(async () => {
+  if (dialogRef.value) {
+    trap.activate(dialogRef.value, () => emit('close'))
+  }
   messages.value.push({ type: 'system', text: '連線中...' })
   messages.value.push({ type: 'user', text: 'hi' })
   scrollToBottom()
   await sendMessage('hi')
+})
+
+onBeforeUnmount(() => {
+  trap.deactivate()
 })
 </script>
 
 <template>
   <div class="modal-overlay" @click.self="$emit('close')">
     <div
+      ref="dialogRef"
       class="modal-content"
+      role="dialog"
+      aria-modal="true"
       style="max-width: 600px; height: 70vh; display: flex; flex-direction: column"
     >
       <!-- Header -->

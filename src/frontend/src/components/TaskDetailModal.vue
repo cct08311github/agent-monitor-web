@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { showToast } from '@/composables/useToast'
 import { confirm } from '@/composables/useConfirm'
+import { createFocusTrap } from '@/lib/focusTrap'
 
 const props = defineProps<{
   task: any
@@ -97,11 +98,19 @@ async function handleDelete() {
   if (!ok) return
   emit('delete', props.task.domain, props.task.id)
 }
+
+// Focus trap — WCAG 2.4.3 focus order
+const dialogRef = ref<HTMLDivElement | null>(null)
+const trap = createFocusTrap()
+onMounted(() => {
+  if (dialogRef.value) trap.activate(dialogRef.value, () => emit('close'))
+})
+onBeforeUnmount(() => { trap.deactivate() })
 </script>
 
 <template>
   <div class="modal-overlay" @click.self="emit('close')">
-    <div class="modal-content" role="dialog" aria-modal="true">
+    <div ref="dialogRef" class="modal-content" role="dialog" aria-modal="true">
       <!-- Header -->
       <div class="modal-header">
         <h3>
