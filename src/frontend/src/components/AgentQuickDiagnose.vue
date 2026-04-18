@@ -52,17 +52,22 @@ function handleDetail(): void {
   emit('close')
 }
 
+// Guard against setTimeout callback firing after unmount (listener leak)
+let mounted = false
+
 onMounted(() => {
+  mounted = true
   if (popoverRef.value) {
     trap.activate(popoverRef.value, () => emit('close'))
   }
   // Attach outside-click on next tick to avoid catching the triggering right-click
   setTimeout(() => {
-    document.addEventListener('click', handleOutsideClick)
+    if (mounted) document.addEventListener('click', handleOutsideClick)
   }, 0)
 })
 
 onBeforeUnmount(() => {
+  mounted = false
   trap.deactivate()
   document.removeEventListener('click', handleOutsideClick)
 })
@@ -73,7 +78,6 @@ onBeforeUnmount(() => {
     ref="popoverRef"
     class="agent-quick-diagnose"
     role="dialog"
-    aria-modal="false"
     :aria-label="'Quick diagnose: ' + agent.id"
   >
     <div class="aqd-header">

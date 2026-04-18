@@ -628,6 +628,7 @@ select.cost-range-selector {
     right: 8px;
     z-index: 50;
     width: 260px;
+    max-width: min(260px, 90vw);
     padding: 12px;
     background: var(--bg-elevated, var(--bg-card));
     border: 1px solid var(--border);
