@@ -11,6 +11,7 @@ const tsdbService = require('./src/backend/services/tsdbService');
 const taskHubRepository = require('./src/backend/repositories/taskHubRepository');
 const { getServerConfig } = require('./src/backend/config');
 const { validateStartup } = require('./src/backend/config/startup');
+const { installHandlers: installProcessHandlers } = require('./src/backend/utils/processHandlers');
 const apiRouter = require('./src/backend/routes/api');
 
 const serverConfig = getServerConfig();
@@ -22,6 +23,10 @@ if (!startup.ok) {
   startup.errors.forEach((error) => console.error(`- ${error}`));
   process.exit(1);
 }
+
+// Defense-in-depth: catch async rejections and uncaught exceptions that would
+// otherwise silently kill the process. Logs structured entry before exit(1).
+installProcessHandlers();
 
 const sslOptions = {
   key: fs.readFileSync(serverConfig.certKeyPath),
