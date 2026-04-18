@@ -40,11 +40,13 @@
 
 ```bash
 npm install
+cp .env.example .env          # 再編輯填入 AUTH_PASSWORD_HASH / AUTH_SESSION_SECRET / HUD_CONTROL_TOKEN
 npm start
 # → https://localhost:3001
 ```
 
 > 需要 mkcert 憑證：`./cert/key.pem` 和 `./cert/cert.pem`
+> 詳細 env 變數見 `.env.example`（24+ 個可調參數，分 Auth / Server / Control / Dashboard / Watchdog 等區塊）
 
 ## 測試
 
