@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const { store } = require('../utils/requestStore');
 
 function getRequestId(req) {
     const inbound = req.get('x-request-id');
@@ -18,7 +19,7 @@ function requestContext(req, res, next) {
     req.requestId = requestId;
     res.locals.requestId = requestId;
     res.setHeader('x-request-id', requestId);
-    next();
+    store.run({ requestId }, next);
 }
 
 module.exports = requestContext;

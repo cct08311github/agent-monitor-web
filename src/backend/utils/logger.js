@@ -1,5 +1,7 @@
 'use strict';
 
+const { store } = require('./requestStore');
+
 function toErrorFields(err) {
     if (!err) return undefined;
     const isProduction = process.env.NODE_ENV === 'production';
@@ -11,10 +13,13 @@ function toErrorFields(err) {
 }
 
 function emit(level, event, fields = {}) {
+    const ctx = store.getStore();
     const payload = {
         ts: new Date().toISOString(),
         level,
         event,
+        // ALS fallback: if caller didn't pass requestId, use async-context value
+        ...(ctx && ctx.requestId && fields.requestId === undefined ? { requestId: ctx.requestId } : {}),
         ...fields,
     };
 
