@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { api } from '@/composables/useApi'
+import { createFocusTrap } from '@/lib/focusTrap'
 
 const props = defineProps<{
   agentId: string
@@ -36,7 +37,15 @@ async function fetchMessages() {
   }
 }
 
-onMounted(fetchMessages)
+// Focus trap — WCAG 2.4.3 focus order
+const dialogRef = ref<HTMLDivElement | null>(null)
+const trap = createFocusTrap()
+
+onMounted(() => {
+  fetchMessages()
+  if (dialogRef.value) trap.activate(dialogRef.value, () => emit('close'))
+})
+onBeforeUnmount(() => { trap.deactivate() })
 
 function handleOverlayClick(event: MouseEvent) {
   if ((event.target as HTMLElement).classList.contains('modal-overlay')) {
@@ -52,7 +61,7 @@ function truncateText(text: string): string {
 
 <template>
   <div class="modal-overlay" style="display:flex" @click="handleOverlayClick">
-    <div class="modal-content" style="max-width:700px;width:95%;max-height:80vh;display:flex;flex-direction:column">
+    <div ref="dialogRef" class="modal-content" role="dialog" aria-modal="true" style="max-width:700px;width:95%;max-height:80vh;display:flex;flex-direction:column">
       <!-- Header -->
       <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border-color);flex-shrink:0">
         <h3 style="margin:0;font-size:14px;font-weight:600">💬 {{ sessionId.slice(-12) }}</h3>
