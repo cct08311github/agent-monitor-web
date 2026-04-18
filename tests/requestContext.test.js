@@ -7,6 +7,7 @@ const app = require('../src/backend/app');
 const requestContext = require('../src/backend/middlewares/requestContext');
 const requestLogger = require('../src/backend/middlewares/requestLogger');
 const errorHandler = require('../src/backend/middlewares/errorHandler');
+const { store } = require('../src/backend/utils/requestStore');
 
 describe('request context', () => {
     it('adds x-request-id to API responses', async () => {
@@ -24,6 +25,40 @@ describe('request context', () => {
 
         expect(res.statusCode).toBe(200);
         expect(res.headers['x-request-id']).toBe('req-test-123');
+    });
+});
+
+describe('requestContext ALS propagation', () => {
+    it('next() is called inside the ALS context with correct requestId', (done) => {
+        const req = { get: () => 'als-test-id' };
+        const res = { locals: {}, setHeader: () => {} };
+
+        requestContext(req, res, () => {
+            const ctx = store.getStore();
+            expect(ctx).toBeDefined();
+            expect(ctx.requestId).toBe('als-test-id');
+            done();
+        });
+    });
+
+    it('store.getStore() is undefined outside the middleware call', () => {
+        // Outside any store.run, getStore() should return undefined
+        const ctx = store.getStore();
+        expect(ctx).toBeUndefined();
+    });
+
+    it('x-request-id header is preserved and echoed as requestId in ALS', (done) => {
+        const inboundId = 'inbound-preserved-123';
+        const req = { get: (h) => (h === 'x-request-id' ? inboundId : undefined) };
+        const res = { locals: {}, setHeader: () => {} };
+
+        requestContext(req, res, () => {
+            const ctx = store.getStore();
+            expect(ctx.requestId).toBe(inboundId);
+            expect(req.requestId).toBe(inboundId);
+            expect(res.locals.requestId).toBe(inboundId);
+            done();
+        });
     });
 });
 
