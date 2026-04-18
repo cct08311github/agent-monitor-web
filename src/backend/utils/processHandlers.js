@@ -13,7 +13,12 @@ function formatRejection(reason) {
     if (reason === null) return { reason: 'null', type: 'null' };
     if (reason === undefined) return { reason: 'undefined', type: 'undefined' };
     if (typeof reason === 'object') {
-        return { reason: JSON.stringify(reason).slice(0, 300), type: 'object' };
+        try {
+            return { reason: JSON.stringify(reason).slice(0, 300), type: 'object' };
+        } catch (_) {
+            // Circular ref, BigInt, toJSON-throws — must not crash the handler
+            return { reason: '[object: not serializable]', type: 'object' };
+        }
     }
     return { reason: String(reason), type: typeof reason };
 }
@@ -40,7 +45,7 @@ function formatException(err) {
  * @param {{ onExit?: (code: number) => void }} [options]
  */
 function installHandlers(options = {}) {
-    const onExit = options.onExit || process.exit;
+    const onExit = options.onExit ?? process.exit;
 
     process.on('unhandledRejection', (reason) => {
         logger.error('unhandled_rejection', formatRejection(reason));
@@ -48,7 +53,9 @@ function installHandlers(options = {}) {
 
     process.on('uncaughtException', (err) => {
         logger.error('uncaught_exception', formatException(err));
-        onExit(1);
+        // Defer exit by one tick so buffered stderr has a chance to flush
+        // to a pipe (pm2 / systemd). On TTY stderr is sync so this is a no-op.
+        setImmediate(() => onExit(1));
     });
 }
 

@@ -34,6 +34,14 @@ describe('processHandlers.formatRejection', () => {
         expect(result.reason.length).toBeLessThanOrEqual(300);
     });
 
+    it('circular-ref object does not crash handler', () => {
+        const circular = { name: 'loop' };
+        circular.self = circular;
+        const result = formatRejection(circular);
+        expect(result.type).toBe('object');
+        expect(result.reason).toBe('[object: not serializable]');
+    });
+
     it('number → String coercion + type=number', () => {
         expect(formatRejection(42)).toEqual({ reason: '42', type: 'number' });
     });
@@ -90,11 +98,15 @@ describe('processHandlers.installHandlers', () => {
         expect(onExit).not.toHaveBeenCalled();
     });
 
-    it('uncaughtException listener logs and calls onExit(1)', () => {
+    it('uncaughtException listener logs and calls onExit(1) via setImmediate', (done) => {
         const onExit = jest.fn();
         installHandlers({ onExit });
         process.emit('uncaughtException', new Error('boom'));
         expect(errSpy).toHaveBeenCalled();
-        expect(onExit).toHaveBeenCalledWith(1);
+        // exit is deferred by setImmediate to let stderr flush
+        setImmediate(() => {
+            expect(onExit).toHaveBeenCalledWith(1);
+            done();
+        });
     });
 });
