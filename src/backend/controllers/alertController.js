@@ -11,7 +11,7 @@ function updateConfig(req, res) {
         const updated = alertEngine.updateConfig(/* istanbul ignore next */ req.body || {});
         return sendOk(res, { config: updated });
     } catch (e) {
-        logger.warn('alert_config_update_invalid', { msg: e.message });
+        logger.warn('alert_config_update_invalid', { requestId: req.requestId, msg: e.message });
         return sendFail(res, 400, 'invalid_config');
     }
 }

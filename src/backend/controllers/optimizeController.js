@@ -50,7 +50,7 @@ async function run(req, res) {
         if (isRunning) {
             isRunning = false;
             const logger = require('../utils/logger');
-            logger.error('optimize_safety_timeout', { msg: 'Pipeline exceeded 15-minute safety limit, auto-reset isRunning' });
+            logger.error('optimize_safety_timeout', { requestId: req.requestId, msg: 'Pipeline exceeded 15-minute safety limit, auto-reset isRunning' });
         }
     }, 15 * 60 * 1000);
 
@@ -89,7 +89,7 @@ async function run(req, res) {
     } catch (e) {
         // H1: log error server-side only, never expose e.message to client
         const logger = require('../utils/logger');
-        logger.error('optimize_pipeline_error', { err: e.message, stack: e.stack });
+        logger.error('optimize_pipeline_error', { requestId: req.requestId, err: e.message, stack: e.stack });
         if (!clientGone) res.write(`event: error\ndata: ${JSON.stringify({ msg: '優化執行失敗，請稍後再試' })}\n\n`);
     } finally {
         clearTimeout(safetyTimeout);
