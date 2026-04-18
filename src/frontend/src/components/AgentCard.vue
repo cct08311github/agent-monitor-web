@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import type { Agent } from '@/types/api'
 import { formatTokens, formatTWD, getAgentEmoji, getStatusInfo } from '@/utils/format'
 import { appState } from '@/stores/appState'
+import AgentQuickDiagnose from '@/components/AgentQuickDiagnose.vue'
 
 const props = defineProps<{
   agent: Agent
@@ -14,7 +16,18 @@ const emit = defineEmits<{
   (e: 'model-switch', id: string, currentModel: string): void
 }>()
 
+const showQuickDiagnose = ref(false)
+
 function handleCardClick() {
+  emit('click', props.agent.id)
+}
+
+function handleContextMenu(event: MouseEvent) {
+  event.preventDefault()
+  showQuickDiagnose.value = true
+}
+
+function handleQuickDetail() {
   emit('click', props.agent.id)
 }
 
@@ -59,6 +72,7 @@ function getTokens(a: Agent): number {
     role="article"
     :aria-label="agent.id"
     @click="handleCardClick"
+    @contextmenu="handleContextMenu"
   >
     <!-- Header -->
     <div class="agent-card-header">
@@ -117,5 +131,14 @@ function getTokens(a: Agent): number {
       <button class="agent-action-btn" @click="handleChat">💬 對話</button>
       <button class="agent-action-btn" @click="handleModelSwitch">🔄 模型</button>
     </div>
+
+    <!-- Quick diagnose popover (right-click / context menu) -->
+    <AgentQuickDiagnose
+      v-if="showQuickDiagnose"
+      :agent="agent"
+      :cost="cost"
+      @close="showQuickDiagnose = false"
+      @detail="handleQuickDetail"
+    />
   </div>
 </template>
