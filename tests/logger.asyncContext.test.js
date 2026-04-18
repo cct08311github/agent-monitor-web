@@ -9,9 +9,15 @@ function captureLog(fn) {
     const origError = console.error;
     console.log = (line) => logs.push(line);
     console.error = (line) => logs.push(line);
-    fn();
-    console.log = origLog;
-    console.error = origError;
+    try {
+        fn();
+    } finally {
+        // Guarantee restoration even if fn() throws, otherwise a single
+        // failing test would permanently patch console globally and swallow
+        // logs in every subsequent test of the Jest worker.
+        console.log = origLog;
+        console.error = origError;
+    }
     return logs.map((l) => JSON.parse(l));
 }
 

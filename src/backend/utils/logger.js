@@ -18,7 +18,10 @@ function emit(level, event, fields = {}) {
         ts: new Date().toISOString(),
         level,
         event,
-        // ALS fallback: if caller didn't pass requestId, use async-context value
+        // ALS fallback: inject requestId from async-context if caller didn't
+        // pass one. fields.requestId === undefined means unspecified;
+        // an explicit null/'' from caller is intentionally respected.
+        // Falsy ctx.requestId (pathological seeding) is treated as "no id".
         ...(ctx && ctx.requestId && fields.requestId === undefined ? { requestId: ctx.requestId } : {}),
         ...fields,
     };
