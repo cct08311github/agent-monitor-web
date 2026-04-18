@@ -3,6 +3,7 @@ import { ref, computed, nextTick, onUnmounted, watch } from 'vue'
 import { useSSE } from '@/composables/useSSE'
 import { showToast } from '@/composables/useToast'
 import { useDebouncedRef } from '@/composables/useDebouncedRef'
+import { useLogPause } from '@/composables/useLogPause'
 import { formatTs } from '@/lib/time'
 
 // ---------------------------------------------------------------------------
@@ -87,8 +88,13 @@ const hasNewMessages = ref(false)
  * Paused mode: SSE stays connected but new lines are queued, not displayed.
  * Resume flushes the queue into the visible buffer.
  */
-const paused = ref(false)
-const pauseQueue = ref<LogEntry[]>([])
+const {
+  paused,
+  pauseQueue,
+  enqueue: enqueuePaused,
+  drain: drainPauseQueue,
+  reset: resetPauseQueue,
+} = useLogPause<LogEntry>({ maxQueueSize: LOG_BUFFER_MAX })
 
 /** Whether to show HH:mm:ss timestamp prefix on each log line */
 const showTimestamp = ref(true)
@@ -188,11 +194,7 @@ function appendLine(line: string, ts?: number): void {
 
   // When paused, queue entries instead of appending to visible buffer
   if (paused.value) {
-    pauseQueue.value.push(entry)
-    // Cap the queue to avoid unbounded growth during long pauses
-    if (pauseQueue.value.length > LOG_BUFFER_MAX) {
-      pauseQueue.value.splice(0, pauseQueue.value.length - LOG_BUFFER_MAX)
-    }
+    enqueuePaused(entry)
     return
   }
 
@@ -306,7 +308,7 @@ function togglePause(): void {
 function resumeFromPause(): void {
   paused.value = false
   // Flush queued entries into the visible buffer
-  const queued = pauseQueue.value.splice(0)
+  const queued = drainPauseQueue()
   for (const entry of queued) {
     logBuffer.value.push(entry)
   }
@@ -356,7 +358,7 @@ function exportLogs(): void {
 
 function clearLog(): void {
   logBuffer.value = [{ id: ++_entrySeq, line: '日誌已清除', level: 'info', cls: 'info', ts: Date.now() }]
-  pauseQueue.value = []
+  resetPauseQueue()
   hasNewMessages.value = false
 }
 
