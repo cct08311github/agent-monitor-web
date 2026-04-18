@@ -621,6 +621,102 @@ select.cost-range-selector {
     }
 }
 
+/* ── AGENT QUICK DIAGNOSE POPOVER ── */
+.agent-quick-diagnose {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 50;
+    width: 260px;
+    max-width: min(260px, 90vw);
+    padding: 12px;
+    background: var(--bg-elevated, var(--bg-card));
+    border: 1px solid var(--border);
+    border-radius: var(--radius, 10px);
+    box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.3));
+    font-size: 12px;
+    color: var(--text-primary);
+}
+.aqd-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+.aqd-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.aqd-emoji { font-size: 16px; }
+.aqd-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0 4px;
+    font-size: 14px;
+    line-height: 1;
+}
+.aqd-close:hover { color: var(--text-primary); }
+.aqd-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.03);
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+.aqd-rows {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 2px 12px;
+    margin: 0 0 8px 0;
+    font-size: 11px;
+}
+.aqd-rows dt { color: var(--text-muted); }
+.aqd-rows dd { margin: 0; color: var(--text-primary); text-align: right; font-variant-numeric: tabular-nums; }
+.aqd-task {
+    padding: 6px 8px;
+    background: rgba(255, 255, 255, 0.02);
+    border-left: 2px solid var(--accent, #7c7cff);
+    border-radius: 2px;
+    margin-bottom: 8px;
+}
+.aqd-task-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+.aqd-task-text {
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.aqd-detail-btn {
+    display: block;
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--accent, #7c7cff);
+    background: var(--accent-light, rgba(124, 124, 255, 0.1));
+    color: var(--accent, #7c7cff);
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.15s;
+}
+.aqd-detail-btn:hover {
+    background: var(--accent, #7c7cff);
+    color: #fff;
+}
+
+/* AgentCard must be position:relative for the popover to anchor to it */
+.agent-card { position: relative; }
+
 /* ── UNSTYLED BUTTON ── native button semantics + :focus-visible, no default UA styling
    Uses :where() to keep specificity at 0 so consumer classes (e.g. .detail-row) can
    override padding/border/color without !important. */
