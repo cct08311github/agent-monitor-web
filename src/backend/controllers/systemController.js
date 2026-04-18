@@ -68,7 +68,7 @@ class SystemController {
             });
 
         } catch (error) { /* istanbul ignore next */
-            logger.error('system_get_comprehensive_status_error', { details: logger.toErrorFields(error) });
+            logger.error('system_get_comprehensive_status_error', { requestId: req.requestId, details: logger.toErrorFields(error) });
             return sendFail(res, 500, 'internal_error');
         }
     }

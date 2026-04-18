@@ -32,7 +32,7 @@ class ComplianceController {
 
             return sendOk(res, report);
         } catch (error) { /* istanbul ignore next */
-            logger.error('compliance_analyze_error', { details: logger.toErrorFields(error) });
+            logger.error('compliance_analyze_error', { requestId: req.requestId, details: logger.toErrorFields(error) });
             return sendFail(res, 500, 'internal_error');
         }
     }
@@ -41,7 +41,7 @@ class ComplianceController {
         try {
             return sendOk(res, complianceSystem.getStatus());
         } catch (error) { /* istanbul ignore next */
-            logger.error('compliance_get_status_error', { details: logger.toErrorFields(error) });
+            logger.error('compliance_get_status_error', { requestId: req.requestId, details: logger.toErrorFields(error) });
             return sendFail(res, 500, 'internal_error');
         }
     }
