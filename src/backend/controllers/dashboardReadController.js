@@ -2,6 +2,7 @@ const { ok, fail, sendOk, sendFail } = require('../utils/apiResponse');
 const { getHistoryPayload } = require('../services/historyService');
 const sessionReadService = require('../services/sessionReadService');
 const dashboardPayloadService = require('../services/dashboardPayloadService');
+const apiMetrics = require('../services/apiMetrics');
 const logger = require('../utils/logger');
 
 class DashboardReadController {
@@ -105,7 +106,6 @@ class DashboardReadController {
 
     async getMetrics(req, res) {
         try {
-            const apiMetrics = require('../services/apiMetrics');
             return sendOk(res, { metrics: apiMetrics.getStats() });
         } catch (error) { /* istanbul ignore next */
             logger.error('dashboard_read_error', { requestId: req.requestId, handler: 'getMetrics', msg: error.message });
