@@ -19,6 +19,9 @@ function errorHandler(err, req, res, next) {
         details: logger.toErrorFields(err),
     });
 
+    // Make error code available to requestLogger via res.locals (for errorBuffer)
+    res.locals.errorCode = error;
+
     return sendFail(res, statusCode, error, { requestId: req.requestId, ...extras });
 }
 

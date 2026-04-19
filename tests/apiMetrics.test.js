@@ -86,3 +86,82 @@ describe('apiMetrics', () => {
         expect(stats).toEqual({});
     });
 });
+
+describe('apiMetrics.recordError + errorCount in getStats', () => {
+    test('recordError increments 4xx counter', () => {
+        apiMetrics.record('GET /api/x', 10);
+        apiMetrics.recordError('GET /api/x', 404);
+        const stats = apiMetrics.getStats();
+        expect(stats['GET /api/x'].errorCount['4xx']).toBe(1);
+        expect(stats['GET /api/x'].errorCount['5xx']).toBe(0);
+    });
+
+    test('recordError increments 5xx counter', () => {
+        apiMetrics.record('GET /api/x', 10);
+        apiMetrics.recordError('GET /api/x', 500);
+        apiMetrics.recordError('GET /api/x', 503);
+        const stats = apiMetrics.getStats();
+        expect(stats['GET /api/x'].errorCount['5xx']).toBe(2);
+        expect(stats['GET /api/x'].errorCount['4xx']).toBe(0);
+    });
+
+    test('errorCount defaults to 0/0 when no errors recorded', () => {
+        apiMetrics.record('GET /api/clean', 5);
+        const stats = apiMetrics.getStats();
+        expect(stats['GET /api/clean'].errorCount).toEqual({ '4xx': 0, '5xx': 0 });
+    });
+
+    test('recordError mixed 4xx and 5xx on same key', () => {
+        apiMetrics.record('POST /api/mixed', 20);
+        apiMetrics.recordError('POST /api/mixed', 400);
+        apiMetrics.recordError('POST /api/mixed', 422);
+        apiMetrics.recordError('POST /api/mixed', 500);
+        const stats = apiMetrics.getStats();
+        expect(stats['POST /api/mixed'].errorCount['4xx']).toBe(2);
+        expect(stats['POST /api/mixed'].errorCount['5xx']).toBe(1);
+    });
+
+    test('recordError ignores statusCode outside 400-599', () => {
+        apiMetrics.record('GET /api/y', 10);
+        apiMetrics.recordError('GET /api/y', 200);
+        apiMetrics.recordError('GET /api/y', 301);
+        apiMetrics.recordError('GET /api/y', 600);
+        const stats = apiMetrics.getStats();
+        expect(stats['GET /api/y'].errorCount).toEqual({ '4xx': 0, '5xx': 0 });
+    });
+
+    test('recordError ignores empty key', () => {
+        apiMetrics.record('GET /api/z', 10);
+        apiMetrics.recordError('', 500);
+        apiMetrics.recordError(null, 500);
+        const stats = apiMetrics.getStats();
+        // 'GET /api/z' should still have zero errors
+        expect(stats['GET /api/z'].errorCount).toEqual({ '4xx': 0, '5xx': 0 });
+    });
+
+    test('recordError ignores non-integer statusCode', () => {
+        apiMetrics.record('GET /api/z', 10);
+        apiMetrics.recordError('GET /api/z', 500.5);
+        apiMetrics.recordError('GET /api/z', '500');
+        apiMetrics.recordError('GET /api/z', NaN);
+        const stats = apiMetrics.getStats();
+        expect(stats['GET /api/z'].errorCount).toEqual({ '4xx': 0, '5xx': 0 });
+    });
+
+    test('reset() clears errorCounts', () => {
+        apiMetrics.record('GET /api/r', 10);
+        apiMetrics.recordError('GET /api/r', 500);
+        apiMetrics.reset();
+        const stats = apiMetrics.getStats();
+        expect(Object.keys(stats)).toHaveLength(0);
+    });
+
+    test('errorCount on key with errors-only (no latency sample yet) — recordError on new key silently ignored before record', () => {
+        // recordError on a key that has no latency samples
+        // The errorCount map will have the key, but getStats skips keys with no samples
+        apiMetrics.recordError('GET /api/nosamples', 500);
+        const stats = apiMetrics.getStats();
+        // No latency recorded → key should not appear in stats
+        expect(stats['GET /api/nosamples']).toBeUndefined();
+    });
+});
