@@ -55,6 +55,17 @@ npm test
 # 600+ tests, 43+ suites — jest --forceExit --detectOpenHandles
 ```
 
+## Pre-commit hook
+
+`npm install` 會透過 `prepare` script 自動安裝 husky hook。每次 `git commit` 會先跑：
+
+- `vue-tsc --noEmit` — TypeScript 型別檢查
+- `npm run test:frontend` — 88 vitest unit tests
+
+總開銷約 4 秒。Backend Jest（28s）留給 CI 跑。
+
+緊急 WIP commit 可用標準 git flag 跳過檢查。
+
 ## Configuration
 
 | 變數 | 說明 |
