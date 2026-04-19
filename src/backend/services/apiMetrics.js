@@ -5,6 +5,9 @@ const WINDOW_SIZE = 500;
 // key: "METHOD normalized-path", value: array of duration ms (sliding window)
 const samples = new Map();
 
+// key: "METHOD normalized-path", value: { '4xx': number, '5xx': number }
+const errorCounts = new Map();
+
 function record(key, durationMs) {
     if (typeof key !== 'string' || !key) return;
     if (typeof durationMs !== 'number' || !Number.isFinite(durationMs) || durationMs < 0) return;
@@ -14,6 +17,18 @@ function record(key, durationMs) {
     // Cap at WINDOW_SIZE by dropping oldest — splice is O(k) but called rarely
     if (arr.length > WINDOW_SIZE) {
         arr.splice(0, arr.length - WINDOW_SIZE);
+    }
+}
+
+function recordError(key, statusCode) {
+    if (typeof key !== 'string' || !key) return;
+    if (!Number.isInteger(statusCode) || statusCode < 400 || statusCode > 599) return;
+    if (!errorCounts.has(key)) errorCounts.set(key, { '4xx': 0, '5xx': 0 });
+    const counts = errorCounts.get(key);
+    if (statusCode >= 400 && statusCode <= 499) {
+        counts['4xx'] += 1;
+    } else if (statusCode >= 500 && statusCode <= 599) {
+        counts['5xx'] += 1;
     }
 }
 
@@ -30,6 +45,7 @@ function getStats() {
         if (arr.length === 0) continue;
         const sorted = [...arr].sort((a, b) => a - b);
         const sum = arr.reduce((s, x) => s + x, 0);
+        const ec = errorCounts.get(key) || { '4xx': 0, '5xx': 0 };
         result[key] = {
             count: sorted.length,
             p50: percentile(sorted, 0.50),
@@ -38,11 +54,15 @@ function getStats() {
             min: sorted[0],
             max: sorted[sorted.length - 1],
             mean: Math.round(sum / arr.length),
+            errorCount: { '4xx': ec['4xx'], '5xx': ec['5xx'] },
         };
     }
     return result;
 }
 
-function reset() { samples.clear(); }
+function reset() {
+    samples.clear();
+    errorCounts.clear();
+}
 
-module.exports = { record, getStats, reset, WINDOW_SIZE };
+module.exports = { record, recordError, getStats, reset, WINDOW_SIZE };
