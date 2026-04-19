@@ -1,0 +1,15 @@
+#!/usr/bin/env sh
+
+echo "🔍 pre-commit: vue-tsc type check..."
+npx --no-install vue-tsc --noEmit || {
+  echo "❌ Type check failed. Fix errors or stash changes."
+  exit 1
+}
+
+echo "🎨 pre-commit: frontend vitest..."
+npm run test:frontend --silent || {
+  echo "❌ Frontend tests failed."
+  exit 1
+}
+
+echo "✅ pre-commit checks passed"
