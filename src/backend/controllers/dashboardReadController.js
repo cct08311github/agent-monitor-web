@@ -2,6 +2,7 @@ const { ok, fail, sendOk, sendFail } = require('../utils/apiResponse');
 const { getHistoryPayload } = require('../services/historyService');
 const sessionReadService = require('../services/sessionReadService');
 const dashboardPayloadService = require('../services/dashboardPayloadService');
+const apiMetrics = require('../services/apiMetrics');
 const logger = require('../utils/logger');
 
 class DashboardReadController {
@@ -99,6 +100,15 @@ class DashboardReadController {
             res.status(result.statusCode).json(result.body);
         } catch (error) {
             logger.error('dashboard_read_error', { requestId: req.requestId, handler: 'getSessions', msg: error.message });
+            return sendFail(res, 500, 'internal_error');
+        }
+    }
+
+    async getMetrics(req, res) {
+        try {
+            return sendOk(res, { metrics: apiMetrics.getStats() });
+        } catch (error) { /* istanbul ignore next */
+            logger.error('dashboard_read_error', { requestId: req.requestId, handler: 'getMetrics', msg: error.message });
             return sendFail(res, 500, 'internal_error');
         }
     }

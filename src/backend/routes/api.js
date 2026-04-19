@@ -68,6 +68,7 @@ router.get('/read/history', dashboardReadController.getHistory);
 router.get('/read/status', dashboardReadController.getStatus);
 router.get('/read/models', dashboardReadController.getModels);
 router.get('/read/agents', dashboardReadController.getAgents);
+router.get('/read/metrics', dashboardReadController.getMetrics.bind(dashboardReadController));
 router.get('/agents/:agentId/sessions', validateAgentId, dashboardReadController.getSessions);
 router.get('/agents/:agentId/sessions/:sessionId', validateAgentId, validateSessionId, dashboardReadController.getSessionContent);
 router.get('/dashboard', dashboardReadController.getDashboard); // very legacy
