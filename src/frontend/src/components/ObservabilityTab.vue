@@ -61,6 +61,39 @@ export interface ApiErrorsResponse {
   }
 }
 
+export interface AlertRecord {
+  rule: string
+  severity: 'warning' | 'critical' | string
+  message: string
+  meta: Record<string, unknown>
+  ts: number
+}
+
+export interface AlertRule {
+  enabled: boolean
+  threshold: number
+  severity: string
+  label: string
+}
+
+export interface AlertConfig {
+  rules: Record<string, AlertRule>
+}
+
+export interface AlertsRecentResponse {
+  success: boolean
+  data: {
+    alerts: AlertRecord[]
+  }
+}
+
+export interface AlertConfigResponse {
+  success: boolean
+  data: {
+    config: AlertConfig
+  }
+}
+
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
@@ -77,6 +110,17 @@ const autoRefresh = ref(true)
 // Sorting for metrics table
 const sortKey = ref<keyof ApiMetric>('p99')
 const sortDesc = ref(true)
+
+// Alerts state
+const alerts = ref<AlertRecord[]>([])
+const alertsLoading = ref(false)
+const alertsError = ref<string | null>(null)
+
+// Alert config / thresholds state
+const alertConfig = ref<AlertConfig | null>(null)
+const configLoading = ref(false)
+const configError = ref<string | null>(null)
+const thresholdsExpanded = ref(false)
 
 // ---------------------------------------------------------------------------
 // Computed
@@ -149,8 +193,44 @@ async function fetchErrors(): Promise<void> {
   }
 }
 
+async function fetchAlerts(): Promise<void> {
+  if (alertsLoading.value) return
+  alertsLoading.value = true
+  alertsError.value = null
+  try {
+    const data = (await api.get('/api/alerts/recent?limit=20')) as AlertsRecentResponse
+    if (data.success) {
+      alerts.value = data.data.alerts
+    } else {
+      alertsError.value = 'Alerts API returned unsuccessful response'
+    }
+  } catch (e) {
+    alertsError.value = (e as Error).message ?? 'Failed to fetch alerts'
+  } finally {
+    alertsLoading.value = false
+  }
+}
+
+async function fetchAlertConfig(): Promise<void> {
+  if (configLoading.value) return
+  configLoading.value = true
+  configError.value = null
+  try {
+    const data = (await api.get('/api/alerts/config')) as AlertConfigResponse
+    if (data.success) {
+      alertConfig.value = data.data.config
+    } else {
+      configError.value = 'Alert config API returned unsuccessful response'
+    }
+  } catch (e) {
+    configError.value = (e as Error).message ?? 'Failed to fetch alert config'
+  } finally {
+    configLoading.value = false
+  }
+}
+
 async function refresh(): Promise<void> {
-  await Promise.all([fetchMetrics(), fetchErrors()])
+  await Promise.all([fetchMetrics(), fetchErrors(), fetchAlerts(), fetchAlertConfig()])
   lastUpdated.value = new Date()
 }
 
@@ -243,7 +323,7 @@ onUnmounted(() => {
       <div class="obs-controls">
         <button
           class="obs-btn obs-btn--secondary"
-          :disabled="loadingMetrics || loadingErrors"
+          :disabled="loadingMetrics || loadingErrors || alertsLoading || configLoading"
           @click="refresh"
         >
           <span v-if="loadingMetrics || loadingErrors" class="obs-spinner" aria-hidden="true" />
@@ -389,6 +469,120 @@ onUnmounted(() => {
           </tbody>
         </table>
       </div>
+    </section>
+
+    <!-- ── Active Alerts ─────────────────────────────────────────────────── -->
+    <section class="obs-section">
+      <h2 class="obs-section-title">Active Alerts</h2>
+
+      <!-- Error state -->
+      <div v-if="alertsError" class="obs-error-state">
+        <span class="obs-error-icon" aria-hidden="true">⚠</span>
+        <span>{{ alertsError }}</span>
+        <button class="obs-btn obs-btn--secondary obs-btn--sm" @click="fetchAlerts">
+          Retry
+        </button>
+      </div>
+
+      <!-- Empty state -->
+      <div v-else-if="!alertsLoading && alerts.length === 0" class="obs-empty-state">
+        <div class="obs-empty-icon" aria-hidden="true">🟢</div>
+        <div class="obs-empty-title">目前無 alert</div>
+        <div class="obs-empty-desc">所有系統指標正常，無警報觸發。</div>
+      </div>
+
+      <!-- Table -->
+      <div v-else class="obs-table-wrap">
+        <table class="obs-table">
+          <thead>
+            <tr>
+              <th class="obs-th">Time</th>
+              <th class="obs-th">Rule</th>
+              <th class="obs-th">Severity</th>
+              <th class="obs-th">Message</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(a, i) in alerts" :key="a.rule + a.ts + i" class="obs-tr">
+              <td class="obs-td obs-td--mono">{{ fmtTime(a.ts) }}</td>
+              <td class="obs-td obs-td--mono obs-td--rule">{{ a.rule }}</td>
+              <td class="obs-td">
+                <span :class="['severity-badge', `severity-badge--${a.severity}`]">
+                  {{ a.severity }}
+                </span>
+              </td>
+              <td class="obs-td obs-td--alertmsg">{{ a.message }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── Alert Thresholds (collapsible) ─────────────────────────────────── -->
+    <section class="obs-section">
+      <h2 class="obs-section-title">
+        <button
+          class="obs-btn obs-btn--secondary obs-btn--sm obs-thresholds-toggle"
+          :aria-expanded="thresholdsExpanded"
+          @click="thresholdsExpanded = !thresholdsExpanded"
+        >
+          {{ thresholdsExpanded ? '▲' : '▶' }} Alert Thresholds
+        </button>
+      </h2>
+
+      <template v-if="thresholdsExpanded">
+        <!-- Error state -->
+        <div v-if="configError" class="obs-error-state">
+          <span class="obs-error-icon" aria-hidden="true">⚠</span>
+          <span>{{ configError }}</span>
+          <button class="obs-btn obs-btn--secondary obs-btn--sm" @click="fetchAlertConfig">
+            Retry
+          </button>
+        </div>
+
+        <!-- Empty / not loaded -->
+        <div
+          v-else-if="!configLoading && (!alertConfig || Object.keys(alertConfig.rules).length === 0)"
+          class="obs-empty-state"
+        >
+          <div class="obs-empty-icon" aria-hidden="true">⚙️</div>
+          <div class="obs-empty-title">No threshold config loaded</div>
+        </div>
+
+        <!-- Table -->
+        <div v-else-if="alertConfig" class="obs-table-wrap">
+          <table class="obs-table">
+            <thead>
+              <tr>
+                <th class="obs-th">Rule Label</th>
+                <th class="obs-th">Enabled</th>
+                <th class="obs-th obs-th--num">Threshold</th>
+                <th class="obs-th">Severity</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(rule, key) in alertConfig.rules"
+                :key="key"
+                class="obs-tr"
+              >
+                <td class="obs-td">{{ rule.label }}</td>
+                <td class="obs-td obs-td--enabled">
+                  <span :title="rule.enabled ? 'Enabled' : 'Disabled'">
+                    {{ rule.enabled ? '🟢' : '⚪' }}
+                  </span>
+                </td>
+                <td class="obs-td obs-td--num obs-td--mono">{{ rule.threshold }}</td>
+                <td class="obs-td">
+                  <span :class="['severity-badge', `severity-badge--${rule.severity}`]">
+                    {{ rule.severity }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
     </section>
   </div>
 </template>
@@ -700,5 +894,59 @@ onUnmounted(() => {
 .obs-method--delete {
   background: rgba(248, 113, 113, 0.15);
   color: #f87171;
+}
+
+/* ── Severity badge ──────────────────────────────────────────────────────── */
+
+.severity-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.severity-badge--critical {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.severity-badge--warning {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
+
+/* fallback for unknown severity values */
+.severity-badge:not(.severity-badge--critical):not(.severity-badge--warning) {
+  background: rgba(156, 163, 175, 0.15);
+  color: #9ca3af;
+}
+
+/* ── Alerts table specific cells ─────────────────────────────────────────── */
+
+.obs-td--rule {
+  font-size: 12px;
+  color: var(--color-text-muted, #bbb);
+  max-width: 180px;
+}
+
+.obs-td--alertmsg {
+  color: var(--color-text, #e0e0e0);
+  font-size: 13px;
+  max-width: 400px;
+}
+
+.obs-td--enabled {
+  text-align: center;
+}
+
+/* ── Thresholds toggle button ────────────────────────────────────────────── */
+
+.obs-thresholds-toggle {
+  font-size: 13px;
+  font-weight: 600;
+  gap: 6px;
 }
 </style>

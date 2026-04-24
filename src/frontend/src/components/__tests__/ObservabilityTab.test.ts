@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import type { ApiMetricsResponse, ApiErrorsResponse } from '../ObservabilityTab.vue'
+import type {
+  ApiMetricsResponse,
+  ApiErrorsResponse,
+  AlertsRecentResponse,
+  AlertConfigResponse,
+} from '../ObservabilityTab.vue'
 
 // ---------------------------------------------------------------------------
 // Stub api composable
@@ -82,6 +87,50 @@ const emptyErrorsFixture: ApiErrorsResponse = {
   data: { errors: [], total: 0 },
 }
 
+const alertsFixture: AlertsRecentResponse = {
+  success: true,
+  data: {
+    alerts: [
+      {
+        rule: 'cpu_critical',
+        severity: 'critical',
+        message: 'CPU 96.5% — 超過危急閾值 95%',
+        meta: { cpu: 96.5 },
+        ts: 1700000000000,
+      },
+      {
+        rule: 'memory_high',
+        severity: 'warning',
+        message: '記憶體 87.3% — 超過閾值 85%',
+        meta: { memory: 87.3 },
+        ts: 1700000001000,
+      },
+    ],
+  },
+}
+
+const emptyAlertsFixture: AlertsRecentResponse = {
+  success: true,
+  data: { alerts: [] },
+}
+
+const alertConfigFixture: AlertConfigResponse = {
+  success: true,
+  data: {
+    config: {
+      rules: {
+        cpu_high: { enabled: true, threshold: 80, severity: 'warning', label: 'CPU 偏高' },
+        cpu_critical: { enabled: true, threshold: 95, severity: 'critical', label: 'CPU 危急' },
+        memory_high: { enabled: true, threshold: 85, severity: 'warning', label: '記憶體偏高' },
+        no_active_agents: { enabled: true, threshold: 0, severity: 'critical', label: 'Agent 全部離線' },
+        cost_today_high: { enabled: true, threshold: 5, severity: 'warning', label: '今日成本偏高 (USD)' },
+        error_rate_high: { enabled: true, threshold: 5, severity: 'warning', label: '5xx Error 激增（5 分鐘內）' },
+        latency_p99_high: { enabled: false, threshold: 2000, severity: 'warning', label: 'API p99 latency 過高' },
+      },
+    },
+  },
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -90,6 +139,8 @@ function setupMockBothSuccess() {
   mockGet.mockImplementation((url: string) => {
     if (url.includes('/api/read/metrics')) return Promise.resolve(metricsFixture)
     if (url.includes('/api/read/errors/recent')) return Promise.resolve(errorsFixture)
+    if (url.includes('/api/alerts/recent')) return Promise.resolve(alertsFixture)
+    if (url.includes('/api/alerts/config')) return Promise.resolve(alertConfigFixture)
     return Promise.reject(new Error('Unknown URL'))
   })
 }
@@ -98,6 +149,8 @@ function setupMockBothEmpty() {
   mockGet.mockImplementation((url: string) => {
     if (url.includes('/api/read/metrics')) return Promise.resolve(emptyMetricsFixture)
     if (url.includes('/api/read/errors/recent')) return Promise.resolve(emptyErrorsFixture)
+    if (url.includes('/api/alerts/recent')) return Promise.resolve(emptyAlertsFixture)
+    if (url.includes('/api/alerts/config')) return Promise.resolve(alertConfigFixture)
     return Promise.reject(new Error('Unknown URL'))
   })
 }
@@ -289,7 +342,8 @@ describe('ObservabilityTab', () => {
       await refreshBtn?.trigger('click')
       await flushPromises()
 
-      expect(mockGet).toHaveBeenCalledTimes(2)
+      // metrics + errors + alerts/recent + alerts/config = 4 calls
+      expect(mockGet).toHaveBeenCalledTimes(4)
       wrapper.unmount()
     })
 
@@ -373,8 +427,8 @@ describe('ObservabilityTab', () => {
       vi.advanceTimersByTime(10_000)
       await flushPromises()
 
-      // Should have fetched metrics + errors = 2 calls
-      expect(mockGet).toHaveBeenCalledTimes(2)
+      // Should have fetched metrics + errors + alerts/recent + alerts/config = 4 calls
+      expect(mockGet).toHaveBeenCalledTimes(4)
       wrapper.unmount()
     })
   })
@@ -393,6 +447,99 @@ describe('ObservabilityTab', () => {
       await countHeader?.trigger('click')
 
       expect(wrapper.text()).toContain('Count')
+      wrapper.unmount()
+    })
+  })
+
+  // ── Alerts rendering ─────────────────────────────────────────────────────
+
+  describe('alerts rendering', () => {
+    it('renders alerts table with rule and message', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const text = wrapper.text()
+      expect(text).toContain('cpu_critical')
+      expect(text).toContain('memory_high')
+      expect(text).toContain('CPU 96.5% — 超過危急閾值 95%')
+      wrapper.unmount()
+    })
+
+    it('shows alerts empty state when no alerts', async () => {
+      setupMockBothEmpty()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('目前無 alert')
+      wrapper.unmount()
+    })
+
+    it('shows alerts error state and retry button on network failure', async () => {
+      mockGet.mockImplementation((url: string) => {
+        if (url.includes('/api/alerts/recent')) return Promise.reject(new Error('Alert fetch failed'))
+        if (url.includes('/api/read/metrics')) return Promise.resolve(emptyMetricsFixture)
+        if (url.includes('/api/read/errors/recent')) return Promise.resolve(emptyErrorsFixture)
+        if (url.includes('/api/alerts/config')) return Promise.resolve(alertConfigFixture)
+        return Promise.reject(new Error('Unknown URL'))
+      })
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Alert fetch failed')
+      const retryBtns = wrapper.findAll('button').filter((b) => b.text() === 'Retry')
+      expect(retryBtns.length).toBeGreaterThan(0)
+      wrapper.unmount()
+    })
+
+    it('severity badge has correct class for critical and warning', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const criticalBadge = wrapper.find('.severity-badge--critical')
+      const warningBadge = wrapper.find('.severity-badge--warning')
+      expect(criticalBadge.exists()).toBe(true)
+      expect(warningBadge.exists()).toBe(true)
+      wrapper.unmount()
+    })
+
+    it('alert config renders all 7 rules when thresholds panel is expanded', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      // Expand thresholds
+      const toggleBtn = wrapper.findAll('button').find((b) => b.text().includes('Alert Thresholds'))
+      await toggleBtn?.trigger('click')
+      await flushPromises()
+
+      const text = wrapper.text()
+      expect(text).toContain('CPU 偏高')
+      expect(text).toContain('CPU 危急')
+      expect(text).toContain('記憶體偏高')
+      expect(text).toContain('Agent 全部離線')
+      expect(text).toContain('今日成本偏高 (USD)')
+      expect(text).toContain('5xx Error 激增（5 分鐘內）')
+      expect(text).toContain('API p99 latency 過高')
+      wrapper.unmount()
+    })
+  })
+
+  // ── Auto-refresh covers alerts ───────────────────────────────────────────
+
+  describe('auto-refresh with alerts', () => {
+    it('auto-refresh triggers all 4 endpoint fetches', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      mockGet.mockClear()
+      vi.advanceTimersByTime(10_000)
+      await flushPromises()
+
+      // metrics + errors + alerts/recent + alerts/config = 4 calls
+      expect(mockGet).toHaveBeenCalledTimes(4)
       wrapper.unmount()
     })
   })
