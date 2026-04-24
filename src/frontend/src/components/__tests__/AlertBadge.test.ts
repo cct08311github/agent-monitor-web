@@ -534,4 +534,211 @@ describe('AlertBadge', () => {
       wrapper.unmount()
     })
   })
+
+  // ── Desktop Notification API ───────────────────────────────────────────────
+  //
+  // Mock strategy:
+  //   - `global.Notification` is replaced via vi.stubGlobal with a vi.fn()
+  //     constructor spy. The static `permission` property is set via
+  //     Object.defineProperty per-test to simulate different browser states.
+  //   - `Notification.requestPermission` is assigned as a static vi.fn().
+  //   - localStorage is replaced with an in-memory Map-backed stub per-test
+  //     because happy-dom's localStorage may not expose all Storage methods.
+  //
+  describe('desktop notifications', () => {
+    // Typed interface for the mock Notification surface
+    interface NotificationLike {
+      new (title: string, opts?: NotificationOptions): void
+      permission: NotificationPermission
+      requestPermission: () => Promise<NotificationPermission>
+    }
+
+    let NotificationMock: ReturnType<typeof vi.fn>
+    let requestPermissionMock: ReturnType<typeof vi.fn>
+
+    // Minimal localStorage stub backed by a Map
+    function makeLocalStorageStub(initial: Record<string, string> = {}): Storage {
+      const store = new Map<string, string>(Object.entries(initial))
+      return {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => { store.set(k, v) },
+        removeItem: (k: string) => { store.delete(k) },
+        clear: () => { store.clear() },
+        get length() { return store.size },
+        key: (i: number) => [...store.keys()][i] ?? null,
+      } as Storage
+    }
+
+    function setPermission(perm: NotificationPermission): void {
+      Object.defineProperty(NotificationMock, 'permission', {
+        value: perm,
+        writable: true,
+        configurable: true,
+      })
+      requestPermissionMock.mockResolvedValue(perm)
+    }
+
+    beforeEach(() => {
+      // Build a fresh constructor mock and localStorage stub for each test
+      NotificationMock = vi.fn()
+      requestPermissionMock = vi.fn()
+      // Assign requestPermission static via double cast to avoid TS error
+      ;(NotificationMock as unknown as NotificationLike).requestPermission =
+        requestPermissionMock as unknown as () => Promise<NotificationPermission>
+      setPermission('default')
+
+      // Stub globals
+      vi.stubGlobal('Notification', NotificationMock)
+      vi.stubGlobal('localStorage', makeLocalStorageStub())
+    })
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    // 1. Load persisted enabled state from localStorage
+    it('loads notificationsEnabled=true from localStorage on mount', async () => {
+      setPermission('granted')
+      vi.stubGlobal('localStorage', makeLocalStorageStub({ oc_desktop_notif_enabled: '1' }))
+      mockGet.mockResolvedValue(emptyResponse())
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      // Open popover to see checkbox
+      await wrapper.find('.alert-badge-wrapper').trigger('focusin')
+      await wrapper.vm.$nextTick()
+
+      const checkbox = wrapper.find<HTMLInputElement>('.notif-toggle-checkbox')
+      expect(checkbox.element.checked).toBe(true)
+      wrapper.unmount()
+    })
+
+    // 2. Toggle on with default permission → requestPermission is called
+    it('calls requestPermission when toggle is enabled and permission is default', async () => {
+      setPermission('default')
+      mockGet.mockResolvedValue(emptyResponse())
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      await wrapper.find('.alert-badge-wrapper').trigger('focusin')
+      await wrapper.vm.$nextTick()
+
+      await wrapper.find('.notif-toggle-checkbox').trigger('change')
+      await flushPromises()
+
+      expect(requestPermissionMock).toHaveBeenCalledTimes(1)
+      wrapper.unmount()
+    })
+
+    // 3. Toggle on + granted → new critical fires Notification constructor
+    it('fires Notification when enabled, granted, and a new critical arrives', async () => {
+      setPermission('granted')
+      vi.stubGlobal('localStorage', makeLocalStorageStub({ oc_desktop_notif_enabled: '1' }))
+
+      mockGet.mockResolvedValue(alertsResponse([makeAlert('critical')]))
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      // The watch fires after recentAlerts updates; constructor should be called
+      expect(NotificationMock).toHaveBeenCalledTimes(1)
+      expect(NotificationMock).toHaveBeenCalledWith(
+        'Agent Monitor — Critical Alert',
+        expect.objectContaining({ body: expect.any(String) }),
+      )
+      wrapper.unmount()
+    })
+
+    // 4. Same critical id is not re-notified on second poll
+    it('does not re-fire Notification for a critical already in lastCriticalIds', async () => {
+      setPermission('granted')
+      vi.stubGlobal('localStorage', makeLocalStorageStub({ oc_desktop_notif_enabled: '1' }))
+
+      const alert = makeAlert('critical')
+      mockGet.mockResolvedValue(alertsResponse([alert]))
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+      const firstCallCount = NotificationMock.mock.calls.length
+
+      // Advance timer to trigger a second poll with the same alert
+      vi.advanceTimersByTime(30_000)
+      await flushPromises()
+
+      // No additional notification should fire
+      expect(NotificationMock.mock.calls.length).toBe(firstCallCount)
+      wrapper.unmount()
+    })
+
+    // 5. Multiple new criticals in same batch → single merged notification
+    it('fires a single merged Notification when multiple new criticals arrive at once', async () => {
+      setPermission('granted')
+      vi.stubGlobal('localStorage', makeLocalStorageStub({ oc_desktop_notif_enabled: '1' }))
+
+      mockGet.mockResolvedValue(
+        alertsResponse([
+          makeAlert('critical', -1000),
+          makeAlert('critical', -2000),
+          makeAlert('critical', -3000),
+        ]),
+      )
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      // Should have fired exactly once (merged batch)
+      expect(NotificationMock).toHaveBeenCalledTimes(1)
+      // Body should reference "3 個 critical alerts"
+      const callArgs = NotificationMock.mock.calls[0]
+      expect(callArgs[1].body).toContain('3')
+      wrapper.unmount()
+    })
+
+    // 6. Toggle off → Notification not fired even for new criticals
+    it('does not fire Notification when notificationsEnabled is false', async () => {
+      setPermission('granted')
+      // Do NOT set localStorage (default is off)
+
+      mockGet.mockResolvedValue(alertsResponse([makeAlert('critical')]))
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      expect(NotificationMock).not.toHaveBeenCalled()
+      wrapper.unmount()
+    })
+
+    // 7. permission === 'denied' → warning message shown in popover
+    it('shows blocked-permission warning when permission is denied', async () => {
+      setPermission('denied')
+      mockGet.mockResolvedValue(emptyResponse())
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      await wrapper.find('.alert-badge-wrapper').trigger('focusin')
+      await wrapper.vm.$nextTick()
+
+      const warning = wrapper.find('.notif-warning--blocked')
+      expect(warning.exists()).toBe(true)
+      expect(warning.text()).toContain('已封鎖通知')
+      wrapper.unmount()
+    })
+
+    // 8. Notification not fired when permission is not 'granted' (even if enabled)
+    it('does not fire Notification when permission is not granted', async () => {
+      setPermission('default')
+      vi.stubGlobal('localStorage', makeLocalStorageStub({ oc_desktop_notif_enabled: '1' }))
+
+      mockGet.mockResolvedValue(alertsResponse([makeAlert('critical')]))
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      expect(NotificationMock).not.toHaveBeenCalled()
+      wrapper.unmount()
+    })
+  })
 })
