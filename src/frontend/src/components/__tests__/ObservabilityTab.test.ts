@@ -6,6 +6,7 @@ import type {
   AlertsRecentResponse,
   AlertConfigResponse,
 } from '../ObservabilityTab.vue'
+import { formatExportTimestamp } from '@/lib/time'
 
 // ---------------------------------------------------------------------------
 // Stub api composable
@@ -728,6 +729,226 @@ describe('ObservabilityTab', () => {
       const costInput = inputs.find((i) => i.attributes('aria-label')?.includes('cost_today_high'))
       expect(costInput?.attributes('step')).toBe('0.01')
       wrapper.unmount()
+    })
+  })
+
+  // ── Export ───────────────────────────────────────────────────────────────
+
+  describe('export JSON', () => {
+    // Setup DOM mocks for Blob / URL.createObjectURL / anchor
+    function setupExportMocks() {
+      const mockClick = vi.fn()
+      const mockAnchor = { href: '', download: '', click: mockClick }
+      const mockCreateObjectURL = vi.fn().mockReturnValue('blob:mock-url')
+      const mockRevokeObjectURL = vi.fn()
+
+      vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+        if (tag === 'a') return mockAnchor as unknown as HTMLElement
+        return document.createElement(tag)
+      })
+      vi.spyOn(URL, 'createObjectURL').mockImplementation(mockCreateObjectURL)
+      vi.spyOn(URL, 'revokeObjectURL').mockImplementation(mockRevokeObjectURL)
+
+      return { mockClick, mockAnchor, mockCreateObjectURL, mockRevokeObjectURL }
+    }
+
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    it('Export All triggers download and calls URL.createObjectURL + revokeObjectURL', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const { mockClick, mockCreateObjectURL, mockRevokeObjectURL } = setupExportMocks()
+
+      const exportAllBtn = wrapper.findAll('[data-export="all"]')[0]
+      await exportAllBtn.trigger('click')
+
+      expect(mockCreateObjectURL).toHaveBeenCalledTimes(1)
+      expect(mockClick).toHaveBeenCalledTimes(1)
+      expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:mock-url')
+      wrapper.unmount()
+    })
+
+    it('Export All filename matches observability-all-YYYYMMDD-HHMMSS.json pattern', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const { mockAnchor } = setupExportMocks()
+
+      const exportAllBtn = wrapper.findAll('[data-export="all"]')[0]
+      await exportAllBtn.trigger('click')
+
+      expect(mockAnchor.download).toMatch(
+        /^observability-all-\d{8}-\d{6}\.json$/,
+      )
+      wrapper.unmount()
+    })
+
+    // Helper: intercept Blob construction by replacing it with a class that extends Blob
+    // and captures the JSON payload before calling super().
+    function createBlobCaptor(): { getPayload: () => unknown } {
+      let capturedPayload: unknown = null
+
+      class CapturingBlob extends Blob {
+        constructor(parts?: BlobPart[], options?: BlobPropertyBag) {
+          super(parts, options)
+          if (parts && parts.length > 0) {
+            try {
+              capturedPayload = JSON.parse(parts[0] as string) as unknown
+            } catch {
+              // ignore
+            }
+          }
+        }
+      }
+
+      vi.stubGlobal('Blob', CapturingBlob)
+
+      return {
+        getPayload: () => capturedPayload,
+      }
+    }
+
+    it('Export Metrics only includes metrics data in payload', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const captor = createBlobCaptor()
+      vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-url')
+      vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+      vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+        if (tag === 'a') return { href: '', download: '', click: vi.fn() } as unknown as HTMLElement
+        return document.createElement(tag)
+      })
+
+      const exportMetricsBtn = wrapper.findAll('[data-export="metrics"]')[0]
+      await exportMetricsBtn.trigger('click')
+
+      const payload = captor.getPayload() as Record<string, unknown>
+      expect(payload).not.toBeNull()
+      expect(payload.category).toBe('metrics')
+      expect(payload.source).toBe('agent-monitor-web')
+      expect(payload.exportedAt).toBeDefined()
+      expect(Array.isArray(payload.data)).toBe(true)
+      const data = payload.data as unknown[]
+      expect(data.length).toBe(2) // two metrics in fixture
+
+      vi.unstubAllGlobals()
+      wrapper.unmount()
+    })
+
+    it('Export Errors only includes errors data in payload', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const captor = createBlobCaptor()
+      vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-url')
+      vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+      vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+        if (tag === 'a') return { href: '', download: '', click: vi.fn() } as unknown as HTMLElement
+        return document.createElement(tag)
+      })
+
+      const exportErrorsBtn = wrapper.findAll('[data-export="errors"]')[0]
+      await exportErrorsBtn.trigger('click')
+
+      const payload = captor.getPayload() as Record<string, unknown>
+      expect(payload.category).toBe('errors')
+      expect(Array.isArray(payload.data)).toBe(true)
+      const data = payload.data as unknown[]
+      expect(data.length).toBe(2) // two errors in fixture
+
+      vi.unstubAllGlobals()
+      wrapper.unmount()
+    })
+
+    it('Export Alerts includes alerts + config in payload', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const captor = createBlobCaptor()
+      vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-url')
+      vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+      vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+        if (tag === 'a') return { href: '', download: '', click: vi.fn() } as unknown as HTMLElement
+        return document.createElement(tag)
+      })
+
+      const exportAlertsBtn = wrapper.findAll('[data-export="alerts"]')[0]
+      await exportAlertsBtn.trigger('click')
+
+      const payload = captor.getPayload() as Record<string, unknown>
+      expect(payload.category).toBe('alerts')
+      const data = payload.data as Record<string, unknown>
+      expect(Array.isArray(data.alerts)).toBe(true)
+      expect(data.config).toBeDefined()
+
+      vi.unstubAllGlobals()
+      wrapper.unmount()
+    })
+
+    it('Export Metrics button is disabled when metrics is empty', async () => {
+      setupMockBothEmpty()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const exportMetricsBtn = wrapper.findAll('[data-export="metrics"]')[0]
+      expect(exportMetricsBtn.attributes('disabled')).toBeDefined()
+      wrapper.unmount()
+    })
+
+    it('Export Errors button is disabled when errors is empty', async () => {
+      setupMockBothEmpty()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const exportErrorsBtn = wrapper.findAll('[data-export="errors"]')[0]
+      expect(exportErrorsBtn.attributes('disabled')).toBeDefined()
+      wrapper.unmount()
+    })
+
+    it('Export buttons are enabled when data is present', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const exportMetricsBtn = wrapper.findAll('[data-export="metrics"]')[0]
+      const exportErrorsBtn = wrapper.findAll('[data-export="errors"]')[0]
+      const exportAlertsBtn = wrapper.findAll('[data-export="alerts"]')[0]
+      const exportAllBtn = wrapper.findAll('[data-export="all"]')[0]
+
+      expect(exportMetricsBtn.attributes('disabled')).toBeUndefined()
+      expect(exportErrorsBtn.attributes('disabled')).toBeUndefined()
+      expect(exportAlertsBtn.attributes('disabled')).toBeUndefined()
+      expect(exportAllBtn.attributes('disabled')).toBeUndefined()
+      wrapper.unmount()
+    })
+  })
+
+  // ── formatExportTimestamp helper ────────────────────────────────────────
+
+  describe('formatExportTimestamp', () => {
+    it('returns YYYYMMDD-HHMMSS format', () => {
+      const d = new Date(2026, 3, 24, 15, 0, 32) // 2026-04-24T15:00:32 local
+      expect(formatExportTimestamp(d)).toBe('20260424-150032')
+    })
+
+    it('pads single-digit month, day, hours, minutes, seconds', () => {
+      const d = new Date(2026, 0, 5, 3, 7, 9) // 2026-01-05T03:07:09
+      expect(formatExportTimestamp(d)).toBe('20260105-030709')
+    })
+
+    it('output matches safe filename pattern [A-Za-z0-9-]+.json', () => {
+      const d = new Date(2026, 3, 24, 9, 5, 1)
+      const ts = formatExportTimestamp(d)
+      expect(ts).toMatch(/^\d{8}-\d{6}$/)
     })
   })
 })
