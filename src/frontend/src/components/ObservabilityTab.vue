@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { api } from '@/composables/useApi'
+import { showToast } from '@/composables/useToast'
 import { formatTs } from '@/lib/time'
 
 // ---------------------------------------------------------------------------
@@ -122,6 +123,10 @@ const configLoading = ref(false)
 const configError = ref<string | null>(null)
 const thresholdsExpanded = ref(false)
 
+// Editable thresholds state
+const editedConfig = ref<AlertConfig | null>(null)
+const saving = ref(false)
+
 // ---------------------------------------------------------------------------
 // Computed
 // ---------------------------------------------------------------------------
@@ -138,6 +143,24 @@ const sortedMetrics = computed(() => {
     const bStr = String(bVal)
     return sortDesc.value ? bStr.localeCompare(aStr) : aStr.localeCompare(bStr)
   })
+})
+
+// hasDirtyChanges: compare editedConfig vs alertConfig per-rule
+// Returns false if any threshold value is NaN (invalid input)
+const hasDirtyChanges = computed(() => {
+  if (!alertConfig.value || !editedConfig.value) return false
+  const original = alertConfig.value.rules
+  const edited = editedConfig.value.rules
+  for (const key of Object.keys(original)) {
+    if (!(key in edited)) continue
+    const orig = original[key]
+    const edit = edited[key]
+    // Guard: if threshold is NaN (empty input), disable save
+    if (Number.isNaN(edit.threshold)) return false
+    if (orig.enabled !== edit.enabled) return true
+    if (orig.threshold !== edit.threshold) return true
+  }
+  return false
 })
 
 const lastUpdatedLabel = computed(() => {
@@ -227,6 +250,56 @@ async function fetchAlertConfig(): Promise<void> {
   } finally {
     configLoading.value = false
   }
+}
+
+// Keep editedConfig in sync when alertConfig is first loaded (or re-fetched after save)
+watch(
+  alertConfig,
+  (newVal) => {
+    if (newVal !== null) {
+      editedConfig.value = JSON.parse(JSON.stringify(newVal)) as AlertConfig
+    }
+  },
+  { immediate: true },
+)
+
+// Build PATCH body: only include rules that have actually changed
+function buildPatchBody(): { rules: Record<string, { enabled?: boolean; threshold?: number }> } {
+  const patch: Record<string, { enabled?: boolean; threshold?: number }> = {}
+  if (!alertConfig.value || !editedConfig.value) return { rules: patch }
+  const original = alertConfig.value.rules
+  const edited = editedConfig.value.rules
+  for (const key of Object.keys(original)) {
+    if (!(key in edited)) continue
+    const orig = original[key]
+    const edit = edited[key]
+    const ruleChange: { enabled?: boolean; threshold?: number } = {}
+    if (orig.enabled !== edit.enabled) ruleChange.enabled = edit.enabled
+    if (orig.threshold !== edit.threshold) ruleChange.threshold = edit.threshold
+    if (Object.keys(ruleChange).length > 0) {
+      patch[key] = ruleChange
+    }
+  }
+  return { rules: patch }
+}
+
+async function saveConfig(): Promise<void> {
+  if (!hasDirtyChanges.value || saving.value) return
+  saving.value = true
+  try {
+    await api.patch('/api/alerts/config', buildPatchBody())
+    showToast('alert config 已更新', 'success')
+    await fetchAlertConfig()
+  } catch (e) {
+    showToast((e as Error).message ?? 'Failed to save alert config', 'error')
+  } finally {
+    saving.value = false
+  }
+}
+
+function resetConfig(): void {
+  if (!alertConfig.value) return
+  editedConfig.value = JSON.parse(JSON.stringify(alertConfig.value)) as AlertConfig
 }
 
 async function refresh(): Promise<void> {
@@ -550,29 +623,42 @@ onUnmounted(() => {
         </div>
 
         <!-- Table -->
-        <div v-else-if="alertConfig" class="obs-table-wrap">
+        <div v-else-if="editedConfig" class="obs-table-wrap">
           <table class="obs-table">
             <thead>
               <tr>
                 <th class="obs-th">Rule Label</th>
-                <th class="obs-th">Enabled</th>
+                <th class="obs-th obs-th--center">Enabled</th>
                 <th class="obs-th obs-th--num">Threshold</th>
                 <th class="obs-th">Severity</th>
               </tr>
             </thead>
             <tbody>
               <tr
-                v-for="(rule, key) in alertConfig.rules"
+                v-for="(rule, key) in editedConfig.rules"
                 :key="key"
                 class="obs-tr"
               >
                 <td class="obs-td">{{ rule.label }}</td>
-                <td class="obs-td obs-td--enabled">
-                  <span :title="rule.enabled ? 'Enabled' : 'Disabled'">
-                    {{ rule.enabled ? '🟢' : '⚪' }}
-                  </span>
+                <td class="obs-td obs-td--center">
+                  <input
+                    type="checkbox"
+                    :checked="rule.enabled"
+                    class="obs-checkbox"
+                    :aria-label="`Toggle ${key}`"
+                    @change="rule.enabled = ($event.target as HTMLInputElement).checked"
+                  />
                 </td>
-                <td class="obs-td obs-td--num obs-td--mono">{{ rule.threshold }}</td>
+                <td class="obs-td obs-td--num">
+                  <input
+                    v-model.number="rule.threshold"
+                    type="number"
+                    min="0"
+                    :step="key === 'cost_today_high' ? 0.01 : 1"
+                    class="obs-number-input"
+                    :aria-label="`Threshold for ${key}`"
+                  />
+                </td>
                 <td class="obs-td">
                   <span :class="['severity-badge', `severity-badge--${rule.severity}`]">
                     {{ rule.severity }}
@@ -581,6 +667,25 @@ onUnmounted(() => {
               </tr>
             </tbody>
           </table>
+          <!-- Footer actions -->
+          <div class="obs-thresholds-footer">
+            <span v-if="hasDirtyChanges" class="obs-unsaved-hint">未儲存的變更</span>
+            <button
+              class="obs-btn obs-btn--secondary obs-btn--sm"
+              :disabled="!hasDirtyChanges || saving"
+              @click="resetConfig"
+            >
+              Reset
+            </button>
+            <button
+              class="obs-btn obs-btn--primary obs-btn--sm"
+              :disabled="!hasDirtyChanges || saving"
+              @click="saveConfig"
+            >
+              <span v-if="saving" class="obs-spinner" aria-hidden="true" />
+              {{ saving ? 'Saving…' : 'Save' }}
+            </button>
+          </div>
         </div>
       </template>
     </section>
@@ -948,5 +1053,70 @@ onUnmounted(() => {
   font-size: 13px;
   font-weight: 600;
   gap: 6px;
+}
+
+/* ── Primary button ──────────────────────────────────────────────────────── */
+
+.obs-btn--primary {
+  background: var(--color-accent, #3b82f6);
+  color: #fff;
+  border-color: transparent;
+}
+
+.obs-btn--primary:not(:disabled):hover {
+  opacity: 0.85;
+}
+
+/* ── Editable thresholds form elements ───────────────────────────────────── */
+
+.obs-th--center {
+  text-align: center;
+}
+
+.obs-td--center {
+  text-align: center;
+}
+
+.obs-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--color-accent, #3b82f6);
+}
+
+.obs-number-input {
+  width: 90px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border, #444);
+  background: var(--color-surface-1, #1e1e1e);
+  color: var(--color-text, #e0e0e0);
+  font-size: 13px;
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+  text-align: right;
+}
+
+.obs-number-input:focus {
+  outline: 2px solid var(--color-accent, #3b82f6);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+/* ── Thresholds footer ───────────────────────────────────────────────────── */
+
+.obs-thresholds-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--color-border, #333);
+  background: var(--color-surface-2, #1a1a1a);
+}
+
+.obs-unsaved-hint {
+  font-size: 12px;
+  color: var(--color-warn, #fbbf24);
+  margin-right: auto;
 }
 </style>

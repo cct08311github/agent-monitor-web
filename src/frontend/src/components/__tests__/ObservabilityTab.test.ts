@@ -12,10 +12,28 @@ import type {
 // ---------------------------------------------------------------------------
 
 const mockGet = vi.fn()
+const mockPatch = vi.fn()
 
 vi.mock('@/composables/useApi', () => ({
-  api: { get: (...args: unknown[]) => mockGet(...args) },
-  useApi: () => ({ get: (...args: unknown[]) => mockGet(...args) }),
+  api: {
+    get: (...args: unknown[]) => mockGet(...args),
+    patch: (...args: unknown[]) => mockPatch(...args),
+  },
+  useApi: () => ({
+    get: (...args: unknown[]) => mockGet(...args),
+    patch: (...args: unknown[]) => mockPatch(...args),
+  }),
+}))
+
+// ---------------------------------------------------------------------------
+// Stub useToast
+// ---------------------------------------------------------------------------
+
+const mockShowToast = vi.fn()
+
+vi.mock('@/composables/useToast', () => ({
+  showToast: (...args: unknown[]) => mockShowToast(...args),
+  useToast: () => ({ showToast: (...args: unknown[]) => mockShowToast(...args) }),
 }))
 
 // ---------------------------------------------------------------------------
@@ -169,6 +187,7 @@ describe('ObservabilityTab', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.clearAllMocks()
+    mockPatch.mockResolvedValue({ success: true })
   })
 
   afterEach(() => {
@@ -540,6 +559,174 @@ describe('ObservabilityTab', () => {
 
       // metrics + errors + alerts/recent + alerts/config = 4 calls
       expect(mockGet).toHaveBeenCalledTimes(4)
+      wrapper.unmount()
+    })
+  })
+
+  // ── Editable Alert Thresholds ────────────────────────────────────────────
+
+  describe('editable alert thresholds', () => {
+    async function mountWithThresholds() {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+      // Expand thresholds panel
+      const toggleBtn = wrapper.findAll('button').find((b) => b.text().includes('Alert Thresholds'))
+      await toggleBtn?.trigger('click')
+      await flushPromises()
+      return wrapper
+    }
+
+    it('renders checkbox and number input for each of the 7 rules', async () => {
+      const wrapper = await mountWithThresholds()
+
+      const checkboxes = wrapper.findAll('.obs-checkbox')
+      const numberInputs = wrapper.findAll('.obs-number-input')
+      expect(checkboxes).toHaveLength(7)
+      expect(numberInputs).toHaveLength(7)
+      wrapper.unmount()
+    })
+
+    it('Save button is disabled initially (no dirty changes)', async () => {
+      const wrapper = await mountWithThresholds()
+
+      const saveBtn = wrapper.findAll('button').find((b) => b.text().includes('Save'))
+      expect(saveBtn?.attributes('disabled')).toBeDefined()
+      wrapper.unmount()
+    })
+
+    it('Save button enables after toggling a rule enabled checkbox', async () => {
+      const wrapper = await mountWithThresholds()
+
+      const firstCheckbox = wrapper.find('.obs-checkbox')
+      // jsdom requires manually setting .checked before triggering 'change'
+      ;(firstCheckbox.element as HTMLInputElement).checked = false
+      await firstCheckbox.trigger('change')
+      await wrapper.vm.$nextTick()
+
+      const saveBtn = wrapper.findAll('button').find((b) => b.text().includes('Save'))
+      // After dirty change, Save should be enabled
+      expect(saveBtn?.attributes('disabled')).toBeUndefined()
+      wrapper.unmount()
+    })
+
+    it('Save button enables after changing a threshold value', async () => {
+      const wrapper = await mountWithThresholds()
+
+      const firstInput = wrapper.find('.obs-number-input')
+      await firstInput.setValue(99)
+      await wrapper.vm.$nextTick()
+
+      const saveBtn = wrapper.findAll('button').find((b) => b.text().includes('Save'))
+      expect(saveBtn?.attributes('disabled')).toBeUndefined()
+      wrapper.unmount()
+    })
+
+    it('Save success: calls PATCH, shows success toast, and re-fetches config', async () => {
+      const wrapper = await mountWithThresholds()
+
+      // Dirty up the form
+      const firstInput = wrapper.find('.obs-number-input')
+      await firstInput.setValue(99)
+      await wrapper.vm.$nextTick()
+
+      mockGet.mockClear()
+      const saveBtn = wrapper.findAll('button').find((b) => b.text().includes('Save'))
+      await saveBtn?.trigger('click')
+      await flushPromises()
+
+      expect(mockPatch).toHaveBeenCalledWith('/api/alerts/config', expect.objectContaining({ rules: expect.any(Object) }))
+      expect(mockShowToast).toHaveBeenCalledWith('alert config 已更新', 'success')
+      // re-fetches config
+      expect(mockGet).toHaveBeenCalledWith(expect.stringContaining('/api/alerts/config'))
+      wrapper.unmount()
+    })
+
+    it('Save failure: shows error toast and keeps editedConfig', async () => {
+      const wrapper = await mountWithThresholds()
+
+      // Dirty up the form
+      const firstInput = wrapper.find('.obs-number-input')
+      await firstInput.setValue(99)
+      await wrapper.vm.$nextTick()
+
+      // Make PATCH fail
+      mockPatch.mockRejectedValueOnce(new Error('Server Error'))
+      const saveBtn = wrapper.findAll('button').find((b) => b.text().includes('Save'))
+      await saveBtn?.trigger('click')
+      await flushPromises()
+
+      expect(mockShowToast).toHaveBeenCalledWith('Server Error', 'error')
+      // editedConfig should still have 99 (preserved for retry)
+      const inputsAfter = wrapper.findAll('.obs-number-input')
+      expect((inputsAfter[0].element as HTMLInputElement).value).toBe('99')
+      wrapper.unmount()
+    })
+
+    it('Reset button reverts editedConfig to alertConfig and disables Save', async () => {
+      const wrapper = await mountWithThresholds()
+
+      // Dirty up the form
+      const firstInput = wrapper.find('.obs-number-input')
+      await firstInput.setValue(99)
+      await wrapper.vm.$nextTick()
+
+      const saveBtn = wrapper.findAll('button').find((b) => b.text().includes('Save'))
+      expect(saveBtn?.attributes('disabled')).toBeUndefined()
+
+      const resetBtn = wrapper.findAll('button').find((b) => b.text() === 'Reset')
+      await resetBtn?.trigger('click')
+      await wrapper.vm.$nextTick()
+
+      // After reset, threshold should be back to 80 (cpu_high original)
+      const inputsAfter = wrapper.findAll('.obs-number-input')
+      expect((inputsAfter[0].element as HTMLInputElement).value).toBe('80')
+      expect(saveBtn?.attributes('disabled')).toBeDefined()
+      wrapper.unmount()
+    })
+
+    it('buildPatchBody only includes changed rules', async () => {
+      const wrapper = await mountWithThresholds()
+
+      // Change only the first rule threshold (cpu_high: 80 → 85)
+      const firstInput = wrapper.find('.obs-number-input')
+      await firstInput.setValue(85)
+      await wrapper.vm.$nextTick()
+
+      mockPatch.mockResolvedValueOnce({ success: true })
+      const saveBtn = wrapper.findAll('button').find((b) => b.text().includes('Save'))
+      await saveBtn?.trigger('click')
+      await flushPromises()
+
+      expect(mockPatch).toHaveBeenCalledTimes(1)
+      const [, patchBody] = mockPatch.mock.calls[0] as [string, { rules: Record<string, unknown> }]
+      // Should contain only cpu_high (changed), not other keys
+      expect(Object.keys(patchBody.rules)).toEqual(['cpu_high'])
+      expect(patchBody.rules['cpu_high']).toMatchObject({ threshold: 85 })
+      wrapper.unmount()
+    })
+
+    it('shows "未儲存的變更" hint when there are dirty changes', async () => {
+      const wrapper = await mountWithThresholds()
+
+      expect(wrapper.text()).not.toContain('未儲存的變更')
+
+      const firstInput = wrapper.find('.obs-number-input')
+      await firstInput.setValue(99)
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.text()).toContain('未儲存的變更')
+      wrapper.unmount()
+    })
+
+    it('cost_today_high rule uses step=0.01', async () => {
+      const wrapper = await mountWithThresholds()
+
+      // cost_today_high is 5th rule in fixture (index 4)
+      const inputs = wrapper.findAll('.obs-number-input')
+      // Find the one for cost_today_high by aria-label
+      const costInput = inputs.find((i) => i.attributes('aria-label')?.includes('cost_today_high'))
+      expect(costInput?.attributes('step')).toBe('0.01')
       wrapper.unmount()
     })
   })
