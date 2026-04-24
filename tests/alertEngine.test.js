@@ -1,4 +1,6 @@
 const alertEngine = require('../src/backend/services/alertEngine');
+const apiMetrics = require('../src/backend/services/apiMetrics');
+const errorBuffer = require('../src/backend/services/errorBuffer');
 
 describe('AlertEngine', () => {
     beforeEach(() => alertEngine.resetForTesting());
@@ -166,6 +168,209 @@ describe('AlertEngine', () => {
             expect(below.some(a => a.rule === 'cost_today_high')).toBe(false);
             const above = alertEngine.evaluate({ sys, agents: [{ costs: { today: 25 } }] });
             expect(above.some(a => a.rule === 'cost_today_high')).toBe(true);
+        });
+    });
+
+    describe('observability alerts', () => {
+        const sys = { cpu: 20, memory: 50, disk: 40 };
+        const basePayload = { sys, agents: [] };
+
+        afterEach(() => {
+            jest.restoreAllMocks();
+        });
+
+        // Helper: create a mock error entry with timestamp
+        function makeError(tsMs) {
+            return {
+                timestamp: tsMs,
+                requestId: 'req-1',
+                method: 'GET',
+                path: '/api/test',
+                statusCode: 500,
+                error: 'Internal Server Error',
+                durationMs: 100,
+            };
+        }
+
+        describe('error_rate_high', () => {
+            it('fires when recent errors within 5 minutes exceed threshold', () => {
+                const now = Date.now();
+                // 6 errors within the last 5 minutes (default threshold: 5)
+                const recentErrors = Array.from({ length: 6 }, () => makeError(now - 60 * 1000));
+                jest.spyOn(errorBuffer, 'getRecent').mockReturnValue(recentErrors);
+
+                const alerts = alertEngine.evaluate(basePayload);
+                const alert = alerts.find(a => a.rule === 'error_rate_high');
+                expect(alert).toBeDefined();
+                expect(alert.severity).toBe('warning');
+                expect(alert.meta.count).toBe(6);
+                expect(alert.meta.threshold).toBe(5);
+            });
+
+            it('does NOT fire when all errors are older than 5 minutes', () => {
+                const now = Date.now();
+                // Errors from 6 minutes ago — outside the 5-min window
+                const oldErrors = Array.from({ length: 10 }, () => makeError(now - 6 * 60 * 1000));
+                jest.spyOn(errorBuffer, 'getRecent').mockReturnValue(oldErrors);
+
+                const alerts = alertEngine.evaluate(basePayload);
+                expect(alerts.some(a => a.rule === 'error_rate_high')).toBe(false);
+            });
+
+            it('does NOT fire when error count is exactly at threshold (> not >=)', () => {
+                const now = Date.now();
+                // Exactly 5 errors — not > threshold
+                const errors = Array.from({ length: 5 }, () => makeError(now - 60 * 1000));
+                jest.spyOn(errorBuffer, 'getRecent').mockReturnValue(errors);
+
+                const alerts = alertEngine.evaluate(basePayload);
+                expect(alerts.some(a => a.rule === 'error_rate_high')).toBe(false);
+            });
+
+            it('accepts ISO string timestamps', () => {
+                const now = Date.now();
+                const isoTs = new Date(now - 60 * 1000).toISOString();
+                const errors = Array.from({ length: 6 }, () => ({ ...makeError(0), timestamp: isoTs }));
+                jest.spyOn(errorBuffer, 'getRecent').mockReturnValue(errors);
+
+                const alerts = alertEngine.evaluate(basePayload);
+                expect(alerts.some(a => a.rule === 'error_rate_high')).toBe(true);
+            });
+
+            it('does NOT re-fire while still above threshold (hysteresis latch)', () => {
+                const now = Date.now();
+                const recentErrors = Array.from({ length: 6 }, () => makeError(now - 60 * 1000));
+                jest.spyOn(errorBuffer, 'getRecent').mockReturnValue(recentErrors);
+
+                alertEngine.evaluate(basePayload); // first fire + latch=true
+                const second = alertEngine.evaluate(basePayload); // still above — latch blocks
+                expect(second.some(a => a.rule === 'error_rate_high')).toBe(false);
+            });
+
+            it('fires again after latch reset + cooldown expired (re-crossing)', () => {
+                jest.useFakeTimers();
+                jest.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+                try {
+                    // Use a dynamic mock that always returns errors within the current 5-min window
+                    jest.spyOn(errorBuffer, 'getRecent').mockImplementation(() => {
+                        const ts = Date.now() - 60 * 1000; // always 1 minute ago relative to current fake time
+                        return Array.from({ length: 6 }, () => makeError(ts));
+                    });
+                    const noErrors = jest.spyOn(errorBuffer, 'getRecent')
+                        .mockReturnValueOnce(Array.from({ length: 6 }, () => makeError(Date.now() - 60 * 1000))) // first: fire + latch
+                        .mockReturnValueOnce([])           // second: below threshold → reset latch
+                        .mockImplementation(() => {
+                            const ts = Date.now() - 60 * 1000;
+                            return Array.from({ length: 6 }, () => makeError(ts));
+                        });
+
+                    alertEngine.evaluate(basePayload); // fire #1 + latch=true
+                    alertEngine.evaluate(basePayload); // drop → latch=false
+                    jest.advanceTimersByTime(6 * 60 * 1000); // past 5min cooldown
+                    const third = alertEngine.evaluate(basePayload);
+                    expect(third.some(a => a.rule === 'error_rate_high')).toBe(true);
+                } finally {
+                    jest.useRealTimers();
+                }
+            });
+
+            it('does not fire when disabled', () => {
+                alertEngine.updateConfig({ rules: { error_rate_high: { enabled: false } } });
+                const now = Date.now();
+                const recentErrors = Array.from({ length: 20 }, () => makeError(now - 60 * 1000));
+                jest.spyOn(errorBuffer, 'getRecent').mockReturnValue(recentErrors);
+
+                const alerts = alertEngine.evaluate(basePayload);
+                expect(alerts.some(a => a.rule === 'error_rate_high')).toBe(false);
+            });
+        });
+
+        describe('latency_p99_high', () => {
+            // Helper: build a stats object with one high-latency endpoint
+            function makeStats(p99, count = 20) {
+                return { 'GET /api/slow': { count, p50: 100, p95: 1800, p99, min: 50, max: p99, mean: 300, errorCount: { '4xx': 0, '5xx': 0 } } };
+            }
+
+            it('fires when an endpoint p99 exceeds threshold and count >= 10', () => {
+                jest.spyOn(apiMetrics, 'getStats').mockReturnValue(makeStats(3000));
+
+                const alerts = alertEngine.evaluate(basePayload);
+                const alert = alerts.find(a => a.rule === 'latency_p99_high');
+                expect(alert).toBeDefined();
+                expect(alert.severity).toBe('warning');
+                expect(alert.meta.endpoint).toBe('GET /api/slow');
+                expect(alert.meta.p99).toBe(3000);
+                expect(alert.meta.threshold).toBe(2000);
+            });
+
+            it('does NOT fire when count < 10 (low sample filter)', () => {
+                jest.spyOn(apiMetrics, 'getStats').mockReturnValue(makeStats(5000, 9));
+
+                const alerts = alertEngine.evaluate(basePayload);
+                expect(alerts.some(a => a.rule === 'latency_p99_high')).toBe(false);
+            });
+
+            it('does NOT fire when p99 is exactly at threshold (> not >=)', () => {
+                jest.spyOn(apiMetrics, 'getStats').mockReturnValue(makeStats(2000));
+
+                const alerts = alertEngine.evaluate(basePayload);
+                expect(alerts.some(a => a.rule === 'latency_p99_high')).toBe(false);
+            });
+
+            it('does NOT fire when stats is empty', () => {
+                jest.spyOn(apiMetrics, 'getStats').mockReturnValue({});
+
+                const alerts = alertEngine.evaluate(basePayload);
+                expect(alerts.some(a => a.rule === 'latency_p99_high')).toBe(false);
+            });
+
+            it('picks the worst (highest p99) endpoint when multiple exceed threshold', () => {
+                jest.spyOn(apiMetrics, 'getStats').mockReturnValue({
+                    'GET /api/slow': { count: 20, p50: 100, p95: 2100, p99: 2500, min: 50, max: 2500, mean: 300, errorCount: { '4xx': 0, '5xx': 0 } },
+                    'POST /api/worst': { count: 15, p50: 200, p95: 3500, p99: 4200, min: 80, max: 4200, mean: 500, errorCount: { '4xx': 0, '5xx': 0 } },
+                });
+
+                const alerts = alertEngine.evaluate(basePayload);
+                const alert = alerts.find(a => a.rule === 'latency_p99_high');
+                expect(alert).toBeDefined();
+                expect(alert.meta.endpoint).toBe('POST /api/worst');
+                expect(alert.meta.p99).toBe(4200);
+            });
+
+            it('does NOT re-fire while still above threshold (hysteresis latch)', () => {
+                jest.spyOn(apiMetrics, 'getStats').mockReturnValue(makeStats(3000));
+
+                alertEngine.evaluate(basePayload); // first fire + latch=true
+                const second = alertEngine.evaluate(basePayload); // still above — latch blocks
+                expect(second.some(a => a.rule === 'latency_p99_high')).toBe(false);
+            });
+
+            it('fires again after latch reset + cooldown expired (re-crossing)', () => {
+                jest.useFakeTimers();
+                jest.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+                try {
+                    const getStatsSpy = jest.spyOn(apiMetrics, 'getStats')
+                        .mockReturnValueOnce(makeStats(3000))  // first: above threshold → fire + latch
+                        .mockReturnValueOnce({})               // second: below threshold → reset latch
+                        .mockReturnValue(makeStats(3000));     // subsequent: above threshold again
+
+                    alertEngine.evaluate(basePayload); // fire #1 + latch=true
+                    alertEngine.evaluate(basePayload); // drop → latch=false
+                    jest.advanceTimersByTime(6 * 60 * 1000); // past 5min cooldown
+                    const third = alertEngine.evaluate(basePayload);
+                    expect(third.some(a => a.rule === 'latency_p99_high')).toBe(true);
+                } finally {
+                    jest.useRealTimers();
+                }
+            });
+
+            it('does not fire when disabled', () => {
+                alertEngine.updateConfig({ rules: { latency_p99_high: { enabled: false } } });
+                jest.spyOn(apiMetrics, 'getStats').mockReturnValue(makeStats(9999));
+
+                const alerts = alertEngine.evaluate(basePayload);
+                expect(alerts.some(a => a.rule === 'latency_p99_high')).toBe(false);
+            });
         });
     });
 });

@@ -1,15 +1,19 @@
 const fs = require('fs');
 const path = require('path');
+const apiMetrics = require('./apiMetrics');
+const errorBuffer = require('./errorBuffer');
 
 const CONFIG_PATH = path.join(__dirname, '../../../data/alert-config.json');
 
 const DEFAULT_CONFIG = {
     rules: {
-        cpu_high:          { enabled: true, threshold: 80,  severity: 'warning',  label: 'CPU 偏高' },
-        cpu_critical:      { enabled: true, threshold: 95,  severity: 'critical', label: 'CPU 危急' },
-        memory_high:       { enabled: true, threshold: 85,  severity: 'warning',  label: '記憶體偏高' },
-        no_active_agents:  { enabled: true, threshold: 0,   severity: 'critical', label: 'Agent 全部離線' },
-        cost_today_high:   { enabled: true, threshold: 5,   severity: 'warning',  label: '今日成本偏高 (USD)' },
+        cpu_high:          { enabled: true, threshold: 80,   severity: 'warning',  label: 'CPU 偏高' },
+        cpu_critical:      { enabled: true, threshold: 95,   severity: 'critical', label: 'CPU 危急' },
+        memory_high:       { enabled: true, threshold: 85,   severity: 'warning',  label: '記憶體偏高' },
+        no_active_agents:  { enabled: true, threshold: 0,    severity: 'critical', label: 'Agent 全部離線' },
+        cost_today_high:   { enabled: true, threshold: 5,    severity: 'warning',  label: '今日成本偏高 (USD)' },
+        error_rate_high:   { enabled: true, threshold: 5,    severity: 'warning',  label: '5xx Error 激增（5 分鐘內）' },
+        latency_p99_high:  { enabled: true, threshold: 2000, severity: 'warning',  label: 'API p99 latency 過高' },
     }
 };
 
@@ -23,6 +27,9 @@ let prevActiveCount = -1;
 // Hysteresis latch for monotonically-increasing rules (cost_today_high).
 // Avoids re-firing every cooldown window while still above threshold.
 let costRuleState = {};
+// Hysteresis state for observability-based rules.
+let errorRateState = false;
+let latencyP99State = false;
 
 function loadConfig() {
     try {
@@ -111,6 +118,53 @@ function evaluate(payload) {
     }
     prevActiveCount = activeNow;
 
+    // Error rate alert — hysteresis: fire once per crossing, reset when below threshold
+    if (rules.error_rate_high?.enabled) {
+        const windowMs = 5 * 60 * 1000;
+        const cutoff = Date.now() - windowMs;
+        const recentErrors = errorBuffer.getRecent(50).filter(e => {
+            const ts = typeof e.timestamp === 'string' ? Date.parse(e.timestamp) : e.timestamp;
+            return ts >= cutoff;
+        });
+        const errorThreshold = rules.error_rate_high.threshold;
+        if (recentErrors.length > errorThreshold && !errorRateState) {
+            if (canFire('error_rate_high')) {
+                fired.push(fire('error_rate_high',
+                    `5 分鐘內發生 ${recentErrors.length} 筆 5xx errors — 超過閾值 ${errorThreshold}`,
+                    'warning',
+                    { count: recentErrors.length, threshold: errorThreshold }));
+                errorRateState = true;
+            }
+        } else if (recentErrors.length <= errorThreshold && errorRateState) {
+            errorRateState = false;
+        }
+    }
+
+    // p99 latency alert — hysteresis: rising edge only, reset when no endpoint exceeds threshold
+    if (rules.latency_p99_high?.enabled) {
+        const stats = apiMetrics.getStats();
+        const latencyThreshold = rules.latency_p99_high.threshold;
+        let worstEndpoint = null;
+        let worstP99 = 0;
+        for (const [endpoint, s] of Object.entries(stats)) {
+            if (s.count >= 10 && s.p99 > latencyThreshold && s.p99 > worstP99) {
+                worstEndpoint = endpoint;
+                worstP99 = s.p99;
+            }
+        }
+        if (worstEndpoint !== null && !latencyP99State) {
+            if (canFire('latency_p99_high')) {
+                fired.push(fire('latency_p99_high',
+                    `${worstEndpoint} p99 latency ${worstP99}ms — 超過閾值 ${latencyThreshold}ms`,
+                    'warning',
+                    { endpoint: worstEndpoint, p99: worstP99, threshold: latencyThreshold }));
+                latencyP99State = true;
+            }
+        } else if (worstEndpoint === null && latencyP99State) {
+            latencyP99State = false;
+        }
+    }
+
     return fired;
 }
 
@@ -121,6 +175,8 @@ function resetForTesting() {
     alertsBuffer = [];
     prevActiveCount = -1;
     costRuleState = {};
+    errorRateState = false;
+    latencyP99State = false;
     config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
     try { if (fs.existsSync(CONFIG_PATH)) fs.unlinkSync(CONFIG_PATH); } catch (e) { /* ignore */ }
 }
