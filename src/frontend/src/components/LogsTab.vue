@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onUnmounted, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useSSE } from '@/composables/useSSE'
 import { showToast } from '@/composables/useToast'
 import { useDebouncedRef } from '@/composables/useDebouncedRef'
@@ -12,12 +12,22 @@ import { formatTs } from '@/lib/time'
 
 const LOG_BUFFER_MAX = 500
 const SCROLL_THRESHOLD = 50
+const STORAGE_KEY = 'oc_log_filter_presets'
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 type LogLevel = 'error' | 'warn' | 'info'
+
+interface FilterPreset {
+  id: string
+  name: string
+  filterText: string
+  regexMode: boolean
+  errorOnly: boolean
+  warnOnly: boolean
+}
 
 interface LogEntry {
   /** M3: stable monotonic id so Vue's :key is stable across buffer shifts */
@@ -421,6 +431,97 @@ function clearLog(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Filter presets
+// ---------------------------------------------------------------------------
+
+const presets = ref<FilterPreset[]>([])
+const selectedPresetId = ref<string>('')
+
+function persistPresets(): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(presets.value))
+  } catch {
+    // localStorage write failure — silent
+  }
+}
+
+function loadPresets(): void {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return
+    const parsed = JSON.parse(raw) as unknown
+    if (Array.isArray(parsed)) {
+      presets.value = parsed as FilterPreset[]
+    }
+  } catch {
+    // Corrupt localStorage — silent fallback to empty
+    presets.value = []
+  }
+}
+
+function saveCurrentAsPreset(name: string): void {
+  const trimmed = name.trim()
+  if (!trimmed) return
+  const newPreset: FilterPreset = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name: trimmed,
+    filterText: filterText.value,
+    regexMode: regexMode.value,
+    errorOnly: errorOnly.value,
+    warnOnly: warnOnly.value,
+  }
+  presets.value = [...presets.value, newPreset]
+  selectedPresetId.value = newPreset.id
+  persistPresets()
+  showToast(`已儲存 preset「${trimmed}」`, 'success')
+}
+
+function applyPreset(preset: FilterPreset): void {
+  filterText.value = preset.filterText
+  debouncedFilter.value = preset.filterText
+  regexMode.value = preset.regexMode
+  errorOnly.value = preset.errorOnly
+  warnOnly.value = preset.warnOnly
+  hasNewMessages.value = false
+}
+
+function deletePreset(id: string): void {
+  presets.value = presets.value.filter((p) => p.id !== id)
+  if (selectedPresetId.value === id) {
+    selectedPresetId.value = ''
+  }
+  persistPresets()
+}
+
+function onPresetSelectChange(event: Event): void {
+  const selectEl = event.target as HTMLSelectElement
+  const id = selectEl.value
+  if (!id) return
+  selectedPresetId.value = id
+  const preset = presets.value.find((p) => p.id === id)
+  if (preset) applyPreset(preset)
+}
+
+function promptSavePreset(): void {
+  const name = window.prompt('請輸入 preset 名稱：')
+  if (name === null) return // cancelled
+  if (!name.trim()) {
+    showToast('Preset 名稱不得為空', 'error')
+    return
+  }
+  saveCurrentAsPreset(name)
+}
+
+function deleteSelectedPreset(): void {
+  if (!selectedPresetId.value) {
+    showToast('請先選擇一個 preset', 'info')
+    return
+  }
+  deletePreset(selectedPresetId.value)
+  showToast('已刪除 preset', 'info')
+}
+
+// ---------------------------------------------------------------------------
 // Filter actions
 // ---------------------------------------------------------------------------
 
@@ -447,6 +548,14 @@ function toggleRegexMode(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Lifecycle
+// ---------------------------------------------------------------------------
+
+onMounted(() => {
+  loadPresets()
+})
+
+// ---------------------------------------------------------------------------
 // Cleanup on unmount
 // ---------------------------------------------------------------------------
 
@@ -466,6 +575,13 @@ defineExpose({
   regexError,
   compiledRegex,
   visibleLines,
+  // preset seam
+  presets,
+  selectedPresetId,
+  saveCurrentAsPreset,
+  applyPreset,
+  deletePreset,
+  loadPresets,
 })
 </script>
 
@@ -522,6 +638,38 @@ defineExpose({
         >
           ⚠️ Warn
         </button>
+
+        <!-- Filter Presets -->
+        <div class="log-preset-wrap">
+          <select
+            class="log-preset-select"
+            :value="selectedPresetId"
+            @change="onPresetSelectChange"
+            title="載入 preset"
+          >
+            <option value="" disabled>載入 preset...</option>
+            <option
+              v-for="preset in presets"
+              :key="preset.id"
+              :value="preset.id"
+            >{{ preset.name }}</option>
+          </select>
+          <button
+            class="ctrl-btn log-preset-btn"
+            title="儲存目前篩選條件為 preset"
+            @click="promptSavePreset"
+          >
+            💾 儲存
+          </button>
+          <button
+            class="ctrl-btn log-preset-btn"
+            :disabled="!selectedPresetId"
+            title="刪除選取的 preset"
+            @click="deleteSelectedPreset"
+          >
+            🗑️ 刪除
+          </button>
+        </div>
       </div>
     </div>
 
@@ -636,5 +784,33 @@ defineExpose({
   white-space: nowrap;
   pointer-events: none;
   z-index: 10;
+}
+
+/* Preset controls */
+.log-preset-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.log-preset-select {
+  font-size: 12px;
+  padding: 2px 6px;
+  border: 1px solid var(--color-border, #3f3f46);
+  border-radius: 4px;
+  background: var(--color-surface, #18181b);
+  color: var(--color-text, #e4e4e7);
+  cursor: pointer;
+  max-width: 140px;
+}
+
+.log-preset-btn {
+  font-size: 11px;
+  padding: 2px 7px;
+}
+
+.log-preset-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 </style>
