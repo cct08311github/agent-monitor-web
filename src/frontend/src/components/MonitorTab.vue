@@ -10,6 +10,7 @@ import SubAgentGrid from '@/components/SubAgentGrid.vue'
 import SummaryCards from '@/components/SummaryCards.vue'
 import CronTab from '@/components/CronTab.vue'
 import TaskHubTab from '@/components/TaskHubTab.vue'
+import ObservabilityTab from '@/components/ObservabilityTab.vue'
 
 const emit = defineEmits<{
   (e: 'agent-click', agentId: string): void
@@ -19,7 +20,7 @@ const emit = defineEmits<{
 
 // ── Sub-tab state ────────────────────────────────────────────────────────────
 
-type SubTab = 'agents' | 'subagents' | 'cron' | 'taskhub'
+type SubTab = 'agents' | 'subagents' | 'cron' | 'taskhub' | 'observability'
 
 const activeSubTab = ref<SubTab>('agents')
 
@@ -124,6 +125,12 @@ const freshnessLabel = computed(() => formatFreshnessLabel(freshness.value, data
       >
         TaskHub
       </button>
+      <button
+        :class="['sub-tab', { active: activeSubTab === 'observability' }]"
+        @click="activeSubTab = 'observability'"
+      >
+        Observability
+      </button>
 
       <!-- Connection status indicator -->
       <span :class="['connection-status', connectionClass]" style="margin-left: auto">
@@ -194,6 +201,11 @@ const freshnessLabel = computed(() => formatFreshnessLabel(freshness.value, data
     <!-- TaskHub tab -->
     <template v-else-if="activeSubTab === 'taskhub'">
       <TaskHubTab />
+    </template>
+
+    <!-- Observability tab -->
+    <template v-else-if="activeSubTab === 'observability'">
+      <ObservabilityTab />
     </template>
   </div>
 </template>
