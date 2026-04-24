@@ -6,6 +6,7 @@ import { useAuth } from '@/composables/useAuth'
 import { appState } from '@/stores/appState'
 import ToastContainer from '@/components/ToastContainer.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import AlertBadge from '@/components/AlertBadge.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -89,6 +90,7 @@ const activeDesktopTab = computed<DesktopTab>(() => {
         </div>
       </div>
       <div class="header-right">
+        <AlertBadge v-if="!isLoginPage" />
         <button class="header-btn icon-only" :title="themeIcon" @click="cycleTheme">{{ themeIcon }}</button>
         <span style="font-size:12px;color:var(--text-muted);margin:0 4px">{{ username }}</span>
         <button
