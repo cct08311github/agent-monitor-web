@@ -41,6 +41,20 @@ let interval: ReturnType<typeof setInterval> | null = null
 let flashTimeout: ReturnType<typeof setTimeout> | null = null
 
 // ---------------------------------------------------------------------------
+// Desktop Notification state
+// ---------------------------------------------------------------------------
+
+const NOTIF_STORAGE_KEY = 'oc_desktop_notif_enabled'
+
+// SSR-safe Notification availability
+const notifSupported = typeof Notification !== 'undefined'
+
+const notificationsEnabled = ref<boolean>(false)
+const notificationPermission = ref<NotificationPermission>('default')
+/** IDs of critical alerts that have already triggered a desktop notification */
+const lastCriticalIds = ref<Set<string>>(new Set())
+
+// ---------------------------------------------------------------------------
 // Computed
 // ---------------------------------------------------------------------------
 
@@ -88,6 +102,75 @@ function truncate(s: string, n = 80): string {
   if (s.length <= n) return s
   return s.slice(0, n) + '…'
 }
+
+/** Build a stable dedup id for a critical alert */
+function criticalAlertId(a: AlertRecord): string {
+  return `${a.rule}:${a.ts}`
+}
+
+// ---------------------------------------------------------------------------
+// Desktop Notification methods
+// ---------------------------------------------------------------------------
+
+async function requestNotificationPermission(): Promise<void> {
+  if (!notifSupported) return
+  const result = await Notification.requestPermission()
+  notificationPermission.value = result
+}
+
+async function toggleNotifications(): Promise<void> {
+  const nextEnabled = !notificationsEnabled.value
+  if (nextEnabled && notificationPermission.value !== 'granted') {
+    await requestNotificationPermission()
+  }
+  notificationsEnabled.value = nextEnabled
+  try {
+    localStorage.setItem(NOTIF_STORAGE_KEY, nextEnabled ? '1' : '0')
+  } catch {
+    // localStorage may be unavailable in some contexts; ignore silently
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Watch recentAlerts → fire desktop notifications for new criticals
+// ---------------------------------------------------------------------------
+
+watch(recentAlerts, (current) => {
+  const currentCriticals = current.filter((a) => a.severity === 'critical')
+
+  const newCriticals = currentCriticals.filter(
+    (a) => !lastCriticalIds.value.has(criticalAlertId(a)),
+  )
+
+  // Always track newly seen critical ids (even when notifications are off)
+  // so we don't fire for stale alerts if the user later enables notifications.
+  for (const a of currentCriticals) {
+    lastCriticalIds.value.add(criticalAlertId(a))
+  }
+
+  if (
+    notificationsEnabled.value &&
+    notificationPermission.value === 'granted' &&
+    notifSupported &&
+    newCriticals.length > 0
+  ) {
+    // Batch: fire a single notification for the entire set of new criticals
+    const body =
+      newCriticals.length === 1
+        ? truncate(newCriticals[0].message)
+        : `${newCriticals.length} 個 critical alerts`
+
+    // Use the first new critical's rule as the notification tag so rapid-fire
+    // updates replace (rather than stack) the same logical alert
+    const tag = newCriticals.length === 1 ? newCriticals[0].rule : 'agent-monitor-critical'
+
+    new Notification('Agent Monitor — Critical Alert', {
+      body,
+      tag,
+      requireInteraction: false,
+    })
+  }
+})
 
 // ---------------------------------------------------------------------------
 // Popover interaction
@@ -160,6 +243,19 @@ async function fetchAlerts(): Promise<void> {
 }
 
 onMounted(() => {
+  // Load persisted notification preference
+  if (notifSupported) {
+    notificationPermission.value = Notification.permission
+    try {
+      const stored = localStorage.getItem(NOTIF_STORAGE_KEY)
+      if (stored !== null) {
+        notificationsEnabled.value = stored === '1'
+      }
+    } catch {
+      // localStorage may be unavailable; default to false
+    }
+  }
+
   void fetchAlerts()
   interval = setInterval(() => {
     void fetchAlerts()
@@ -268,6 +364,41 @@ function handleClick(): void {
 
         <div class="popover-footer">
           <button class="popover-more" @click="handleClick">顯示更多 →</button>
+        </div>
+
+        <!-- Desktop notification settings row -->
+        <div class="popover-notif-settings">
+          <label
+            class="notif-toggle-label"
+            :class="{ 'notif-toggle-disabled': !notifSupported }"
+          >
+            <input
+              type="checkbox"
+              class="notif-toggle-checkbox"
+              :checked="notificationsEnabled"
+              :disabled="!notifSupported || notificationPermission === 'denied'"
+              @change="toggleNotifications"
+            />
+            <span class="notif-toggle-text">啟用桌面通知</span>
+          </label>
+
+          <!-- Browser not supported -->
+          <p
+            v-if="!notifSupported"
+            class="notif-warning"
+            role="alert"
+          >
+            瀏覽器不支援通知
+          </p>
+
+          <!-- Permission denied -->
+          <p
+            v-else-if="notificationPermission === 'denied'"
+            class="notif-warning notif-warning--blocked"
+            role="alert"
+          >
+            已封鎖通知，請到瀏覽器設定允許
+          </p>
         </div>
       </div>
     </Transition>
@@ -441,6 +572,49 @@ function handleClick(): void {
 
 .popover-more:hover {
   opacity: 0.75;
+}
+
+/* ── Desktop Notification settings row ─────────────────────────────────── */
+
+.popover-notif-settings {
+  padding: 8px 14px 10px;
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.notif-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.notif-toggle-label.notif-toggle-disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.notif-toggle-checkbox {
+  width: 13px;
+  height: 13px;
+  cursor: inherit;
+  accent-color: var(--color-accent, #60a5fa);
+}
+
+.notif-toggle-text {
+  font-size: 11px;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.65));
+}
+
+.notif-warning {
+  margin: 5px 0 0;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--text-muted, rgba(255, 255, 255, 0.4));
+}
+
+.notif-warning--blocked {
+  color: #f87171;
 }
 
 /* ── Fade transition ────────────────────────────────────────────────────── */
