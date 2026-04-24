@@ -8,7 +8,9 @@ import ChatTab from '@/components/ChatTab.vue'
 import OptimizeTab from '@/components/OptimizeTab.vue'
 import ChatModal from '@/components/ChatModal.vue'
 import ModelSwitchModal from '@/components/ModelSwitchModal.vue'
+import HelpModal from '@/components/HelpModal.vue'
 import { appState } from '@/stores/appState'
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 
 const detailAgentId = ref('')
 
@@ -20,6 +22,46 @@ const showChatModal = ref(false)
 const modelSwitchAgentId = ref('')
 const modelSwitchCurrentModel = ref('')
 const showModelModal = ref(false)
+
+// Help modal state
+const showHelpModal = ref(false)
+
+// ---------------------------------------------------------------------------
+// Keyboard shortcuts
+// ---------------------------------------------------------------------------
+
+const { registerShortcut } = useKeyboardShortcuts()
+
+const TAB_SHORTCUTS: Array<[string, string, string]> = [
+  ['1', 'monitor', '切到 Monitor'],
+  ['2', 'system', '切到 System'],
+  ['3', 'logs', '切到 Logs'],
+  ['4', 'chat', '切到 Chat'],
+  ['5', 'optimize', '切到 Optimize'],
+]
+
+for (const [key, tab, description] of TAB_SHORTCUTS) {
+  registerShortcut({
+    key,
+    handler: () => {
+      appState.currentDesktopTab = tab
+    },
+    description,
+    category: 'Navigation',
+  })
+}
+
+// '?' on a US keyboard is Shift+/, event.key === '?' and event.shiftKey === true
+// useKeyboardShortcuts matches !!shortcut.shift === event.shiftKey, so shift: true is required
+registerShortcut({
+  key: '?',
+  shift: true,
+  handler: () => {
+    showHelpModal.value = true
+  },
+  description: '顯示快捷鍵清單',
+  category: 'Actions',
+})
 
 function showAgentDetail(agentId: string) {
   detailAgentId.value = agentId
@@ -45,6 +87,16 @@ function openModelSwitch(agentId: string, model: string) {
 
 <template>
   <div>
+    <!-- Help button (floating top-right) -->
+    <button
+      class="help-trigger-btn"
+      title="快捷鍵清單 (?)"
+      aria-label="顯示快捷鍵清單"
+      @click="showHelpModal = true"
+    >
+      ❓
+    </button>
+
     <!-- Main Content -->
     <main class="main-content">
       <!-- Monitor Tab (manages its own SSE + data) -->
@@ -93,5 +145,30 @@ function openModelSwitch(agentId: string, model: string) {
       @close="showModelModal = false"
       @switched="showModelModal = false"
     />
+
+    <!-- Help Modal -->
+    <HelpModal :open="showHelpModal" @close="showHelpModal = false" />
   </div>
 </template>
+
+<style scoped>
+.help-trigger-btn {
+  position: fixed;
+  top: 0.75rem;
+  right: 1rem;
+  z-index: 900;
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.3rem 0.4rem;
+  border-radius: 0.375rem;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.help-trigger-btn:hover {
+  opacity: 1;
+}
+</style>
