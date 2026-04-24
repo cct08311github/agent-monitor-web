@@ -287,6 +287,212 @@ describe('AlertBadge', () => {
     })
   })
 
+  // ── Popover — hover timing ─────────────────────────────────────────────────
+
+  describe('popover hover behavior', () => {
+    it('shows popover after 200ms mouseenter', async () => {
+      mockGet.mockResolvedValue(alertsResponse([makeAlert('critical')]))
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      await wrapper.find('.alert-badge-wrapper').trigger('mouseenter')
+      expect(wrapper.find('.popover').exists()).toBe(false)
+
+      vi.advanceTimersByTime(200)
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.popover').exists()).toBe(true)
+      wrapper.unmount()
+    })
+
+    it('does not show popover if mouseleave fires before 200ms', async () => {
+      mockGet.mockResolvedValue(alertsResponse([makeAlert('critical')]))
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      await wrapper.find('.alert-badge-wrapper').trigger('mouseenter')
+      vi.advanceTimersByTime(100)
+      await wrapper.find('.alert-badge-wrapper').trigger('mouseleave')
+      vi.advanceTimersByTime(200)
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.popover').exists()).toBe(false)
+      wrapper.unmount()
+    })
+
+    it('hides popover after 300ms mouseleave', async () => {
+      mockGet.mockResolvedValue(alertsResponse([makeAlert('warning')]))
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      // Show popover first
+      await wrapper.find('.alert-badge-wrapper').trigger('mouseenter')
+      vi.advanceTimersByTime(200)
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('.popover').exists()).toBe(true)
+
+      // Mouse leave — popover should remain briefly
+      await wrapper.find('.alert-badge-wrapper').trigger('mouseleave')
+      vi.advanceTimersByTime(100)
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('.popover').exists()).toBe(true)
+
+      // After 300ms it should hide
+      vi.advanceTimersByTime(200)
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('.popover').exists()).toBe(false)
+      wrapper.unmount()
+    })
+
+    it('keeps popover open if mouse re-enters during hide delay', async () => {
+      mockGet.mockResolvedValue(alertsResponse([makeAlert('warning')]))
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      // Open popover
+      await wrapper.find('.alert-badge-wrapper').trigger('mouseenter')
+      vi.advanceTimersByTime(200)
+      await wrapper.vm.$nextTick()
+
+      // Leave then quickly re-enter before 300ms
+      await wrapper.find('.alert-badge-wrapper').trigger('mouseleave')
+      vi.advanceTimersByTime(100)
+      await wrapper.find('.alert-badge-wrapper').trigger('mouseenter')
+      vi.advanceTimersByTime(300)
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.popover').exists()).toBe(true)
+      wrapper.unmount()
+    })
+  })
+
+  // ── Popover — keyboard / focus ─────────────────────────────────────────────
+
+  describe('popover focus behavior', () => {
+    it('shows popover immediately on focusin', async () => {
+      mockGet.mockResolvedValue(alertsResponse([makeAlert('critical')]))
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      await wrapper.find('.alert-badge-wrapper').trigger('focusin')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.popover').exists()).toBe(true)
+      wrapper.unmount()
+    })
+
+    it('hides popover immediately on focusout', async () => {
+      mockGet.mockResolvedValue(alertsResponse([makeAlert('critical')]))
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      await wrapper.find('.alert-badge-wrapper').trigger('focusin')
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('.popover').exists()).toBe(true)
+
+      await wrapper.find('.alert-badge-wrapper').trigger('focusout')
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('.popover').exists()).toBe(false)
+      wrapper.unmount()
+    })
+  })
+
+  // ── Popover — content ─────────────────────────────────────────────────────
+
+  describe('popover content', () => {
+    it('shows at most 3 alerts in popover', async () => {
+      const manyAlerts = [
+        makeAlert('critical', -1000),
+        makeAlert('warning', -2000),
+        makeAlert('warning', -3000),
+        makeAlert('critical', -4000),
+        makeAlert('warning', -5000),
+      ]
+      mockGet.mockResolvedValue(alertsResponse(manyAlerts))
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      await wrapper.find('.alert-badge-wrapper').trigger('focusin')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.findAll('.popover-item')).toHaveLength(3)
+      wrapper.unmount()
+    })
+
+    it('truncates long message to 80 characters + ellipsis', async () => {
+      const longMsg = 'A'.repeat(100)
+      const alert = { rule: 'long_rule', severity: 'warning' as const, message: longMsg, meta: {}, ts: NOW }
+      mockGet.mockResolvedValue(alertsResponse([alert]))
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      await wrapper.find('.alert-badge-wrapper').trigger('focusin')
+      await wrapper.vm.$nextTick()
+
+      const msgEl = wrapper.find('.popover-msg')
+      expect(msgEl.text()).toHaveLength(81) // 80 chars + '…'
+      expect(msgEl.text()).toMatch(/…$/)
+      wrapper.unmount()
+    })
+
+    it('shows friendly empty state when no recent alerts', async () => {
+      mockGet.mockResolvedValue(emptyResponse())
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      await wrapper.find('.alert-badge-wrapper').trigger('focusin')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.popover-header').text()).toContain('目前無 alert')
+      expect(wrapper.findAll('.popover-item')).toHaveLength(0)
+      wrapper.unmount()
+    })
+
+    it('"顯示更多" button triggers same navigation as badge click', async () => {
+      mockGet.mockResolvedValue(alertsResponse([makeAlert('critical')]))
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      await wrapper.find('.alert-badge-wrapper').trigger('focusin')
+      await wrapper.vm.$nextTick()
+
+      mockAppState.currentDesktopTab = 'logs'
+      mockAppState.preferredMonitorSubTab = null
+
+      await wrapper.find('.popover-more').trigger('click')
+
+      expect(mockAppState.currentDesktopTab).toBe('monitor')
+      expect(mockAppState.preferredMonitorSubTab).toBe('observability')
+      wrapper.unmount()
+    })
+
+    it('popover has role="tooltip"', async () => {
+      mockGet.mockResolvedValue(alertsResponse([makeAlert('warning')]))
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      await wrapper.find('.alert-badge-wrapper').trigger('focusin')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.popover').attributes('role')).toBe('tooltip')
+      wrapper.unmount()
+    })
+
+    it('displays relative time for each alert', async () => {
+      // Alert from 3 minutes ago
+      const threeMinAgo = makeAlert('warning', -(3 * 60_000))
+      mockGet.mockResolvedValue(alertsResponse([threeMinAgo]))
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      await wrapper.find('.alert-badge-wrapper').trigger('focusin')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.popover-time').text()).toBe('3m ago')
+      wrapper.unmount()
+    })
+  })
+
   // ── Accessibility ──────────────────────────────────────────────────────────
 
   describe('accessibility', () => {
