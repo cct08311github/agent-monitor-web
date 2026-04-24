@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { api } from '@/composables/useApi'
 import { showToast } from '@/composables/useToast'
 import { confirm } from '@/composables/useConfirm'
@@ -13,6 +13,64 @@ import { formatCronError } from '@/lib/cronError'
 
 const jobs = ref<CronJob[]>([])
 const loading = ref(false)
+
+const searchQuery = ref('')
+const filterMode = ref<'all' | 'enabled' | 'disabled'>('all')
+const sortBy = ref<'name' | 'nextRun' | 'lastRun'>('name')
+
+// ---------------------------------------------------------------------------
+// Computed
+// ---------------------------------------------------------------------------
+
+const filteredJobs = computed<CronJob[]>(() => {
+  const query = searchQuery.value.trim().toLowerCase()
+
+  // 1. Search by name OR schedule.expr (case-insensitive substring)
+  let result = query
+    ? jobs.value.filter((j) => {
+        const nameMatch = j.name.toLowerCase().includes(query)
+        const exprMatch = (j.schedule?.expr ?? '').toLowerCase().includes(query)
+        return nameMatch || exprMatch
+      })
+    : [...jobs.value]
+
+  // 2. Filter by enabled/disabled
+  if (filterMode.value === 'enabled') {
+    result = result.filter((j) => j.enabled)
+  } else if (filterMode.value === 'disabled') {
+    result = result.filter((j) => !j.enabled)
+  }
+
+  // 3. Sort
+  result = [...result].sort((a, b) => {
+    if (sortBy.value === 'name') {
+      return a.name.localeCompare(b.name)
+    }
+    if (sortBy.value === 'nextRun') {
+      const aMs = a.state?.nextRunAtMs ?? Infinity
+      const bMs = b.state?.nextRunAtMs ?? Infinity
+      return aMs - bMs
+    }
+    if (sortBy.value === 'lastRun') {
+      const aMs = a.state?.lastRunAtMs ?? -1
+      const bMs = b.state?.lastRunAtMs ?? -1
+      // desc: most recent first; unexecuted (-1) placed last
+      if (aMs === -1 && bMs === -1) return 0
+      if (aMs === -1) return 1
+      if (bMs === -1) return -1
+      return bMs - aMs
+    }
+    return 0
+  })
+
+  return result
+})
+
+const hasJobs = computed(() => jobs.value.length > 0)
+const hasResults = computed(() => filteredJobs.value.length > 0)
+const isFiltered = computed(
+  () => searchQuery.value.trim() !== '' || filterMode.value !== 'all',
+)
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -134,8 +192,8 @@ function formatNextRun(ms: number | undefined): string {
       <div class="empty-state-title">載入中...</div>
     </div>
 
-    <!-- Empty state -->
-    <div v-else-if="jobs.length === 0" class="empty-state">
+    <!-- Empty state: no jobs at all -->
+    <div v-else-if="!hasJobs" class="empty-state">
       <div class="empty-state-icon">
         <span class="empty-icon-inner">⏰</span>
       </div>
@@ -143,127 +201,250 @@ function formatNextRun(ms: number | undefined): string {
       <div class="empty-state-desc">目前沒有已排程的定時任務</div>
     </div>
 
-    <!-- Cron job grid -->
-    <div v-else class="cron-grid">
-      <div
-        v-for="job in jobs"
-        :key="job.id"
-        :class="['agent-card', { dormant: !job.enabled }]"
-        style="cursor: default"
-      >
-        <!-- Card header -->
-        <div class="agent-card-header">
-          <!-- Name block -->
-          <div class="agent-card-name">
-            <div class="agent-avatar">⏰</div>
-            <div>
-              <div class="agent-name">{{ job.name }}</div>
-              <div class="agent-hostname">{{ job.schedule?.expr ?? 'Once' }}</div>
+    <!-- Jobs exist: show filter bar + grid -->
+    <template v-else>
+      <!-- Filter bar -->
+      <div class="cron-filter-bar">
+        <input
+          v-model="searchQuery"
+          class="cron-search-input"
+          placeholder="搜尋名稱或 schedule"
+          type="search"
+        />
+
+        <div class="cron-filter-buttons" role="group" aria-label="啟用狀態篩選">
+          <button
+            :class="['cron-filter-btn', { active: filterMode === 'all' }]"
+            @click="filterMode = 'all'"
+          >
+            全部
+          </button>
+          <button
+            :class="['cron-filter-btn', { active: filterMode === 'enabled' }]"
+            @click="filterMode = 'enabled'"
+          >
+            已啟用
+          </button>
+          <button
+            :class="['cron-filter-btn', { active: filterMode === 'disabled' }]"
+            @click="filterMode = 'disabled'"
+          >
+            已停用
+          </button>
+        </div>
+
+        <select v-model="sortBy" class="cron-sort-select" aria-label="排序方式">
+          <option value="name">名稱</option>
+          <option value="nextRun">下次執行</option>
+          <option value="lastRun">上次執行</option>
+        </select>
+      </div>
+
+      <!-- Empty state: jobs exist but none match filters -->
+      <div v-if="!hasResults" class="empty-state">
+        <div class="empty-state-icon">
+          <span class="empty-icon-inner">🔍</span>
+        </div>
+        <div class="empty-state-title">沒有符合條件</div>
+        <div class="empty-state-desc">
+          {{ isFiltered ? '請嘗試調整搜尋或篩選條件' : '目前沒有已排程的定時任務' }}
+        </div>
+      </div>
+
+      <!-- Cron job grid -->
+      <div v-else class="cron-grid">
+        <div
+          v-for="job in filteredJobs"
+          :key="job.id"
+          :class="['agent-card', { dormant: !job.enabled }]"
+          style="cursor: default"
+        >
+          <!-- Card header -->
+          <div class="agent-card-header">
+            <!-- Name block -->
+            <div class="agent-card-name">
+              <div class="agent-avatar">⏰</div>
+              <div>
+                <div class="agent-name">{{ job.name }}</div>
+                <div class="agent-hostname">{{ job.schedule?.expr ?? 'Once' }}</div>
+              </div>
+            </div>
+
+            <!-- Controls -->
+            <div style="display: flex; align-items: center; gap: 8px">
+              <!-- Run button -->
+              <button
+                class="cron-run-button"
+                title="立即執行"
+                style="
+                  background: var(--green);
+                  color: white;
+                  border: none;
+                  border-radius: 4px;
+                  padding: 4px 8px;
+                  font-size: 12px;
+                  cursor: pointer;
+                "
+                @click="runJob(job.id)"
+              >
+                ▶️ 執行
+              </button>
+
+              <!-- Delete button -->
+              <button
+                title="刪除任務"
+                style="
+                  background: rgba(239, 68, 68, 0.15);
+                  color: #ef4444;
+                  border: none;
+                  border-radius: 4px;
+                  padding: 4px 8px;
+                  font-size: 12px;
+                  cursor: pointer;
+                "
+                @click="deleteJob(job.id, job.name)"
+              >
+                🗑
+              </button>
+
+              <!-- Enable/disable toggle -->
+              <label class="watchdog-toggle">
+                <input
+                  type="checkbox"
+                  :checked="job.enabled"
+                  @change="toggleJob(job.id, ($event.target as HTMLInputElement).checked)"
+                />
+                <span class="toggle-slider" />
+              </label>
             </div>
           </div>
 
-          <!-- Controls -->
-          <div style="display: flex; align-items: center; gap: 8px">
-            <!-- Run button -->
-            <button
-              class="cron-run-button"
-              title="立即執行"
-              style="
-                background: var(--green);
-                color: white;
-                border: none;
-                border-radius: 4px;
-                padding: 4px 8px;
-                font-size: 12px;
-                cursor: pointer;
-              "
-              @click="runJob(job.id)"
+          <!-- Card body -->
+          <div class="agent-card-body">
+            <!-- Status row -->
+            <div class="agent-info-row">
+              <span class="agent-info-label">最後狀態</span>
+              <span :class="['agent-status', getStatusClass(job.state?.lastStatus)]">
+                <span class="agent-status-dot" />
+                {{ getStatusText(job.state?.lastStatus) }}
+              </span>
+            </div>
+
+            <!-- lastError inline display (only when status is error AND lastError exists) -->
+            <div
+              v-if="job.state?.lastStatus === 'error' && job.state?.lastError"
+              class="cron-error-inline"
+              :title="formatCronError(job.state.lastError, 300)"
             >
-              ▶️ 執行
-            </button>
+              {{ formatCronError(job.state.lastError) }}
+            </div>
 
-            <!-- Delete button -->
-            <button
-              title="刪除任務"
-              style="
-                background: rgba(239, 68, 68, 0.15);
-                color: #ef4444;
-                border: none;
-                border-radius: 4px;
-                padding: 4px 8px;
-                font-size: 12px;
-                cursor: pointer;
-              "
-              @click="deleteJob(job.id, job.name)"
+            <!-- Last run row -->
+            <div class="agent-info-row">
+              <span class="agent-info-label">上次執行</span>
+              <span class="agent-info-value" style="font-size: 11px">
+                {{ formatLastRun(job.state?.lastRunAtMs) }}
+              </span>
+            </div>
+
+            <!-- Next run row -->
+            <div class="agent-info-row">
+              <span class="agent-info-label">下次執行</span>
+              <span class="agent-info-value" style="font-size: 11px">
+                {{ formatNextRun(job.state?.nextRunAtMs) }}
+              </span>
+            </div>
+
+            <!-- Agent ID row -->
+            <div class="agent-info-row">
+              <span class="agent-info-label">Agent ID</span>
+              <span class="agent-info-value">{{ job.agentId ?? 'N/A' }}</span>
+            </div>
+          </div>
+
+          <!-- Description preview -->
+          <div class="agent-task-preview" style="margin-top: 8px">
+            <div
+              class="agent-task-content"
+              style="white-space: pre-wrap; word-break: break-word; max-height: 60px; overflow-y: auto"
             >
-              🗑
-            </button>
-
-            <!-- Enable/disable toggle -->
-            <label class="watchdog-toggle">
-              <input
-                type="checkbox"
-                :checked="job.enabled"
-                @change="toggleJob(job.id, ($event.target as HTMLInputElement).checked)"
-              />
-              <span class="toggle-slider" />
-            </label>
-          </div>
-        </div>
-
-        <!-- Card body -->
-        <div class="agent-card-body">
-          <!-- Status row -->
-          <div class="agent-info-row">
-            <span class="agent-info-label">最後狀態</span>
-            <span :class="['agent-status', getStatusClass(job.state?.lastStatus)]">
-              <span class="agent-status-dot" />
-              {{ getStatusText(job.state?.lastStatus) }}
-            </span>
-          </div>
-
-          <!-- lastError inline display (only when status is error AND lastError exists) -->
-          <div
-            v-if="job.state?.lastStatus === 'error' && job.state?.lastError"
-            class="cron-error-inline"
-            :title="formatCronError(job.state.lastError, 300)"
-          >
-            {{ formatCronError(job.state.lastError) }}
-          </div>
-
-          <!-- Last run row -->
-          <div class="agent-info-row">
-            <span class="agent-info-label">上次執行</span>
-            <span class="agent-info-value" style="font-size: 11px">
-              {{ formatLastRun(job.state?.lastRunAtMs) }}
-            </span>
-          </div>
-
-          <!-- Next run row -->
-          <div class="agent-info-row">
-            <span class="agent-info-label">下次執行</span>
-            <span class="agent-info-value" style="font-size: 11px">
-              {{ formatNextRun(job.state?.nextRunAtMs) }}
-            </span>
-          </div>
-
-          <!-- Agent ID row -->
-          <div class="agent-info-row">
-            <span class="agent-info-label">Agent ID</span>
-            <span class="agent-info-value">{{ job.agentId ?? 'N/A' }}</span>
-          </div>
-        </div>
-
-        <!-- Description preview -->
-        <div class="agent-task-preview" style="margin-top: 8px">
-          <div
-            class="agent-task-content"
-            style="white-space: pre-wrap; word-break: break-word; max-height: 60px; overflow-y: auto"
-          >
-            {{ job.description ?? '無描述' }}
+              {{ job.description ?? '無描述' }}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </template>
   </div>
 </template>
+
+<style scoped>
+.cron-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0 14px;
+  flex-wrap: wrap;
+}
+
+.cron-search-input {
+  flex: 1;
+  min-width: 160px;
+  padding: 6px 10px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
+  background: var(--surface2, rgba(255, 255, 255, 0.05));
+  color: var(--text, #e2e8f0);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.cron-search-input:focus {
+  border-color: var(--accent, #6366f1);
+}
+
+.cron-filter-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.cron-filter-btn {
+  padding: 5px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.cron-filter-btn:hover {
+  background: var(--surface2, rgba(255, 255, 255, 0.07));
+  color: var(--text, #e2e8f0);
+}
+
+.cron-filter-btn.active {
+  background: var(--accent, #6366f1);
+  border-color: var(--accent, #6366f1);
+  color: #fff;
+}
+
+.cron-sort-select {
+  padding: 5px 8px;
+  font-size: 12px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 5px;
+  background: var(--surface2, rgba(255, 255, 255, 0.05));
+  color: var(--text, #e2e8f0);
+  cursor: pointer;
+  outline: none;
+}
+
+.cron-sort-select:focus {
+  border-color: var(--accent, #6366f1);
+}
+</style>
