@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { nextTick } from 'vue'
 
@@ -39,6 +39,15 @@ interface LogEntry {
   ts: number
 }
 
+interface FilterPreset {
+  id: string
+  name: string
+  filterText: string
+  regexMode: boolean
+  errorOnly: boolean
+  warnOnly: boolean
+}
+
 // Vue Test Utils auto-unwraps refs exposed via defineExpose when accessed
 // through wrapper.vm. So vm.regexMode is boolean (not { value: boolean }),
 // vm.logBuffer is LogEntry[] (array), vm.regexError is string | null.
@@ -50,6 +59,13 @@ type ExposedVm = Record<string, unknown> & {
   regexMode: boolean
   regexError: string | null
   visibleLines: LogEntry[]
+  // preset seam
+  presets: FilterPreset[]
+  selectedPresetId: string
+  saveCurrentAsPreset: (name: string) => void
+  applyPreset: (preset: FilterPreset) => void
+  deletePreset: (id: string) => void
+  loadPresets: () => void
 }
 
 // ---------------------------------------------------------------------------
@@ -282,6 +298,185 @@ describe('LogsTab — regex filter mode', () => {
     await setFilter(vm, '[invalid')
 
     expect(wrapper.find('.log-search-input').classes()).toContain('log-search-input--error')
+    wrapper.unmount()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Tests — filter presets
+// ---------------------------------------------------------------------------
+
+describe('LogsTab — filter presets', () => {
+  // Minimal localStorage mock — uses a plain Map for isolation between tests.
+  let store: Record<string, string>
+
+  beforeEach(() => {
+    seq = 0
+    vi.clearAllMocks()
+    store = {}
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => store[key] ?? null,
+      setItem: (key: string, val: string) => { store[key] = val },
+      removeItem: (key: string) => { delete store[key] },
+    })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  // ── 1. Load presets from localStorage on mount ────────────────────────────
+
+  it('loads presets from localStorage on mount', async () => {
+    const saved: FilterPreset[] = [
+      { id: 'abc', name: 'Error only', filterText: 'error', regexMode: false, errorOnly: true, warnOnly: false },
+    ]
+    store['oc_log_filter_presets'] = JSON.stringify(saved)
+
+    const { wrapper, vm } = mountTab()
+    await flushPromises()
+    await nextTick()
+
+    expect(vm.presets).toHaveLength(1)
+    expect(vm.presets[0].name).toBe('Error only')
+    wrapper.unmount()
+  })
+
+  // ── 2. Corrupt localStorage falls back to empty array ────────────────────
+
+  it('falls back to empty presets array when localStorage is corrupt JSON', async () => {
+    store['oc_log_filter_presets'] = 'not-valid-json{{'
+
+    const { wrapper, vm } = mountTab()
+    await flushPromises()
+    await nextTick()
+
+    expect(vm.presets).toHaveLength(0)
+    wrapper.unmount()
+  })
+
+  // ── 3. Save current filter as preset ─────────────────────────────────────
+
+  it('saveCurrentAsPreset adds a new preset with the given name', async () => {
+    const { wrapper, vm } = mountTab()
+    await setFilter(vm, 'timeout')
+    await setRegexMode(vm, true)
+
+    vm.saveCurrentAsPreset('Timeout regex')
+    await nextTick()
+
+    expect(vm.presets).toHaveLength(1)
+    const p = vm.presets[0]
+    expect(p.name).toBe('Timeout regex')
+    expect(p.filterText).toBe('timeout')
+    expect(p.regexMode).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('saveCurrentAsPreset persists to localStorage', async () => {
+    const { wrapper, vm } = mountTab()
+    await setFilter(vm, 'warn')
+
+    vm.saveCurrentAsPreset('Warn filter')
+    await nextTick()
+
+    const saved = JSON.parse(store['oc_log_filter_presets'] as string) as FilterPreset[]
+    expect(saved).toHaveLength(1)
+    expect(saved[0].name).toBe('Warn filter')
+    wrapper.unmount()
+  })
+
+  it('saveCurrentAsPreset with empty name does nothing', async () => {
+    const { wrapper, vm } = mountTab()
+    await setFilter(vm, 'error')
+
+    vm.saveCurrentAsPreset('')
+    await nextTick()
+
+    expect(vm.presets).toHaveLength(0)
+    wrapper.unmount()
+  })
+
+  it('saveCurrentAsPreset with whitespace-only name does nothing', async () => {
+    const { wrapper, vm } = mountTab()
+    vm.saveCurrentAsPreset('   ')
+    await nextTick()
+    expect(vm.presets).toHaveLength(0)
+    wrapper.unmount()
+  })
+
+  // ── 4. Apply preset sets all filter state ────────────────────────────────
+
+  it('applyPreset sets filterText, regexMode, errorOnly, warnOnly', async () => {
+    const { wrapper, vm } = mountTab()
+
+    const preset: FilterPreset = {
+      id: 'p1',
+      name: 'My preset',
+      filterText: 'disk',
+      regexMode: true,
+      errorOnly: true,
+      warnOnly: false,
+    }
+
+    vm.applyPreset(preset)
+    await nextTick()
+
+    expect(vm.filterText).toBe('disk')
+    expect(vm.regexMode).toBe(true)
+    wrapper.unmount()
+  })
+
+  // ── 5. Delete preset removes it and persists ──────────────────────────────
+
+  it('deletePreset removes the preset from the list and persists', async () => {
+    const { wrapper, vm } = mountTab()
+    vm.saveCurrentAsPreset('First')
+    vm.saveCurrentAsPreset('Second')
+    await nextTick()
+
+    const idToDelete = vm.presets[0].id
+    vm.deletePreset(idToDelete)
+    await nextTick()
+
+    expect(vm.presets).toHaveLength(1)
+    expect(vm.presets[0].name).toBe('Second')
+
+    const stored = JSON.parse(store['oc_log_filter_presets'] as string) as FilterPreset[]
+    expect(stored).toHaveLength(1)
+    expect(stored[0].name).toBe('Second')
+    wrapper.unmount()
+  })
+
+  it('deletePreset clears selectedPresetId when the deleted id was selected', async () => {
+    const { wrapper, vm } = mountTab()
+    vm.saveCurrentAsPreset('Only preset')
+    await nextTick()
+
+    const id = vm.presets[0].id
+    ;(vm as unknown as Record<string, unknown>).selectedPresetId = id
+    await nextTick()
+
+    vm.deletePreset(id)
+    await nextTick()
+
+    expect(vm.selectedPresetId).toBe('')
+    wrapper.unmount()
+  })
+
+  // ── 6. Preset dropdown rendered in UI ────────────────────────────────────
+
+  it('renders the preset select dropdown', () => {
+    const { wrapper } = mountTab()
+    expect(wrapper.find('.log-preset-select').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('renders 💾 儲存 and 🗑️ 刪除 buttons', () => {
+    const { wrapper } = mountTab()
+    const text = wrapper.text()
+    expect(text).toContain('儲存')
+    expect(text).toContain('刪除')
     wrapper.unmount()
   })
 })
