@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { appState } from '@/stores/appState'
 import { useDashboard } from '@/composables/useDashboard'
 import { formatFreshnessLabel } from '@/lib/freshness'
@@ -22,7 +22,34 @@ const emit = defineEmits<{
 
 type SubTab = 'agents' | 'subagents' | 'cron' | 'taskhub' | 'observability'
 
+const VALID_SUB_TABS: readonly SubTab[] = ['agents', 'subagents', 'cron', 'taskhub', 'observability']
+
+function isValidSubTab(v: unknown): v is SubTab {
+  return typeof v === 'string' && (VALID_SUB_TABS as string[]).includes(v)
+}
+
 const activeSubTab = ref<SubTab>('agents')
+
+// ── preferredMonitorSubTab — cross-component navigation ──────────────────────
+
+onMounted(() => {
+  // Handle value already set before MonitorTab mounted (e.g., from AlertBadge click
+  // that happened before monitor tab was rendered).
+  if (isValidSubTab(appState.preferredMonitorSubTab)) {
+    activeSubTab.value = appState.preferredMonitorSubTab
+    appState.preferredMonitorSubTab = null
+  }
+})
+
+watch(
+  () => appState.preferredMonitorSubTab,
+  (newVal) => {
+    if (isValidSubTab(newVal)) {
+      activeSubTab.value = newVal
+      appState.preferredMonitorSubTab = null
+    }
+  },
+)
 
 // ── Dashboard data ────────────────────────────────────────────────────────────
 

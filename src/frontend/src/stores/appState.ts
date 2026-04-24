@@ -44,6 +44,8 @@ export const appState = reactive({
   commandRunning: false,
   lastSseTs: 0,
   chatSending: false,
+  /** Consumed by MonitorTab: navigate to this sub-tab, then cleared to null */
+  preferredMonitorSubTab: null as string | null,
 })
 
 // Track mobile breakpoint changes reactively
