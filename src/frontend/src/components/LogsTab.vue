@@ -81,6 +81,31 @@ const filterText = ref('')
 const debouncedFilter = useDebouncedRef(filterText, 200)
 const errorOnly = ref(false)
 const warnOnly = ref(false)
+const regexMode = ref(false)
+
+/**
+ * When regexMode is on and filterText is non-empty, attempt to compile it.
+ * Returns the error message string if invalid, null otherwise.
+ */
+const regexError = computed<string | null>(() => {
+  if (!regexMode.value || !debouncedFilter.value) return null
+  try {
+    new RegExp(debouncedFilter.value, 'i')
+    return null
+  } catch (e: unknown) {
+    if (e instanceof Error) return `Invalid regex: ${e.message}`
+    return 'Invalid regex'
+  }
+})
+
+/**
+ * Compiled RegExp for line matching (case-insensitive, no 'g' flag here
+ * so it is safe to reuse across test() calls without lastIndex side-effects).
+ */
+const compiledRegex = computed<RegExp | null>(() => {
+  if (!regexMode.value || !debouncedFilter.value || regexError.value !== null) return null
+  return new RegExp(debouncedFilter.value, 'i')
+})
 const userScrolledUp = ref(false)
 const hasNewMessages = ref(false)
 
@@ -137,7 +162,15 @@ function lineMatchesFilter(line: string): boolean {
   const level = detectLineLevel(line)
   if (errorOnly.value && level !== 'error') return false
   if (warnOnly.value && level !== 'error' && level !== 'warn') return false
-  if (debouncedFilter.value && !line.toLowerCase().includes(debouncedFilter.value.toLowerCase())) return false
+  if (debouncedFilter.value) {
+    if (regexMode.value) {
+      // Invalid regex → treat as no-match (safer than showing all)
+      if (regexError.value !== null) return false
+      if (compiledRegex.value && !compiledRegex.value.test(line)) return false
+    } else {
+      if (!line.toLowerCase().includes(debouncedFilter.value.toLowerCase())) return false
+    }
+  }
   return true
 }
 
@@ -145,6 +178,31 @@ function lineMatchesFilter(line: string): boolean {
 function buildSegments(line: string, keyword: string): Array<{ text: string; highlight: boolean }> {
   if (!keyword) return [{ text: line, highlight: false }]
   const segments: Array<{ text: string; highlight: boolean }> = []
+
+  if (regexMode.value) {
+    // In regex mode: use the compiled regex with 'g' flag for matchAll iteration.
+    // If the regex is invalid or not compiled, fall back to no-highlight.
+    if (regexError.value !== null || !compiledRegex.value) {
+      return [{ text: line, highlight: false }]
+    }
+    // Re-create with 'gi' flags so matchAll works correctly.
+    const re = new RegExp(compiledRegex.value.source, 'gi')
+    let lastIndex = 0
+    for (const match of line.matchAll(re)) {
+      const start = match.index!
+      const end = start + match[0].length
+      // Avoid infinite loops from zero-length matches
+      if (end === lastIndex) continue
+      if (start > lastIndex) segments.push({ text: line.slice(lastIndex, start), highlight: false })
+      segments.push({ text: line.slice(start, end), highlight: true })
+      lastIndex = end
+    }
+    if (lastIndex < line.length) segments.push({ text: line.slice(lastIndex), highlight: false })
+    if (segments.length === 0) segments.push({ text: line, highlight: false })
+    return segments
+  }
+
+  // Substring mode (original logic)
   const lower = line.toLowerCase()
   const kLower = keyword.toLowerCase()
   let pos = 0
@@ -383,12 +441,31 @@ function toggleWarnOnly(): void {
   applyFilter()
 }
 
+function toggleRegexMode(): void {
+  regexMode.value = !regexMode.value
+  applyFilter()
+}
+
 // ---------------------------------------------------------------------------
 // Cleanup on unmount
 // ---------------------------------------------------------------------------
 
 onUnmounted(() => {
   stopStream()
+})
+
+// ---------------------------------------------------------------------------
+// Test seam — expose internal state for unit tests
+// ---------------------------------------------------------------------------
+
+defineExpose({
+  logBuffer,
+  filterText,
+  debouncedFilter,
+  regexMode,
+  regexError,
+  compiledRegex,
+  visibleLines,
 })
 </script>
 
@@ -417,12 +494,22 @@ onUnmounted(() => {
         >
           🕐
         </button>
-        <input
-          v-model="filterText"
-          class="log-search-input"
-          placeholder="篩選..."
-          @input="applyFilter"
-        />
+        <div class="log-search-wrap">
+          <input
+            v-model="filterText"
+            :class="['log-search-input', { 'log-search-input--error': regexError !== null }]"
+            placeholder="篩選..."
+            @input="applyFilter"
+          />
+          <button
+            :class="['log-filter-btn', 'regex', { active: regexMode }]"
+            title="切換 Regex 模式"
+            @click="toggleRegexMode"
+          >
+            .*
+          </button>
+          <div v-if="regexError !== null" class="log-regex-error">{{ regexError }}</div>
+        </div>
         <button
           :class="['log-filter-btn', { 'active-error': errorOnly }]"
           @click="toggleErrorOnly"
@@ -500,3 +587,54 @@ onUnmounted(() => {
     </button>
   </div>
 </template>
+
+<style scoped>
+.log-search-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.log-search-wrap .log-search-input {
+  padding-right: 36px;
+}
+
+.log-search-input--error {
+  border-color: var(--color-error, #ef4444) !important;
+  outline-color: var(--color-error, #ef4444);
+}
+
+.log-filter-btn.regex {
+  /* Absolute-position the .* badge inside the search wrap */
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  font-family: monospace;
+  padding: 1px 5px;
+  line-height: 1;
+  border-radius: 3px;
+  opacity: 0.55;
+  cursor: pointer;
+}
+
+.log-filter-btn.regex.active {
+  opacity: 1;
+  background: var(--color-accent, #6366f1);
+  color: #fff;
+  border-color: var(--color-accent, #6366f1);
+}
+
+.log-regex-error {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  font-size: 11px;
+  color: var(--color-error, #ef4444);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+}
+</style>
