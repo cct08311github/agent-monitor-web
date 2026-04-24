@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { api } from '@/composables/useApi'
 import { showToast } from '@/composables/useToast'
-import { formatTs } from '@/lib/time'
+import { formatTs, formatExportTimestamp } from '@/lib/time'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -302,6 +302,48 @@ function resetConfig(): void {
   editedConfig.value = JSON.parse(JSON.stringify(alertConfig.value)) as AlertConfig
 }
 
+// ---------------------------------------------------------------------------
+// Export
+// ---------------------------------------------------------------------------
+
+type ExportCategory = 'all' | 'metrics' | 'errors' | 'alerts'
+
+function exportJSON(category: ExportCategory): void {
+  const now = new Date()
+  const timestamp = formatExportTimestamp(now)
+
+  let data: unknown
+  if (category === 'all') {
+    data = {
+      metrics: metrics.value,
+      errors: errors.value,
+      alerts: alerts.value,
+      config: alertConfig.value,
+    }
+  } else if (category === 'metrics') {
+    data = metrics.value
+  } else if (category === 'errors') {
+    data = errors.value
+  } else {
+    data = { alerts: alerts.value, config: alertConfig.value }
+  }
+
+  const payload = {
+    exportedAt: now.toISOString(),
+    source: 'agent-monitor-web',
+    category,
+    data,
+  }
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `observability-${category}-${timestamp}.json`
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
 async function refresh(): Promise<void> {
   await Promise.all([fetchMetrics(), fetchErrors(), fetchAlerts(), fetchAlertConfig()])
   lastUpdated.value = new Date()
@@ -408,6 +450,40 @@ onUnmounted(() => {
         >
           Auto-refresh {{ autoRefresh ? 'ON' : 'OFF' }}
         </button>
+        <div class="obs-export-group" role="group" aria-label="Export data">
+          <button
+            class="obs-btn obs-btn--secondary obs-btn--sm"
+            :disabled="metrics.length === 0 && errors.length === 0 && alerts.length === 0 && alertConfig === null"
+            data-export="all"
+            @click="exportJSON('all')"
+          >
+            Export All
+          </button>
+          <button
+            class="obs-btn obs-btn--secondary obs-btn--sm"
+            :disabled="metrics.length === 0"
+            data-export="metrics"
+            @click="exportJSON('metrics')"
+          >
+            Metrics
+          </button>
+          <button
+            class="obs-btn obs-btn--secondary obs-btn--sm"
+            :disabled="errors.length === 0"
+            data-export="errors"
+            @click="exportJSON('errors')"
+          >
+            Errors
+          </button>
+          <button
+            class="obs-btn obs-btn--secondary obs-btn--sm"
+            :disabled="alerts.length === 0 && alertConfig === null"
+            data-export="alerts"
+            @click="exportJSON('alerts')"
+          >
+            Alerts
+          </button>
+        </div>
       </div>
     </div>
 
@@ -719,6 +795,15 @@ onUnmounted(() => {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+.obs-export-group {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding-left: 8px;
+  border-left: 1px solid var(--color-border, #444);
 }
 
 /* ── Buttons ─────────────────────────────────────────────────────────────── */

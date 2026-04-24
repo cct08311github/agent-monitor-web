@@ -13,3 +13,18 @@ export function formatTs(ts: number): string {
     hour12: false,
   })
 }
+
+/**
+ * Format a Date into YYYYMMDD-HHMMSS (local timezone).
+ * Used as a safe filename timestamp component — only [A-Za-z0-9-] chars.
+ */
+export function formatExportTimestamp(d: Date): string {
+  const pad = (n: number, len = 2) => String(n).padStart(len, '0')
+  const year = d.getFullYear()
+  const month = pad(d.getMonth() + 1)
+  const day = pad(d.getDate())
+  const hours = pad(d.getHours())
+  const minutes = pad(d.getMinutes())
+  const seconds = pad(d.getSeconds())
+  return `${year}${month}${day}-${hours}${minutes}${seconds}`
+}
