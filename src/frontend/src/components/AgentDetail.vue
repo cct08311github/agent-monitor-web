@@ -143,6 +143,16 @@ function fmtHistTs(ts: string): string {
   }
 }
 
+// ── Session search ────────────────────────────────────────────────────────────
+
+const sessionSearchQuery = ref('')
+
+const filteredSessions = computed(() => {
+  const q = sessionSearchQuery.value.trim().toLowerCase()
+  if (!q) return sessions.value
+  return sessions.value.filter((s) => s.id.toLowerCase().includes(q))
+})
+
 // ── Model usage ───────────────────────────────────────────────────────────────
 
 interface ModelUsageEntry {
@@ -275,7 +285,16 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
 
       <!-- Sessions Card -->
       <div class="detail-card">
-        <div class="detail-card-title">Sessions</div>
+        <div class="sessions-card-header">
+          <div class="detail-card-title">Sessions</div>
+          <input
+            v-if="sessions.length > 0"
+            v-model="sessionSearchQuery"
+            type="text"
+            placeholder="搜尋 session id..."
+            class="session-search-input"
+          >
+        </div>
         <div v-if="sessionsLoading" style="color:var(--text-muted);font-size:12px;padding:4px 0">載入中…</div>
         <div v-else-if="sessionsError" style="color:var(--error);font-size:12px;padding:4px 0">
           ⚠️ 載入失敗
@@ -283,8 +302,12 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
         </div>
         <div v-else-if="sessions.length === 0" style="color:var(--text-muted);font-size:12px">無 session 記錄</div>
         <div v-else>
+          <div
+            v-if="filteredSessions.length === 0 && sessionSearchQuery.trim().length > 0"
+            class="sessions-empty-search"
+          >無符合 session</div>
           <button
-            v-for="s in sessions"
+            v-for="s in filteredSessions"
             :key="s.id"
             type="button"
             class="btn-reset detail-row"
@@ -352,5 +375,44 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
   border-radius: 3px;
   min-width: 2px;
   transition: width 0.2s ease;
+}
+
+.sessions-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.sessions-card-header .detail-card-title {
+  margin-bottom: 0;
+}
+
+.session-search-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--border, #45475a);
+  background: var(--bg-secondary, #1e1e2e);
+  color: var(--text, #cdd6f4);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.session-search-input::placeholder {
+  color: var(--text-muted, #6c7086);
+}
+
+.session-search-input:focus {
+  border-color: var(--blue, #89b4fa);
+}
+
+.sessions-empty-search {
+  font-size: 12px;
+  color: var(--text-muted, #6c7086);
+  padding: 4px 0;
 }
 </style>
