@@ -481,3 +481,179 @@ describe('SystemTab — 系統健康 Card', () => {
     wrapper.unmount()
   })
 })
+
+// ---------------------------------------------------------------------------
+// SystemTab — Smart Insights card
+// ---------------------------------------------------------------------------
+
+interface InsightFixture {
+  type: string
+  severity: 'critical' | 'warning' | 'info'
+  message: string
+  ts: number
+  meta?: Record<string, unknown>
+}
+
+function makeInsight(overrides?: Partial<InsightFixture>): InsightFixture {
+  return {
+    type: 'test_insight',
+    severity: 'info',
+    message: 'テスト observation',
+    ts: Date.now(),
+    ...overrides,
+  }
+}
+
+// Helper: return a mock function that routes to the right endpoint
+function makeInsightsMock(
+  insightsResult: { insights: InsightFixture[] } | null = { insights: [] },
+  insightsReject = false,
+) {
+  return (url: string) => {
+    if ((url as string).includes('/insights')) {
+      if (insightsReject) return Promise.reject(new Error('insights error'))
+      if (insightsResult === null) return Promise.reject(new Error('null'))
+      return Promise.resolve(insightsResult)
+    }
+    if ((url as string).includes('/health/full')) return Promise.resolve(makeHealthFull())
+    return Promise.resolve(makeHistoryResponse())
+  }
+}
+
+describe('SystemTab — Smart Insights card', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  // 1. Empty state when no insights
+  it('shows empty state when no insights returned', async () => {
+    mockGet.mockImplementation(makeInsightsMock({ insights: [] }))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const empty = wrapper.find('[data-testid="insights-empty"]')
+    expect(empty.exists()).toBe(true)
+    expect(empty.text()).toContain('一切正常')
+    wrapper.unmount()
+  })
+
+  // 2. Renders insights list
+  it('renders insights list when insights are returned', async () => {
+    mockGet.mockImplementation(makeInsightsMock({
+      insights: [
+        makeInsight({ severity: 'critical', message: '告警風暴：1 小時內 15 條 alert' }),
+        makeInsight({ severity: 'warning', message: 'Agent stale 已 36 小時未活動' }),
+      ],
+    }))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const list = wrapper.find('[data-testid="insights-list"]')
+    expect(list.exists()).toBe(true)
+    const items = wrapper.findAll('.insight-item')
+    expect(items).toHaveLength(2)
+    expect(wrapper.text()).toContain('告警風暴')
+    expect(wrapper.text()).toContain('stale')
+    wrapper.unmount()
+  })
+
+  // 3. Severity icon mapping
+  it('renders correct icons for each severity level', async () => {
+    mockGet.mockImplementation(makeInsightsMock({
+      insights: [
+        makeInsight({ severity: 'critical', message: 'critical insight' }),
+        makeInsight({ severity: 'warning', message: 'warning insight' }),
+        makeInsight({ severity: 'info', message: 'info insight' }),
+      ],
+    }))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const criticalItem = wrapper.find('[data-testid="insight-item-critical"]')
+    const warningItem = wrapper.find('[data-testid="insight-item-warning"]')
+    const infoItem = wrapper.find('[data-testid="insight-item-info"]')
+
+    expect(criticalItem.exists()).toBe(true)
+    expect(criticalItem.text()).toContain('🔴')
+
+    expect(warningItem.exists()).toBe(true)
+    expect(warningItem.text()).toContain('🟠')
+
+    expect(infoItem.exists()).toBe(true)
+    expect(infoItem.text()).toContain('🔵')
+
+    wrapper.unmount()
+  })
+
+  // 4. Loading state shown before fetch resolves
+  it('shows loading state before insights resolve', async () => {
+    let resolveInsights!: (value: { insights: InsightFixture[] }) => void
+    const pending = new Promise<{ insights: InsightFixture[] }>((res) => { resolveInsights = res })
+    mockGet.mockImplementation((url: string) => {
+      if ((url as string).includes('/insights')) return pending
+      if ((url as string).includes('/health/full')) return Promise.resolve(makeHealthFull())
+      return Promise.resolve(makeHistoryResponse())
+    })
+    const wrapper = mount(SystemTab)
+    // Not awaiting flushPromises — data not yet resolved
+    expect(wrapper.find('[data-testid="insights-loading"]').exists()).toBe(true)
+    resolveInsights({ insights: [] })
+    await flushPromises()
+    wrapper.unmount()
+  })
+
+  // 5. Error state + retry when fetch fails
+  it('shows error state with retry button when insights fetch fails', async () => {
+    mockGet.mockImplementation(makeInsightsMock(null, true))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const errorEl = wrapper.find('[data-testid="insights-error"]')
+    expect(errorEl.exists()).toBe(true)
+    expect(errorEl.text()).toContain('Insights 載入失敗')
+    expect(errorEl.find('button').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  // 6. Retry button re-fetches and shows data
+  it('retry button re-fetches and shows data on success', async () => {
+    let callCount = 0
+    mockGet.mockImplementation((url: string) => {
+      if ((url as string).includes('/insights')) {
+        callCount += 1
+        if (callCount === 1) return Promise.reject(new Error('first fail'))
+        return Promise.resolve({ insights: [makeInsight({ message: 'recovered' })] })
+      }
+      if ((url as string).includes('/health/full')) return Promise.resolve(makeHealthFull())
+      return Promise.resolve(makeHistoryResponse())
+    })
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    // First call fails → error state
+    const errorEl = wrapper.find('[data-testid="insights-error"]')
+    expect(errorEl.exists()).toBe(true)
+
+    // Click retry
+    await errorEl.find('button').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="insights-list"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('recovered')
+    wrapper.unmount()
+  })
+
+  // 7. Insight card is always rendered in the DOM
+  it('renders insights-card container element', async () => {
+    mockGet.mockImplementation(makeInsightsMock({ insights: [] }))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="insights-card"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+})
