@@ -10,8 +10,15 @@ import { watch, nextTick, onUnmounted, ref } from 'vue'
 import { useKeyboardShortcutsHelp } from '@/composables/useKeyboardShortcutsHelp'
 import { groupByCategory, SHORTCUTS } from '@/data/keyboardShortcuts'
 import { createFocusTrap } from '@/lib/focusTrap'
+import { useOnboardingTour } from '@/composables/useOnboardingTour'
 
 const { isOpen, close } = useKeyboardShortcutsHelp()
+const { restart: restartTour } = useOnboardingTour()
+
+function handleRestartTour(): void {
+  close()
+  restartTour()
+}
 
 // ---------------------------------------------------------------------------
 // Grouped shortcut data (static — no filtering needed here; HelpModal handles search)
@@ -105,6 +112,9 @@ onUnmounted(() => {
         <!-- Footer -->
         <div class="ksh-footer">
           <span class="ksh-hint">在輸入框中快捷鍵不生效（Esc 除外）</span>
+          <button class="ksh-restart-tour-btn" @click="handleRestartTour">
+            🎓 重新觀看引導
+          </button>
         </div>
       </div>
     </div>
@@ -253,11 +263,33 @@ onUnmounted(() => {
   padding: 0.625rem 1.25rem;
   border-top: 1px solid var(--color-border, #313244);
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .ksh-hint {
   font-size: 0.75rem;
   color: var(--color-muted, #6c7086);
+}
+
+.ksh-restart-tour-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.375rem;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.5;
+}
+
+.ksh-restart-tour-btn:hover {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-text, #cdd6f4);
 }
 
 /* ── Reduced motion ─────────────────────────────────────────────────────── */
