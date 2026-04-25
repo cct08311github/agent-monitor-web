@@ -85,6 +85,47 @@ function makeHistoryResponse(agentActivity: unknown[] = []) {
   }
 }
 
+interface HealthFull {
+  status: 'ok' | 'degraded' | 'critical'
+  uptime_ms: number
+  alerts_recent_count: number
+  alerts_critical_count: number
+  alerts_warning_count: number
+  errors_recent_count: number
+  p99_max_ms: number
+  agents_active_count: number
+  agents_total_count: number
+  ts: number
+}
+
+function makeHealthFull(overrides?: Partial<HealthFull>): HealthFull {
+  return {
+    status: 'ok',
+    uptime_ms: 60_000,
+    alerts_recent_count: 0,
+    alerts_critical_count: 0,
+    alerts_warning_count: 0,
+    errors_recent_count: 0,
+    p99_max_ms: 45,
+    agents_active_count: 2,
+    agents_total_count: 5,
+    ts: Date.now(),
+    ...overrides,
+  }
+}
+
+// mockGet discriminator: /health/full returns HealthFull, /history returns HistoryResponse
+function makeDiscriminatedMock(healthData: HealthFull | null = makeHealthFull(), historyReject = false) {
+  return (url: string) => {
+    if ((url as string).includes('/health/full')) {
+      if (healthData === null) return Promise.reject(new Error('network error'))
+      return Promise.resolve(healthData)
+    }
+    if (historyReject) return Promise.reject(new Error('history error'))
+    return Promise.resolve(makeHistoryResponse())
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Suite
 // ---------------------------------------------------------------------------
@@ -250,6 +291,193 @@ describe('SystemTab — Agent Activity Summary card', () => {
     expect(text).toContain('Agent')
     expect(text).toContain('活躍時長')
     expect(text).toContain('最後活動')
+    wrapper.unmount()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// SystemTab — 系統健康 Card (health/full composite status)
+// ---------------------------------------------------------------------------
+
+describe('SystemTab — 系統健康 Card', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  // 1. Renders health card with status pill for status 'ok'
+  it('renders health card with OK status pill', async () => {
+    mockGet.mockImplementation(makeDiscriminatedMock(makeHealthFull({ status: 'ok' })))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('系統健康')
+    const pill = wrapper.find('.health-status-pill')
+    expect(pill.exists()).toBe(true)
+    expect(pill.classes()).toContain('health-status--ok')
+    expect(pill.text()).toBe('OK')
+    wrapper.unmount()
+  })
+
+  // 2. Status 'degraded' → amber class
+  it('renders DEGRADED pill with amber class for degraded status', async () => {
+    mockGet.mockImplementation(makeDiscriminatedMock(makeHealthFull({ status: 'degraded' })))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const pill = wrapper.find('.health-status-pill')
+    expect(pill.exists()).toBe(true)
+    expect(pill.classes()).toContain('health-status--degraded')
+    expect(pill.text()).toBe('DEGRADED')
+    wrapper.unmount()
+  })
+
+  // 3. Status 'critical' → red class
+  it('renders CRITICAL pill with red class for critical status', async () => {
+    mockGet.mockImplementation(makeDiscriminatedMock(makeHealthFull({ status: 'critical' })))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const pill = wrapper.find('.health-status-pill')
+    expect(pill.exists()).toBe(true)
+    expect(pill.classes()).toContain('health-status--critical')
+    expect(pill.text()).toBe('CRITICAL')
+    wrapper.unmount()
+  })
+
+  // 4. Loading state shown before fetch resolves
+  it('shows loading state before health data resolves', async () => {
+    let resolveHealth!: (value: HealthFull) => void
+    const pending = new Promise<HealthFull>((res) => { resolveHealth = res })
+    mockGet.mockImplementation((url: string) => {
+      if ((url as string).includes('/health/full')) return pending
+      return Promise.resolve(makeHistoryResponse())
+    })
+    const wrapper = mount(SystemTab)
+    // Do NOT await flushPromises — data not yet resolved
+    expect(wrapper.find('[data-testid="health-loading"]').exists()).toBe(true)
+    // Now resolve to clean up
+    resolveHealth(makeHealthFull())
+    await flushPromises()
+    wrapper.unmount()
+  })
+
+  // 5. Error state + retry button when fetch fails
+  it('shows error state with retry button when health fetch fails', async () => {
+    mockGet.mockImplementation(makeDiscriminatedMock(null))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const errorEl = wrapper.find('[data-testid="health-error"]')
+    expect(errorEl.exists()).toBe(true)
+    expect(errorEl.text()).toContain('健康狀態載入失敗')
+    const retryBtn = errorEl.find('button')
+    expect(retryBtn.exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  // 6. Metrics rows visible with correct values
+  it('renders metric rows with correct values', async () => {
+    mockGet.mockImplementation(makeDiscriminatedMock(makeHealthFull({
+      agents_active_count: 3,
+      agents_total_count: 7,
+      alerts_recent_count: 4,
+      alerts_critical_count: 1,
+      alerts_warning_count: 3,
+      errors_recent_count: 2,
+      p99_max_ms: 120,
+    })))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const text = wrapper.text()
+    expect(text).toContain('3 / 7')
+    expect(text).toContain('120 ms')
+    expect(wrapper.find('[data-testid="health-metrics"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  // 7. Auto-refresh: setInterval triggers fetchHealth after 15s
+  it('auto-refresh interval triggers fetchHealth at 15s cadence', async () => {
+    vi.useFakeTimers()
+    mockGet.mockImplementation(makeDiscriminatedMock())
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const callsBefore = mockGet.mock.calls.filter((c: unknown[]) =>
+      (c[0] as string).includes('/health/full'),
+    ).length
+
+    vi.advanceTimersByTime(15000)
+    await flushPromises()
+
+    const callsAfter = mockGet.mock.calls.filter((c: unknown[]) =>
+      (c[0] as string).includes('/health/full'),
+    ).length
+
+    expect(callsAfter).toBeGreaterThan(callsBefore)
+    wrapper.unmount()
+    vi.useRealTimers()
+  })
+
+  // 8. onUnmounted clears the health interval
+  it('clears health interval on unmount', async () => {
+    vi.useFakeTimers()
+    const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval')
+    mockGet.mockImplementation(makeDiscriminatedMock())
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    wrapper.unmount()
+    expect(clearIntervalSpy).toHaveBeenCalled()
+    vi.useRealTimers()
+  })
+
+  // 9. Retry button calls fetchHealth again
+  it('retry button re-fetches health data', async () => {
+    // First call rejects, second call succeeds
+    let callCount = 0
+    mockGet.mockImplementation((url: string) => {
+      if ((url as string).includes('/health/full')) {
+        callCount++
+        if (callCount === 1) return Promise.reject(new Error('fail'))
+        return Promise.resolve(makeHealthFull({ status: 'ok' }))
+      }
+      return Promise.resolve(makeHistoryResponse())
+    })
+
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    // Should be in error state
+    const errorEl = wrapper.find('[data-testid="health-error"]')
+    expect(errorEl.exists()).toBe(true)
+
+    // Click retry
+    await errorEl.find('button').trigger('click')
+    await flushPromises()
+
+    // Now shows data
+    expect(wrapper.find('[data-testid="health-metrics"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  // 10. Health and history calls are independent (history still works even if health fails)
+  it('history data still loads when health fetch fails', async () => {
+    mockGet.mockImplementation((url: string) => {
+      if ((url as string).includes('/health/full')) return Promise.reject(new Error('fail'))
+      return Promise.resolve(makeHistoryResponse([
+        makeActivity({ agent_id: 'agent-independent', active_minutes: 10 }),
+      ]))
+    })
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="health-error"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('agent-independent')
     wrapper.unmount()
   })
 })
