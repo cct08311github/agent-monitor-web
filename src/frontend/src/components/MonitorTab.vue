@@ -12,19 +12,26 @@ import CronTab from '@/components/CronTab.vue'
 import TaskHubTab from '@/components/TaskHubTab.vue'
 import ObservabilityTab from '@/components/ObservabilityTab.vue'
 import AgentCompareModal from '@/components/AgentCompareModal.vue'
+import AgentConstellation from '@/components/AgentConstellation.vue'
 import type { CompareAgentLike } from '@/utils/agentCompare'
+import type { SubAgentLayout } from '@/utils/constellation'
 
 const emit = defineEmits<{
   (e: 'agent-click', agentId: string): void
   (e: 'agent-chat', agentId: string): void
   (e: 'agent-model-switch', agentId: string, model: string): void
+  (e: 'constellation-drill-down', subagent: SubAgentLayout): void
 }>()
+
+function onConstellationDrillDown(subagent: SubAgentLayout) {
+  emit('constellation-drill-down', subagent)
+}
 
 // ── Sub-tab state ────────────────────────────────────────────────────────────
 
-type SubTab = 'agents' | 'subagents' | 'cron' | 'taskhub' | 'observability'
+type SubTab = 'agents' | 'subagents' | 'cron' | 'taskhub' | 'observability' | 'constellation'
 
-const VALID_SUB_TABS: readonly SubTab[] = ['agents', 'subagents', 'cron', 'taskhub', 'observability']
+const VALID_SUB_TABS: readonly SubTab[] = ['agents', 'subagents', 'cron', 'taskhub', 'observability', 'constellation']
 
 function isValidSubTab(v: unknown): v is SubTab {
   return typeof v === 'string' && (VALID_SUB_TABS as string[]).includes(v)
@@ -184,6 +191,12 @@ function closeCompare() {
       >
         Observability
       </button>
+      <button
+        :class="['sub-tab', { active: activeSubTab === 'constellation' }]"
+        @click="activeSubTab = 'constellation'"
+      >
+        🌌 Constellation
+      </button>
 
       <!-- Connection status indicator -->
       <span :class="['connection-status', connectionClass]" style="margin-left: auto">
@@ -260,6 +273,15 @@ function closeCompare() {
     <!-- Observability tab -->
     <template v-else-if="activeSubTab === 'observability'">
       <ObservabilityTab />
+    </template>
+
+    <!-- Constellation tab -->
+    <template v-else-if="activeSubTab === 'constellation'">
+      <AgentConstellation
+        :agents="dashboard?.agents ?? []"
+        :subagents="subagentsAsRecords as unknown as { ownerAgent?: string; subagentId?: string; label?: string; status?: string; tokens?: number }[]"
+        @drill-down="onConstellationDrillDown"
+      />
     </template>
 
     <!-- Compare Modal -->
