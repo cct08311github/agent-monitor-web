@@ -13,6 +13,8 @@ import TaskHubTab from '@/components/TaskHubTab.vue'
 import ObservabilityTab from '@/components/ObservabilityTab.vue'
 import AgentCompareModal from '@/components/AgentCompareModal.vue'
 import AgentConstellation from '@/components/AgentConstellation.vue'
+import ActivityHeatmap from '@/components/ActivityHeatmap.vue'
+import { useActivityAccumulator } from '@/composables/useActivityAccumulator'
 import type { CompareAgentLike } from '@/utils/agentCompare'
 import type { SubAgentLayout } from '@/utils/constellation'
 
@@ -144,6 +146,45 @@ function openCompare(idA: string, idB: string) {
 function closeCompare() {
   compareIds.value = null
 }
+
+// ── Activity Heatmap ──────────────────────────────────────────────────────────
+
+// The dashboard payload does not include historical per-day session counts,
+// so we use the localStorage accumulator.  Each SSE message signals that the
+// dashboard is live; we record one "activity tick" per successful SSE update.
+//
+// Guard: localStorage may not be available or functional in test environments.
+function _tryGetStorage(): Storage | null {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      // Verify localStorage is actually functional before using it
+      localStorage.getItem('__oc_probe__')
+      return localStorage
+    }
+  } catch {
+    // Ignore — localStorage unavailable or broken (e.g. test environment)
+  }
+  return null
+}
+const _storage = _tryGetStorage()
+const _accumulator = _storage ? useActivityAccumulator(_storage) : null
+
+// Record a tick whenever we receive a fresh SSE payload
+watch(
+  () => appState.latestDashboard,
+  (newVal, oldVal) => {
+    if (newVal && newVal !== oldVal) {
+      _accumulator?.increment()
+    }
+  },
+)
+
+// Compute the heatmap data from localStorage
+const heatmapData = computed<Map<string, number> | null>(() => {
+  // Re-compute when dashboard updates so heatmap reflects the latest tick
+  void appState.latestDashboard
+  return _accumulator?.load() ?? null
+})
 </script>
 
 <template>
@@ -243,6 +284,11 @@ function closeCompare() {
         @agent-click="showAgentDetail"
       />
 
+      <!-- Activity Heatmap -->
+      <div class="heatmap-row">
+        <ActivityHeatmap :data="heatmapData" />
+      </div>
+
       <!-- Empty state -->
       <div v-if="isEmpty" class="empty-state">
         <div class="empty-state-icon">🔍</div>
@@ -293,3 +339,9 @@ function closeCompare() {
     />
   </div>
 </template>
+
+<style scoped>
+.heatmap-row {
+  padding: 12px 0 4px;
+}
+</style>
