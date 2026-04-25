@@ -10,6 +10,8 @@ import {
   maxBucketCost,
   colorForCost,
 } from '@/utils/costHeatmap'
+import { buildForecast } from '@/utils/costForecast'
+import type { Forecast } from '@/utils/costForecast'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -152,6 +154,19 @@ const heatmapMatrix = computed(() => {
 const maxCost = computed(() => maxBucketCost(heatmapMatrix.value))
 
 const heatmapEmpty = computed(() => maxCost.value === 0)
+
+// ---------------------------------------------------------------------------
+// Cost Forecast computed
+// ---------------------------------------------------------------------------
+
+const forecast = computed<Forecast>(() =>
+  buildForecast(
+    costHistoryData.value.map((p) => ({
+      ts: p.ts ?? '',
+      total_cost: p.total_cost ?? 0,
+    })),
+  ),
+)
 
 // ---------------------------------------------------------------------------
 // Health computed helpers
@@ -802,6 +817,66 @@ watch(tokenChartRef, (el) => {
         </div>
 
         <!-- ---------------------------------------------------------------- -->
+        <!-- Cost Forecast Card                                               -->
+        <!-- ---------------------------------------------------------------- -->
+        <div class="section-header" style="margin-top: 16px" data-testid="forecast-section">
+          <h2>🔮 成本預測</h2>
+        </div>
+
+        <div class="forecast-card" data-testid="forecast-card">
+          <!-- Empty state: insufficient data -->
+          <div
+            v-if="forecast.basis_days < 2"
+            class="forecast-empty"
+            data-testid="forecast-empty"
+          >
+            資料不足（需至少 2 天歷史資料）
+          </div>
+
+          <!-- Data state -->
+          <div v-else data-testid="forecast-content">
+            <!-- Primary forecast numbers -->
+            <div class="forecast-row" data-testid="forecast-7d">
+              <span class="forecast-row-label">下 7 天 預估</span>
+              <span class="forecast-row-value">${{ forecast.next7d_total.toFixed(2) }}</span>
+            </div>
+            <div class="forecast-row" data-testid="forecast-30d">
+              <span class="forecast-row-label">下 30 天 預估</span>
+              <span class="forecast-row-value">${{ forecast.next30d_total.toFixed(2) }}</span>
+            </div>
+
+            <!-- Trend line -->
+            <div class="forecast-trend" data-testid="forecast-trend">
+              <span class="forecast-trend-label">趨勢：</span>
+              <span
+                v-if="forecast.trend === 'up'"
+                class="forecast-trend-value forecast-trend--up"
+              >↑ +${{ forecast.slope_per_day.toFixed(2) }}/day</span>
+              <span
+                v-else-if="forecast.trend === 'down'"
+                class="forecast-trend-value forecast-trend--down"
+              >↓ ${{ forecast.slope_per_day.toFixed(2) }}/day</span>
+              <span
+                v-else
+                class="forecast-trend-value forecast-trend--flat"
+              >→ 持平</span>
+            </div>
+
+            <!-- Confidence badge + basis -->
+            <div class="forecast-meta" data-testid="forecast-meta">
+              <span
+                class="forecast-confidence-badge"
+                :class="`forecast-confidence--${forecast.confidence}`"
+                data-testid="forecast-confidence"
+              >{{ forecast.confidence === 'low' ? '低' : forecast.confidence === 'medium' ? '中' : '高' }} 可信度</span>
+              <span class="forecast-basis" data-testid="forecast-basis">
+                基於過去 {{ forecast.basis_days }} 天資料
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ---------------------------------------------------------------- -->
         <!-- Cost Heatmap Card                                                 -->
         <!-- ---------------------------------------------------------------- -->
         <div class="section-header" style="margin-top: 16px" data-testid="heatmap-section">
@@ -1149,6 +1224,119 @@ watch(tokenChartRef, (el) => {
   text-align: center;
   color: var(--text-muted, #94a3b8);
   font-size: 13px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Cost Forecast Card                                                   */
+/* ------------------------------------------------------------------ */
+
+.forecast-card {
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: var(--surface-base, #fff);
+  margin-top: 4px;
+}
+
+.forecast-empty {
+  padding: 12px 0;
+  text-align: center;
+  color: var(--text-muted, #94a3b8);
+  font-size: 13px;
+}
+
+.forecast-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border-color, #f1f5f9);
+}
+
+.forecast-row:last-of-type {
+  border-bottom: none;
+}
+
+.forecast-row-label {
+  color: var(--text-muted, #64748b);
+  font-size: 13px;
+}
+
+.forecast-row-value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary, #1e293b);
+  font-size: 15px;
+}
+
+.forecast-trend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0 4px;
+  font-size: 13px;
+}
+
+.forecast-trend-label {
+  color: var(--text-muted, #64748b);
+}
+
+.forecast-trend-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.forecast-trend--up {
+  color: var(--red, #ef4444);
+}
+
+.forecast-trend--down {
+  color: var(--green, #22c55e);
+}
+
+.forecast-trend--flat {
+  color: var(--text-muted, #64748b);
+}
+
+.forecast-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 8px;
+  flex-wrap: wrap;
+}
+
+.forecast-confidence-badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.forecast-confidence--low {
+  background: color-mix(in srgb, var(--amber, #f59e0b) 15%, transparent);
+  color: var(--amber, #d97706);
+  border: 1px solid var(--amber, #f59e0b);
+}
+
+.forecast-confidence--medium {
+  background: color-mix(in srgb, var(--accent, #3b82f6) 12%, transparent);
+  color: var(--accent, #2563eb);
+  border: 1px solid var(--accent, #3b82f6);
+}
+
+.forecast-confidence--high {
+  background: color-mix(in srgb, var(--green, #22c55e) 15%, transparent);
+  color: var(--green, #16a34a);
+  border: 1px solid var(--green, #22c55e);
+}
+
+.forecast-basis {
+  font-size: 12px;
+  color: var(--text-muted, #94a3b8);
 }
 
 /* ------------------------------------------------------------------ */
