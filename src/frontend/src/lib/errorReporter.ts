@@ -82,8 +82,8 @@ export function reportError(err: unknown, context: string): void {
   console.error(`[${context}]`, info.type, info.message, err)
   // Cap active error toasts — sticky toasts (duration=0) can stack indefinitely
   // during a render loop and render the UI unusable.
-  const { toasts } = useToast()
-  const activeErrorCount = toasts.value.filter((t) => t.type === 'error').length
+  const toastApi = useToast()
+  const activeErrorCount = toastApi.queue.value.filter((t) => t.variant === 'error').length
   if (activeErrorCount >= MAX_ACTIVE_ERROR_TOASTS) {
     return
   }
