@@ -5,8 +5,22 @@ import { mount } from '@vue/test-utils'
 // Mocks — hoisted before component import
 // ---------------------------------------------------------------------------
 
+vi.mock('@/composables/useToast', () => ({
+  showToast: vi.fn(),
+}))
+
+const mockAppState: {
+  currentExchangeRate: number
+  compareSelection: { firstAgentId: string | null } | null
+} = {
+  currentExchangeRate: 32,
+  compareSelection: null,
+}
+
 vi.mock('@/stores/appState', () => ({
-  appState: { currentExchangeRate: 32 },
+  get appState() {
+    return mockAppState
+  },
 }))
 
 vi.mock('@/components/AgentQuickDiagnose.vue', () => ({
@@ -121,5 +135,58 @@ describe('AgentCard — mood indicator', () => {
       },
     })
     expect(wrapper.find('.agent-mood').text()).toBe('😰')
+  })
+})
+
+describe('AgentCard — compare button', () => {
+  it('renders .agent-compare-btn button', () => {
+    const wrapper = mount(AgentCard, {
+      props: { agent: makeAgent() as never, cost: 0 },
+    })
+    expect(wrapper.find('.agent-compare-btn').exists()).toBe(true)
+  })
+
+  it('clicking compare button when no selection sets compareSelection', async () => {
+    mockAppState.compareSelection = null
+    const wrapper = mount(AgentCard, {
+      props: { agent: makeAgent({ id: 'my-agent' }) as never, cost: 0 },
+    })
+    await wrapper.find('.agent-compare-btn').trigger('click')
+    // After click, the component sets appState.compareSelection = { firstAgentId: 'my-agent' }
+    // We can't use optional chain here due to TS narrowing; check via JSON.stringify
+    expect(JSON.stringify(mockAppState.compareSelection)).toBe(
+      JSON.stringify({ firstAgentId: 'my-agent' }),
+    )
+  })
+
+  it('clicking compare button when self is first selection clears compareSelection', async () => {
+    mockAppState.compareSelection = { firstAgentId: 'my-agent' }
+    const wrapper = mount(AgentCard, {
+      props: { agent: makeAgent({ id: 'my-agent' }) as never, cost: 0 },
+    })
+    await wrapper.find('.agent-compare-btn').trigger('click')
+    expect(mockAppState.compareSelection).toBeNull()
+  })
+
+  it('emits compare event with both ids when second agent is clicked', async () => {
+    mockAppState.compareSelection = { firstAgentId: 'agent-alpha' }
+    const wrapper = mount(AgentCard, {
+      props: { agent: makeAgent({ id: 'agent-beta' }) as never, cost: 0 },
+    })
+    await wrapper.find('.agent-compare-btn').trigger('click')
+    const emitted = wrapper.emitted('compare')
+    expect(emitted).toBeTruthy()
+    expect(emitted![0]).toEqual(['agent-alpha', 'agent-beta'])
+    // State is cleared after emit
+    expect(mockAppState.compareSelection).toBeNull()
+  })
+
+  it('does not emit click event when compare button is clicked (stops propagation)', async () => {
+    mockAppState.compareSelection = null
+    const wrapper = mount(AgentCard, {
+      props: { agent: makeAgent({ id: 'my-agent' }) as never, cost: 0 },
+    })
+    await wrapper.find('.agent-compare-btn').trigger('click')
+    expect(wrapper.emitted('click')).toBeFalsy()
   })
 })
