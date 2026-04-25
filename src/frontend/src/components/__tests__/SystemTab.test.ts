@@ -657,3 +657,107 @@ describe('SystemTab — Smart Insights card', () => {
     wrapper.unmount()
   })
 })
+
+// ---------------------------------------------------------------------------
+// SystemTab — Cost Heatmap card
+// ---------------------------------------------------------------------------
+
+function makeHistoryWithCost(costHistory: Array<{ ts: string; total_cost: number }>) {
+  return {
+    success: true,
+    history: [],
+    costHistory,
+    topSpenders: [],
+    modelUsage: [],
+    agentActivity: [],
+  }
+}
+
+function recentIso(offsetDays: number, hour: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - offsetDays)
+  d.setHours(hour, 0, 0, 0)
+  return d.toISOString()
+}
+
+describe('SystemTab — Cost Heatmap card', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  // 1. Heatmap card renders when cost data is present
+  it('renders heatmap card section when cost data is present', async () => {
+    mockGet.mockResolvedValue(
+      makeHistoryWithCost([
+        { ts: recentIso(0, 10), total_cost: 0.05 },
+        { ts: recentIso(1, 14), total_cost: 0.10 },
+      ]),
+    )
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="heatmap-card"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('成本熱力圖 (7×24h)')
+    wrapper.unmount()
+  })
+
+  // 2. SVG contains exactly 168 rect cells (7 days × 24 hours)
+  it('renders exactly 168 rect cells in the SVG', async () => {
+    mockGet.mockResolvedValue(
+      makeHistoryWithCost([
+        { ts: recentIso(0, 8), total_cost: 0.01 },
+      ]),
+    )
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const svg = wrapper.find('[data-testid="heatmap-svg"]')
+    expect(svg.exists()).toBe(true)
+    const cells = wrapper.findAll('rect')
+    expect(cells).toHaveLength(168)
+    wrapper.unmount()
+  })
+
+  // 3. Empty state shown when costHistory is empty
+  it('shows empty state when costHistory is empty', async () => {
+    mockGet.mockResolvedValue(makeHistoryWithCost([]))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const empty = wrapper.find('[data-testid="heatmap-empty"]')
+    expect(empty.exists()).toBe(true)
+    expect(empty.text()).toContain('無 cost 資料')
+    // SVG should NOT render
+    expect(wrapper.find('[data-testid="heatmap-svg"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  // 4. Tooltip title includes day label, hour, and cost value
+  it('cell title tooltip contains day, hour, and cost', async () => {
+    const ts = recentIso(0, 9)
+    mockGet.mockResolvedValue(
+      makeHistoryWithCost([{ ts, total_cost: 0.1234 }]),
+    )
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const svg = wrapper.find('[data-testid="heatmap-svg"]')
+    expect(svg.exists()).toBe(true)
+
+    // Find any title element; at least one cell should have a populated cost
+    const titles = wrapper.findAll('title')
+    // At least one title must mention both an hour ":00" and "$"
+    const matched = titles.find((t) => t.text().includes(':00') && t.text().includes('$'))
+    expect(matched).toBeDefined()
+
+    // The specific populated cell title must include 9:00 and the cost
+    const populated = titles.find((t) => t.text().includes('9:00') && t.text().includes('0.1234'))
+    expect(populated).toBeDefined()
+
+    wrapper.unmount()
+  })
+})

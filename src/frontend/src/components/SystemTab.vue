@@ -5,6 +5,11 @@ import { formatTokens, formatTWD } from '@/utils/format'
 import { formatRelativeTime } from '@/lib/time'
 import { appState } from '@/stores/appState'
 import { showToast } from '@/composables/useToast'
+import {
+  computeHeatmapBuckets,
+  maxBucketCost,
+  colorForCost,
+} from '@/utils/costHeatmap'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -128,6 +133,25 @@ const topAgentActivity = computed<AgentActivitySummary[]>(() => {
     .sort((a, b) => b.active_minutes - a.active_minutes)
     .slice(0, 10)
 })
+
+// ---------------------------------------------------------------------------
+// Cost Heatmap computed
+// ---------------------------------------------------------------------------
+
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+
+const heatmapMatrix = computed(() => {
+  return computeHeatmapBuckets(
+    costHistoryData.value.map((p) => ({
+      ts: p.ts ?? '',
+      total_cost: p.total_cost ?? 0,
+    })),
+  )
+})
+
+const maxCost = computed(() => maxBucketCost(heatmapMatrix.value))
+
+const heatmapEmpty = computed(() => maxCost.value === 0)
 
 // ---------------------------------------------------------------------------
 // Health computed helpers
@@ -776,6 +800,69 @@ watch(tokenChartRef, (el) => {
           </table>
           <div v-else class="activity-empty">目前無活躍記錄</div>
         </div>
+
+        <!-- ---------------------------------------------------------------- -->
+        <!-- Cost Heatmap Card                                                 -->
+        <!-- ---------------------------------------------------------------- -->
+        <div class="section-header" style="margin-top: 16px" data-testid="heatmap-section">
+          <h2>🔥 成本熱力圖 (7×24h)</h2>
+        </div>
+
+        <div class="heatmap-card" data-testid="heatmap-card">
+          <!-- Empty state -->
+          <div v-if="heatmapEmpty" class="heatmap-empty" data-testid="heatmap-empty">
+            無 cost 資料
+          </div>
+
+          <!-- SVG heatmap -->
+          <svg
+            v-else
+            viewBox="0 0 720 220"
+            class="heatmap-svg"
+            aria-label="成本熱力圖"
+            data-testid="heatmap-svg"
+          >
+            <!-- y-axis day labels -->
+            <text
+              v-for="(d, i) in DAY_LABELS"
+              :key="d"
+              :x="0"
+              :y="20 + i * 25 + 12"
+              class="heatmap-label"
+            >{{ d }}</text>
+
+            <!-- x-axis hour labels (every 3rd hour for readability) -->
+            <text
+              v-for="h in 24"
+              :key="h - 1"
+              :x="40 + (h - 1) * 28"
+              :y="14"
+              class="heatmap-label"
+            >{{ h - 1 }}</text>
+
+            <!-- cells: 7 rows × 24 cols = 168 cells -->
+            <g
+              v-for="(row, dy) in heatmapMatrix"
+              :key="dy"
+              :data-testid="`heatmap-row-${dy}`"
+            >
+              <rect
+                v-for="(cell, hr) in row"
+                :key="hr"
+                :x="40 + hr * 28"
+                :y="20 + dy * 25"
+                width="26"
+                height="22"
+                rx="3"
+                :fill="colorForCost(cell.cost, maxCost)"
+                stroke="rgba(0,0,0,0.06)"
+                :data-testid="`heatmap-cell-${dy}-${hr}`"
+              >
+                <title>{{ DAY_LABELS[dy] }} {{ hr }}:00 — ${{ cell.cost.toFixed(4) }}</title>
+              </rect>
+            </g>
+          </svg>
+        </div>
       </div>
     </div>
   </div>
@@ -1058,6 +1145,38 @@ watch(tokenChartRef, (el) => {
 }
 
 .activity-empty {
+  padding: 16px 12px;
+  text-align: center;
+  color: var(--text-muted, #94a3b8);
+  font-size: 13px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Cost Heatmap Card                                                    */
+/* ------------------------------------------------------------------ */
+
+.heatmap-card {
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  padding: 12px 8px;
+  background: var(--surface-base, #fff);
+  overflow-x: auto;
+}
+
+.heatmap-svg {
+  display: block;
+  width: 100%;
+  min-width: 480px;
+  height: auto;
+}
+
+.heatmap-label {
+  font-size: 9px;
+  fill: var(--text-muted, #94a3b8);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.heatmap-empty {
   padding: 16px 12px;
   text-align: center;
   color: var(--text-muted, #94a3b8);
