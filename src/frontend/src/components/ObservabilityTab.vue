@@ -105,6 +105,14 @@ export interface AlertConfigResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Auto-refresh interval constants
+// ---------------------------------------------------------------------------
+
+const REFRESH_KEY = 'oc_observability_refresh_ms'
+const REFRESH_OPTIONS = [5000, 10000, 30000, 60000] as const
+const DEFAULT_REFRESH_MS = 10000
+
+// ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
 
@@ -116,6 +124,7 @@ const metricsError = ref<string | null>(null)
 const errorsError = ref<string | null>(null)
 const lastUpdated = ref<Date | null>(null)
 const autoRefresh = ref(true)
+const refreshIntervalMs = ref<number>(DEFAULT_REFRESH_MS)
 
 // Sorting for metrics table
 const sortKey = ref<keyof ApiMetric>('p99')
@@ -466,7 +475,7 @@ function startAutoRefresh(): void {
   stopAutoRefresh()
   autoRefreshTimer = setInterval(() => {
     void refresh()
-  }, 10_000)
+  }, refreshIntervalMs.value)
 }
 
 function stopAutoRefresh(): void {
@@ -482,6 +491,14 @@ function toggleAutoRefresh(): void {
     startAutoRefresh()
   } else {
     stopAutoRefresh()
+  }
+}
+
+function setRefreshInterval(ms: number): void {
+  refreshIntervalMs.value = ms
+  localStorage.setItem(REFRESH_KEY, String(ms))
+  if (autoRefresh.value) {
+    startAutoRefresh()
   }
 }
 
@@ -565,6 +582,14 @@ function formatBucketLabel(b: HourBucket): string {
 }
 
 onMounted(() => {
+  // Load persisted refresh interval from localStorage
+  const stored = localStorage.getItem(REFRESH_KEY)
+  if (stored !== null) {
+    const parsed = Number(stored)
+    if ((REFRESH_OPTIONS as readonly number[]).includes(parsed)) {
+      refreshIntervalMs.value = parsed
+    }
+  }
   void refresh()
   if (autoRefresh.value) startAutoRefresh()
 })
@@ -592,10 +617,24 @@ onUnmounted(() => {
         </button>
         <button
           :class="['obs-btn', autoRefresh ? 'obs-btn--active' : 'obs-btn--secondary']"
+          data-testid="auto-refresh-toggle"
           @click="toggleAutoRefresh"
         >
           Auto-refresh {{ autoRefresh ? 'ON' : 'OFF' }}
         </button>
+        <select
+          class="obs-refresh-select"
+          :value="refreshIntervalMs"
+          :disabled="!autoRefresh"
+          aria-label="Refresh interval"
+          data-testid="refresh-interval-select"
+          @change="setRefreshInterval(Number(($event.target as HTMLSelectElement).value))"
+        >
+          <option :value="5000">5 秒</option>
+          <option :value="10000">10 秒</option>
+          <option :value="30000">30 秒</option>
+          <option :value="60000">60 秒</option>
+        </select>
         <div class="obs-export-group" role="group" aria-label="Export data">
           <button
             class="obs-btn obs-btn--secondary obs-btn--sm"
@@ -1165,6 +1204,37 @@ onUnmounted(() => {
 .obs-btn--sm {
   padding: 4px 8px;
   font-size: 12px;
+}
+
+/* ── Refresh interval select ─────────────────────────────────────────────── */
+
+.obs-refresh-select {
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border, #444);
+  background: var(--color-surface-2, #2a2a2a);
+  color: var(--color-text, #e0e0e0);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  height: 32px;
+  min-width: 72px;
+  transition: opacity 0.15s;
+}
+
+.obs-refresh-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.obs-refresh-select:not(:disabled):hover {
+  background: var(--color-surface-3, #333);
+}
+
+.obs-refresh-select:focus {
+  outline: 2px solid var(--color-accent, #3b82f6);
+  outline-offset: 1px;
+  border-color: transparent;
 }
 
 /* ── Spinner ─────────────────────────────────────────────────────────────── */

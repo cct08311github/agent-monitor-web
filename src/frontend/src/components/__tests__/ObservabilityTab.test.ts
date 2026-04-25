@@ -223,11 +223,31 @@ function setupMockBothError() {
 
 import ObservabilityTab from '../ObservabilityTab.vue'
 
+// ---------------------------------------------------------------------------
+// Global localStorage stub (happy-dom may not expose all Storage methods)
+// ---------------------------------------------------------------------------
+
+const _lsStore: Record<string, string> = {}
+const globalLocalStorageMock = {
+  getItem: vi.fn((key: string): string | null => _lsStore[key] ?? null),
+  setItem: vi.fn((key: string, value: string): void => { _lsStore[key] = value }),
+  removeItem: vi.fn((key: string): void => { delete _lsStore[key] }),
+  clear: vi.fn((): void => { Object.keys(_lsStore).forEach((k) => { delete _lsStore[k] }) }),
+}
+
+Object.defineProperty(globalThis, 'localStorage', {
+  value: globalLocalStorageMock,
+  writable: true,
+  configurable: true,
+})
+
 describe('ObservabilityTab', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.clearAllMocks()
     mockPatch.mockResolvedValue({ success: true })
+    // Reset localStorage store between tests
+    globalLocalStorageMock.clear()
   })
 
   afterEach(() => {
@@ -1318,6 +1338,124 @@ describe('ObservabilityTab', () => {
       const d = new Date(2026, 3, 24, 9, 5, 1)
       const ts = formatExportTimestamp(d)
       expect(ts).toMatch(/^\d{8}-\d{6}$/)
+    })
+  })
+
+  // ── Refresh interval ─────────────────────────────────────────────────────
+
+  describe('refresh interval', () => {
+    it('defaults to 10s when localStorage has no saved value', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const select = wrapper.find('[data-testid="refresh-interval-select"]')
+      expect((select.element as HTMLSelectElement).value).toBe('10000')
+      wrapper.unmount()
+    })
+
+    it('setting 30s persists to localStorage and updates select', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const select = wrapper.find('[data-testid="refresh-interval-select"]')
+      await select.setValue('30000')
+      await wrapper.vm.$nextTick()
+
+      expect(globalLocalStorageMock.setItem).toHaveBeenCalledWith('oc_observability_refresh_ms', '30000')
+      expect((select.element as HTMLSelectElement).value).toBe('30000')
+      wrapper.unmount()
+    })
+
+    it('tick 30s triggers fetch when interval is set to 30s', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      // Set 30s interval — this resets the timer
+      const select = wrapper.find('[data-testid="refresh-interval-select"]')
+      await select.setValue('30000')
+      await wrapper.vm.$nextTick()
+
+      // Should NOT trigger at 10s (new interval is 30s)
+      mockGet.mockClear()
+      vi.advanceTimersByTime(10_000)
+      await flushPromises()
+      expect(mockGet).not.toHaveBeenCalled()
+
+      // Should trigger at 30s mark
+      vi.advanceTimersByTime(20_000)
+      await flushPromises()
+      expect(mockGet).toHaveBeenCalledTimes(5)
+      wrapper.unmount()
+    })
+
+    it('autoRefresh off → changing interval does not start timer', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      // Turn off auto-refresh first
+      const toggleBtn = wrapper.find('[data-testid="auto-refresh-toggle"]')
+      await toggleBtn.trigger('click')
+
+      mockGet.mockClear()
+      // Change interval to 5s — should not start timer since autoRefresh is OFF
+      const select = wrapper.find('[data-testid="refresh-interval-select"]')
+      await select.setValue('5000')
+      await wrapper.vm.$nextTick()
+
+      vi.advanceTimersByTime(10_000)
+      await flushPromises()
+      expect(mockGet).not.toHaveBeenCalled()
+      wrapper.unmount()
+    })
+
+    it('invalid localStorage value falls back to default 10s', async () => {
+      // Pre-seed invalid value before mount
+      globalLocalStorageMock.getItem.mockReturnValueOnce('garbage')
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const select = wrapper.find('[data-testid="refresh-interval-select"]')
+      expect((select.element as HTMLSelectElement).value).toBe('10000')
+      wrapper.unmount()
+    })
+
+    it('out-of-range localStorage value (e.g. 99999) falls back to default 10s', async () => {
+      globalLocalStorageMock.getItem.mockReturnValueOnce('99999')
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const select = wrapper.find('[data-testid="refresh-interval-select"]')
+      expect((select.element as HTMLSelectElement).value).toBe('10000')
+      wrapper.unmount()
+    })
+
+    it('select is disabled when autoRefresh is OFF', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const toggleBtn = wrapper.find('[data-testid="auto-refresh-toggle"]')
+      await toggleBtn.trigger('click')
+
+      const select = wrapper.find('[data-testid="refresh-interval-select"]')
+      expect(select.attributes('disabled')).toBeDefined()
+      wrapper.unmount()
+    })
+
+    it('select is enabled when autoRefresh is ON', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const select = wrapper.find('[data-testid="refresh-interval-select"]')
+      expect(select.attributes('disabled')).toBeUndefined()
+      wrapper.unmount()
     })
   })
 
