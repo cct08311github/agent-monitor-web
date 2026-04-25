@@ -8,6 +8,7 @@ import { showToast } from '@/composables/useToast'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useCompactMode } from '@/composables/useCompactMode'
 import { usePomodoro } from '@/composables/usePomodoro'
+import { useAmbientMode } from '@/composables/useAmbientMode'
 import { appState } from '@/stores/appState'
 import ToastContainer from '@/components/ToastContainer.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -123,6 +124,24 @@ registerShortcut({
   description: '切換 compact 模式',
   category: 'Actions',
 })
+
+// ── Ambient Mode ────────────────────────────────────────────────────────────
+
+const ambient = useAmbientMode({
+  getAgentIds: () => (appState.latestDashboard?.agents ?? []).map((a: any) => a.id as string),
+  onCycle: (id: string) => {
+    appState.currentDesktopTab = 'monitor'
+    appState.currentDetailAgentId = id
+  },
+})
+
+registerShortcut({
+  key: 'm',
+  shift: true,
+  handler: () => ambient.toggle(),
+  description: 'Ambient mode 切換',
+  category: 'Actions',
+})
 </script>
 
 <template>
@@ -203,6 +222,13 @@ registerShortcut({
           :aria-pressed="compact"
           @click="toggleCompact"
         >📐</button>
+        <button
+          v-if="!isLoginPage"
+          class="header-btn icon-only ambient-btn"
+          :title="`Ambient mode (${ambient.enabled.value ? 'ON' : 'OFF'}) (Shift+M)`"
+          :aria-pressed="ambient.enabled.value"
+          @click="ambient.toggle()"
+        >📺</button>
         <select
           :value="currentTheme"
           class="header-theme-select"

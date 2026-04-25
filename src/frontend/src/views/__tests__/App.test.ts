@@ -528,6 +528,30 @@ describe('App.vue — Compact Mode Toggle', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Ambient Mode
+// ---------------------------------------------------------------------------
+
+const { mockAmbientEnabled, mockAmbientToggle } = vi.hoisted(() => {
+  const mockAmbientEnabled = { value: false }
+  const mockAmbientToggle = vi.fn(() => {
+    mockAmbientEnabled.value = !mockAmbientEnabled.value
+  })
+  return { mockAmbientEnabled, mockAmbientToggle }
+})
+
+vi.mock('@/composables/useAmbientMode', () => ({
+  useAmbientMode: (_opts?: unknown) => ({
+    enabled: mockAmbientEnabled,
+    intervalMs: { value: 8000 },
+    currentIndex: { value: 0 },
+    isPaused: { value: false },
+    toggle: mockAmbientToggle,
+    setIntervalMs: vi.fn(),
+    bumpInteraction: vi.fn(),
+  }),
+}))
+
+// ---------------------------------------------------------------------------
 // Pomodoro Timer
 // ---------------------------------------------------------------------------
 
@@ -669,6 +693,116 @@ describe('App.vue — Pomodoro Timer', () => {
     await flushPromises()
 
     expect(wrapper.find('.pomo-btn').exists()).toBe(false)
+    wrapper.unmount()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Ambient Mode Button
+// ---------------------------------------------------------------------------
+
+describe('App.vue — Ambient Mode Button', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockRouteName.value = 'dashboard'
+    mockAppState.currentDesktopTab = 'monitor'
+    mockAppState.currentDetailAgentId = ''
+    mockAppState.commandPaletteRequest = 0
+    mockAppState.latestDashboard = null
+    mockCompact.value = false
+    capturedShortcuts.length = 0
+    mockAmbientEnabled.value = false
+  })
+
+  // ── 1. Renders ambient button ──────────────────────────────────────────────
+
+  it('renders ambient-btn button in header when not on login page', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.find('.ambient-btn').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  // ── 2. Title shows OFF when disabled ──────────────────────────────────────
+
+  it('ambient button title shows OFF when ambient is disabled', async () => {
+    mockAmbientEnabled.value = false
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const btn = wrapper.find('.ambient-btn')
+    expect(btn.attributes('title')).toContain('OFF')
+    wrapper.unmount()
+  })
+
+  // ── 3. Title shows ON when enabled ────────────────────────────────────────
+
+  it('ambient button title shows ON when ambient is enabled', async () => {
+    mockAmbientEnabled.value = true
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const btn = wrapper.find('.ambient-btn')
+    expect(btn.attributes('title')).toContain('ON')
+    wrapper.unmount()
+  })
+
+  // ── 4. Click calls toggle ─────────────────────────────────────────────────
+
+  it('clicking ambient-btn calls ambient.toggle()', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    await wrapper.find('.ambient-btn').trigger('click')
+    expect(mockAmbientToggle).toHaveBeenCalledOnce()
+    wrapper.unmount()
+  })
+
+  // ── 5. aria-pressed reflects enabled state ────────────────────────────────
+
+  it('ambient button has aria-pressed=false when disabled', async () => {
+    mockAmbientEnabled.value = false
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const btn = wrapper.find('.ambient-btn')
+    expect(btn.attributes('aria-pressed')).toBe('false')
+    wrapper.unmount()
+  })
+
+  it('ambient button has aria-pressed=true when enabled', async () => {
+    mockAmbientEnabled.value = true
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const btn = wrapper.find('.ambient-btn')
+    expect(btn.attributes('aria-pressed')).toBe('true')
+    wrapper.unmount()
+  })
+
+  // ── 6. Shift+M shortcut is registered ─────────────────────────────────────
+
+  it('registers Shift+M shortcut for Ambient mode toggle', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const ambientShortcut = capturedShortcuts.find(
+      (s) => s.key === 'm' && s.shift === true,
+    )
+    expect(ambientShortcut).toBeDefined()
+    expect(ambientShortcut?.category).toBe('Actions')
+    wrapper.unmount()
+  })
+
+  // ── 7. Hidden on login page ────────────────────────────────────────────────
+
+  it('does not render ambient-btn on login page', async () => {
+    mockRouteName.value = 'login'
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.find('.ambient-btn').exists()).toBe(false)
     wrapper.unmount()
   })
 })
