@@ -298,3 +298,118 @@ describe('AgentDetail — API calls', () => {
     wrapper.unmount()
   })
 })
+
+// ---------------------------------------------------------------------------
+// 6. Sessions search
+// ---------------------------------------------------------------------------
+
+describe('AgentDetail — sessions search', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  function setupSessionsMocks(sessionList: { id: string; messageCount: number; lastTs?: string }[]) {
+    mockGet.mockImplementation((url: string) => {
+      if (url.includes('/sessions')) return Promise.resolve({ success: true, sessions: sessionList })
+      if (url.includes('/history')) return Promise.resolve({ success: true, history: [] })
+      return Promise.resolve({ success: true })
+    })
+  }
+
+  it('renders search input when sessions exist', async () => {
+    setupSessionsMocks([
+      { id: 'abc-session-001', messageCount: 3 },
+      { id: 'xyz-session-002', messageCount: 7 },
+    ])
+
+    const wrapper = mountDetail()
+    await flushPromises()
+    await nextTick()
+
+    const searchInput = wrapper.find('.session-search-input')
+    expect(searchInput.exists()).toBe(true)
+    expect(searchInput.attributes('placeholder')).toContain('session id')
+
+    wrapper.unmount()
+  })
+
+  it('filters sessions by id substring (case-insensitive)', async () => {
+    setupSessionsMocks([
+      { id: 'abc-session-001', messageCount: 3 },
+      { id: 'xyz-session-002', messageCount: 7 },
+      { id: 'ABC-session-003', messageCount: 2 },
+    ])
+
+    const wrapper = mountDetail()
+    await flushPromises()
+    await nextTick()
+
+    const searchInput = wrapper.find('.session-search-input')
+    await searchInput.setValue('abc')
+    await nextTick()
+
+    const sessionButtons = wrapper.findAll('.detail-card button.btn-reset')
+    // only 'abc-session-001' and 'ABC-session-003' should match
+    expect(sessionButtons.length).toBe(2)
+
+    wrapper.unmount()
+  })
+
+  it('shows empty result message when no sessions match query', async () => {
+    setupSessionsMocks([
+      { id: 'abc-session-001', messageCount: 3 },
+      { id: 'xyz-session-002', messageCount: 7 },
+    ])
+
+    const wrapper = mountDetail()
+    await flushPromises()
+    await nextTick()
+
+    const searchInput = wrapper.find('.session-search-input')
+    await searchInput.setValue('zzznomatch')
+    await nextTick()
+
+    expect(wrapper.find('.sessions-empty-search').exists()).toBe(true)
+    expect(wrapper.text()).toContain('無符合 session')
+
+    wrapper.unmount()
+  })
+
+  it('clears query and restores full session list', async () => {
+    setupSessionsMocks([
+      { id: 'abc-session-001', messageCount: 3 },
+      { id: 'xyz-session-002', messageCount: 7 },
+    ])
+
+    const wrapper = mountDetail()
+    await flushPromises()
+    await nextTick()
+
+    const searchInput = wrapper.find('.session-search-input')
+
+    // Filter down to 1
+    await searchInput.setValue('abc')
+    await nextTick()
+    expect(wrapper.findAll('.detail-card button.btn-reset').length).toBe(1)
+
+    // Clear — all 2 should return
+    await searchInput.setValue('')
+    await nextTick()
+    expect(wrapper.findAll('.detail-card button.btn-reset').length).toBe(2)
+    expect(wrapper.find('.sessions-empty-search').exists()).toBe(false)
+
+    wrapper.unmount()
+  })
+
+  it('does not render search input when sessions list is empty', async () => {
+    setupDefaultMocks() // sessions: []
+
+    const wrapper = mountDetail()
+    await flushPromises()
+    await nextTick()
+
+    expect(wrapper.find('.session-search-input').exists()).toBe(false)
+
+    wrapper.unmount()
+  })
+})
