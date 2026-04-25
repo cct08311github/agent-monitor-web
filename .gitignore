@@ -4,6 +4,8 @@ dist/
 logs/
 cache/
 data/
+# Allow frontend data source-of-truth module
+!src/frontend/src/data/
 .DS_Store
 .env
 coverage/
