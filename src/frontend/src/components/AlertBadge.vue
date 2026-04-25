@@ -47,6 +47,15 @@ let flashTimeout: ReturnType<typeof setTimeout> | null = null
 const NOTIF_STORAGE_KEY = 'oc_desktop_notif_enabled'
 
 // ---------------------------------------------------------------------------
+// Audio cue state
+// ---------------------------------------------------------------------------
+
+const AUDIO_KEY = 'oc_alert_audio_enabled'
+
+const audioEnabled = ref<boolean>(false)
+let audioCtx: AudioContext | null = null
+
+// ---------------------------------------------------------------------------
 // Snooze state
 // ---------------------------------------------------------------------------
 
@@ -192,6 +201,39 @@ async function toggleNotifications(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Audio cue methods
+// ---------------------------------------------------------------------------
+
+function toggleAudio(): void {
+  audioEnabled.value = !audioEnabled.value
+  try {
+    localStorage.setItem(AUDIO_KEY, audioEnabled.value ? '1' : '0')
+  } catch {
+    // localStorage may be unavailable; ignore silently
+  }
+}
+
+function playBeep(): void {
+  try {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
+    }
+    const osc = audioCtx.createOscillator()
+    const gain = audioCtx.createGain()
+    osc.connect(gain)
+    gain.connect(audioCtx.destination)
+    osc.frequency.value = 880 // A5
+    gain.gain.setValueAtTime(0.0001, audioCtx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.3, audioCtx.currentTime + 0.01)
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.25)
+    osc.start()
+    osc.stop(audioCtx.currentTime + 0.25)
+  } catch {
+    // Silent — audio failure must never break UX
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Watch recentAlerts → fire desktop notifications for new criticals
 // ---------------------------------------------------------------------------
 
@@ -208,28 +250,34 @@ watch(recentAlerts, (current) => {
     lastCriticalIds.value.add(criticalAlertId(a))
   }
 
-  if (
-    notificationsEnabled.value &&
-    notificationPermission.value === 'granted' &&
-    notifSupported &&
-    !isSnoozed.value &&
-    newCriticals.length > 0
-  ) {
-    // Batch: fire a single notification for the entire set of new criticals
-    const body =
-      newCriticals.length === 1
-        ? truncate(newCriticals[0].message)
-        : `${newCriticals.length} 個 critical alerts`
+  if (newCriticals.length > 0 && !isSnoozed.value) {
+    // Desktop notification
+    if (
+      notificationsEnabled.value &&
+      notificationPermission.value === 'granted' &&
+      notifSupported
+    ) {
+      // Batch: fire a single notification for the entire set of new criticals
+      const body =
+        newCriticals.length === 1
+          ? truncate(newCriticals[0].message)
+          : `${newCriticals.length} 個 critical alerts`
 
-    // Use the first new critical's rule as the notification tag so rapid-fire
-    // updates replace (rather than stack) the same logical alert
-    const tag = newCriticals.length === 1 ? newCriticals[0].rule : 'agent-monitor-critical'
+      // Use the first new critical's rule as the notification tag so rapid-fire
+      // updates replace (rather than stack) the same logical alert
+      const tag = newCriticals.length === 1 ? newCriticals[0].rule : 'agent-monitor-critical'
 
-    new Notification('Agent Monitor — Critical Alert', {
-      body,
-      tag,
-      requireInteraction: false,
-    })
+      new Notification('Agent Monitor — Critical Alert', {
+        body,
+        tag,
+        requireInteraction: false,
+      })
+    }
+
+    // Audio cue
+    if (audioEnabled.value) {
+      playBeep()
+    }
   }
 })
 
@@ -315,6 +363,16 @@ onMounted(() => {
     } catch {
       // localStorage may be unavailable; default to false
     }
+  }
+
+  // Load persisted audio cue preference
+  try {
+    const storedAudio = localStorage.getItem(AUDIO_KEY)
+    if (storedAudio !== null) {
+      audioEnabled.value = storedAudio === '1'
+    }
+  } catch {
+    // localStorage may be unavailable; default to false
   }
 
   // Load persisted snooze
@@ -474,6 +532,17 @@ function handleClick(): void {
               @change="toggleNotifications"
             />
             <span class="notif-toggle-text">啟用桌面通知</span>
+          </label>
+
+          <!-- Audio cue settings row -->
+          <label class="notif-toggle-label audio-toggle-label">
+            <input
+              type="checkbox"
+              class="notif-toggle-checkbox audio-toggle-checkbox"
+              :checked="audioEnabled"
+              @change="toggleAudio"
+            />
+            <span class="notif-toggle-text">啟用 critical 音效</span>
           </label>
 
           <!-- Browser not supported -->
@@ -706,6 +775,10 @@ function handleClick(): void {
 .notif-toggle-text {
   font-size: 11px;
   color: var(--text-secondary, rgba(255, 255, 255, 0.65));
+}
+
+.audio-toggle-label {
+  margin-top: 6px;
 }
 
 .notif-warning {

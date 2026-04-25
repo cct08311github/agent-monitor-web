@@ -970,4 +970,171 @@ describe('AlertBadge', () => {
       wrapper.unmount()
     })
   })
+
+  // ── Audio cue ──────────────────────────────────────────────────────────────
+
+  describe('audio cue', () => {
+    // Shared AudioContext mock builder
+    function makeAudioContextMock() {
+      const oscillatorStop = vi.fn()
+      const oscillatorStart = vi.fn()
+      const oscillatorConnect = vi.fn()
+      const gainConnect = vi.fn()
+      const setValueAtTime = vi.fn()
+      const exponentialRampToValueAtTime = vi.fn()
+      const gainNode = {
+        connect: gainConnect,
+        gain: {
+          setValueAtTime,
+          exponentialRampToValueAtTime,
+        },
+      }
+      const oscillatorNode = {
+        connect: oscillatorConnect,
+        start: oscillatorStart,
+        stop: oscillatorStop,
+        frequency: { value: 0 },
+      }
+      // Use a real class so `new MockAudioContext()` works correctly
+      class MockAudioContext {
+        destination = {}
+        currentTime = 0
+        createOscillator = vi.fn().mockReturnValue(oscillatorNode)
+        createGain = vi.fn().mockReturnValue(gainNode)
+      }
+      const MockAudioContextSpy = vi.fn().mockImplementation(function(this: MockAudioContext) {
+        Object.assign(this, new MockAudioContext())
+      })
+      return { MockAudioContext: MockAudioContextSpy, oscillatorStart, oscillatorStop }
+    }
+
+    function makeLocalStorageStub(initial: Record<string, string> = {}): Storage {
+      const store = new Map<string, string>(Object.entries(initial))
+      return {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => { store.set(k, v) },
+        removeItem: (k: string) => { store.delete(k) },
+        clear: () => { store.clear() },
+        get length() { return store.size },
+        key: (i: number) => [...store.keys()][i] ?? null,
+      } as Storage
+    }
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    // 1. audioEnabled loads true from localStorage on mount
+    it('loads audioEnabled=true from localStorage on mount', async () => {
+      vi.stubGlobal('localStorage', makeLocalStorageStub({ oc_alert_audio_enabled: '1' }))
+      mockGet.mockResolvedValue(emptyResponse())
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      await wrapper.find('.alert-badge-wrapper').trigger('focusin')
+      await wrapper.vm.$nextTick()
+
+      const checkbox = wrapper.find<HTMLInputElement>('.audio-toggle-checkbox')
+      expect(checkbox.element.checked).toBe(true)
+      wrapper.unmount()
+    })
+
+    // 2. toggleAudio on → persists '1' to localStorage
+    it('persists audioEnabled=true to localStorage when toggled on', async () => {
+      const lsStub = makeLocalStorageStub()
+      vi.stubGlobal('localStorage', lsStub)
+      mockGet.mockResolvedValue(emptyResponse())
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      await wrapper.find('.alert-badge-wrapper').trigger('focusin')
+      await wrapper.vm.$nextTick()
+
+      await wrapper.find('.audio-toggle-checkbox').trigger('change')
+      await wrapper.vm.$nextTick()
+
+      expect(lsStub.getItem('oc_alert_audio_enabled')).toBe('1')
+      wrapper.unmount()
+    })
+
+    // 3. new critical + audioEnabled=true + not snoozed → AudioContext instantiated and beep plays
+    it('calls AudioContext and starts oscillator when new critical arrives with audioEnabled=true', async () => {
+      const { MockAudioContext, oscillatorStart } = makeAudioContextMock()
+      vi.stubGlobal('AudioContext', MockAudioContext)
+      vi.stubGlobal('localStorage', makeLocalStorageStub({ oc_alert_audio_enabled: '1' }))
+      mockGet.mockResolvedValue(alertsResponse([makeAlert('critical')]))
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      expect(MockAudioContext).toHaveBeenCalledTimes(1)
+      expect(oscillatorStart).toHaveBeenCalledTimes(1)
+      wrapper.unmount()
+    })
+
+    // 4. new critical + audioEnabled=false → no AudioContext instantiation
+    it('does not play audio when audioEnabled=false', async () => {
+      const { MockAudioContext } = makeAudioContextMock()
+      vi.stubGlobal('AudioContext', MockAudioContext)
+      vi.stubGlobal('localStorage', makeLocalStorageStub({ oc_alert_audio_enabled: '0' }))
+      mockGet.mockResolvedValue(alertsResponse([makeAlert('critical')]))
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      expect(MockAudioContext).not.toHaveBeenCalled()
+      wrapper.unmount()
+    })
+
+    // 5. snoozed + audioEnabled=true → no audio played
+    it('does not play audio when snoozed even if audioEnabled=true', async () => {
+      const { MockAudioContext } = makeAudioContextMock()
+      vi.stubGlobal('AudioContext', MockAudioContext)
+      vi.stubGlobal('localStorage', makeLocalStorageStub({
+        oc_alert_audio_enabled: '1',
+        oc_alert_notif_snooze_until: String(NOW + 60 * 60_000),
+      }))
+      mockGet.mockResolvedValue(alertsResponse([makeAlert('critical')]))
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      expect(MockAudioContext).not.toHaveBeenCalled()
+      wrapper.unmount()
+    })
+
+    // 6. AudioContext constructor throws → silent (no unhandled error)
+    it('does not throw when AudioContext constructor fails', async () => {
+      vi.stubGlobal('AudioContext', vi.fn().mockImplementation(() => {
+        throw new Error('AudioContext not available')
+      }))
+      vi.stubGlobal('localStorage', makeLocalStorageStub({ oc_alert_audio_enabled: '1' }))
+      mockGet.mockResolvedValue(alertsResponse([makeAlert('critical')]))
+
+      // Should not throw
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      // Component still renders normally
+      expect(wrapper.find('.bell-icon').exists()).toBe(true)
+      wrapper.unmount()
+    })
+
+    // 7. audio toggle checkbox renders in popover settings
+    it('renders audio toggle checkbox in popover settings', async () => {
+      mockGet.mockResolvedValue(emptyResponse())
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      await wrapper.find('.alert-badge-wrapper').trigger('focusin')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.audio-toggle-checkbox').exists()).toBe(true)
+      expect(wrapper.find('.audio-toggle-label').exists()).toBe(true)
+      wrapper.unmount()
+    })
+  })
 })
