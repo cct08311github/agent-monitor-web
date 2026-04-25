@@ -4,6 +4,7 @@ import type { DashboardPayload } from '@/types/api'
 import type { CostRange } from '@/composables/useDashboard'
 import { formatTWD } from '@/utils/format'
 import { appState } from '@/stores/appState'
+import NumberTicker from './NumberTicker.vue'
 
 const props = defineProps<{
   activeTab: string
@@ -29,8 +30,8 @@ const enabledCronCount = computed(() => props.dashboard?.cron?.filter(c => c.ena
     <div class="summary-card">
       <div class="summary-label">活躍 Agent</div>
       <div class="summary-value">
-        {{ activeAgentCount }}
-        <span style="font-size:14px;color:var(--text-muted);font-weight:400">/ {{ totalAgentCount }}</span>
+        <NumberTicker :value="activeAgentCount" />
+        <span style="font-size:14px;color:var(--text-muted);font-weight:400">/ <NumberTicker :value="totalAgentCount" /></span>
       </div>
     </div>
 
@@ -51,7 +52,7 @@ const enabledCronCount = computed(() => props.dashboard?.cron?.filter(c => c.ena
         </select>
       </div>
       <div class="summary-value cost">
-        {{ formatTWD(totalCost, appState.currentExchangeRate) }}
+        <NumberTicker :value="formatTWD(totalCost, appState.currentExchangeRate)" />
       </div>
     </div>
 
@@ -59,7 +60,7 @@ const enabledCronCount = computed(() => props.dashboard?.cron?.filter(c => c.ena
     <div class="summary-card">
       <div class="summary-label">Cron 任務</div>
       <div class="summary-value">
-        {{ enabledCronCount }}
+        <NumberTicker :value="enabledCronCount" />
         <span style="font-size:14px;color:var(--text-muted);font-weight:400">啟用</span>
       </div>
     </div>

@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { api } from '@/composables/useApi'
 import { appState } from '@/stores/appState'
 import { formatRelativeTime } from '@/lib/time'
+import NumberTicker from './NumberTicker.vue'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -477,7 +478,7 @@ function handleClick(): void {
         v-if="badgeCount > 0"
         :class="['alert-badge', severity]"
         aria-hidden="true"
-      >{{ badgeCount }}</span>
+      ><NumberTicker :value="badgeCount" /></span>
     </button>
 
     <Transition name="fade">
