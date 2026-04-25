@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { api } from '@/composables/useApi'
 import { formatTokens, formatTWD } from '@/utils/format'
+import { formatRelativeTime } from '@/lib/time'
 import { appState } from '@/stores/appState'
 import { showToast } from '@/composables/useToast'
 
@@ -33,6 +34,12 @@ interface ModelUsageItem {
   cost?: number
 }
 
+interface AgentActivitySummary {
+  agent_id: string
+  active_minutes: number
+  last_seen: string  // ISO timestamp
+}
+
 // ---------------------------------------------------------------------------
 // Canvas refs
 // ---------------------------------------------------------------------------
@@ -49,6 +56,7 @@ const sysHistoryData = ref<HistoryPoint[]>([])
 const costHistoryData = ref<CostHistoryPoint[]>([])
 const tokenSpendersData = ref<TopSpender[]>([])
 const modelUsageData = ref<ModelUsageItem[]>([])
+const agentActivityData = ref<AgentActivitySummary[]>([])
 const historyError = ref(false)
 
 // ---------------------------------------------------------------------------
@@ -81,6 +89,24 @@ const totalCostUSD = computed(() => {
     return sum + parseFloat(String((a as Record<string, unknown>).costUSD ?? 0))
   }, 0)
 })
+
+// Top 10 agents sorted by active_minutes descending
+const topAgentActivity = computed<AgentActivitySummary[]>(() => {
+  return [...agentActivityData.value]
+    .sort((a, b) => b.active_minutes - a.active_minutes)
+    .slice(0, 10)
+})
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function formatActiveMinutes(min: number): string {
+  if (min < 60) return `${min} 分鐘`
+  const hours = Math.floor(min / 60)
+  const remaining = min % 60
+  return `${hours} 小時 ${remaining} 分`
+}
 
 // ---------------------------------------------------------------------------
 // Canvas drawing helpers — plain TS functions, not in template
@@ -333,6 +359,7 @@ async function fetchHistory(): Promise<void> {
       costHistory?: CostHistoryPoint[]
       topSpenders?: TopSpender[]
       modelUsage?: ModelUsageItem[]
+      agentActivity?: AgentActivitySummary[]
     }
     if (data.success && data.history) {
       sysHistoryData.value = data.history
@@ -346,6 +373,7 @@ async function fetchHistory(): Promise<void> {
     if (data.modelUsage) {
       modelUsageData.value = data.modelUsage
     }
+    agentActivityData.value = data.agentActivity ?? []
     // Draw after data arrives
     redrawCharts()
   } catch {
@@ -498,7 +526,105 @@ watch(tokenChartRef, (el) => {
             {{ formatTWD(totalCostUSD, appState.currentExchangeRate) }}
           </span>
         </div>
+
+        <!-- Agent Activity Summary Card -->
+        <div class="section-header" style="margin-top: 16px">
+          <h2>⏱ Agent 活躍度 (Top 10)</h2>
+        </div>
+
+        <div class="activity-table-wrap">
+          <table v-if="topAgentActivity.length > 0" class="activity-table">
+            <thead>
+              <tr>
+                <th class="activity-th activity-th--agent">Agent</th>
+                <th class="activity-th activity-th--duration">活躍時長</th>
+                <th class="activity-th activity-th--last-seen">最後活動</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="item in topAgentActivity"
+                :key="item.agent_id"
+                class="activity-row"
+              >
+                <td class="activity-td activity-td--agent">{{ item.agent_id }}</td>
+                <td class="activity-td activity-td--duration">{{ formatActiveMinutes(item.active_minutes) }}</td>
+                <td class="activity-td activity-td--last-seen">
+                  {{ formatRelativeTime(Date.parse(item.last_seen)) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="activity-empty">目前無活躍記錄</div>
+        </div>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.activity-table-wrap {
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border-color, #e2e8f0);
+  margin-top: 4px;
+}
+
+.activity-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.activity-th {
+  padding: 8px 10px;
+  text-align: left;
+  font-weight: 600;
+  background: var(--surface-raised, #f1f5f9);
+  color: var(--text-muted, #64748b);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.activity-th--duration,
+.activity-th--last-seen {
+  text-align: right;
+}
+
+.activity-row:not(:last-child) {
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.activity-row:hover {
+  background: var(--surface-hover, #f8fafc);
+}
+
+.activity-td {
+  padding: 7px 10px;
+  color: var(--text-primary, #1e293b);
+}
+
+.activity-td--agent {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-td--duration,
+.activity-td--last-seen {
+  text-align: right;
+  white-space: nowrap;
+  color: var(--text-muted, #64748b);
+}
+
+.activity-empty {
+  padding: 16px 12px;
+  text-align: center;
+  color: var(--text-muted, #94a3b8);
+  font-size: 13px;
+}
+</style>
