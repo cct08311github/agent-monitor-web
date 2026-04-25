@@ -422,7 +422,28 @@ describe('CronTab', () => {
       await flushPromises()
 
       expect(wrapper.find('.agent-name').text()).toBe('Test Job')
-      expect(wrapper.find('.agent-hostname').text()).toBe('*/5 * * * *')
+      // .agent-hostname now contains expr + humanized text
+      expect(wrapper.find('.agent-hostname').text()).toContain('*/5 * * * *')
+      wrapper.unmount()
+    })
+
+    it('renders humanized cron text alongside raw expression', async () => {
+      mockGet.mockResolvedValue(jobsResponse([makeJob({ schedule: { expr: '*/5 * * * *' } })]))
+      const wrapper = mount(CronTab)
+      await flushPromises()
+
+      const humanEl = wrapper.find('.cron-human')
+      expect(humanEl.exists()).toBe(true)
+      expect(humanEl.text()).toContain('每 5 分鐘')
+      wrapper.unmount()
+    })
+
+    it('does not render .cron-human when schedule expr is absent', async () => {
+      mockGet.mockResolvedValue(jobsResponse([makeJob({ schedule: undefined })]))
+      const wrapper = mount(CronTab)
+      await flushPromises()
+
+      expect(wrapper.find('.cron-human').exists()).toBe(false)
       wrapper.unmount()
     })
 

@@ -10,6 +10,7 @@ import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { formatCountdown } from '@/lib/time'
 import { buildMarkers, formatRelative } from '@/utils/cronTimeline'
 import type { TimelineMarker } from '@/utils/cronTimeline'
+import { humanizeCron } from '@/utils/cronHumanizer'
 
 // ---------------------------------------------------------------------------
 // State
@@ -370,7 +371,10 @@ function getNextRunCountdown(job: CronJob): string {
               <div class="agent-avatar">⏰</div>
               <div>
                 <div class="agent-name">{{ job.name }}</div>
-                <div class="agent-hostname">{{ job.schedule?.expr ?? 'Once' }}</div>
+                <div class="agent-hostname">
+                  {{ job.schedule?.expr ?? 'Once' }}
+                  <small v-if="job.schedule?.expr" class="cron-human">· {{ humanizeCron(job.schedule.expr) }}</small>
+                </div>
               </div>
             </div>
 
@@ -611,5 +615,11 @@ function getNextRunCountdown(job: CronJob): string {
   height: auto;
   display: block;
   overflow: visible;
+}
+
+.cron-human {
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.85em;
+  font-weight: 400;
 }
 </style>
