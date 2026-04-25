@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import MonitorTab from '@/components/MonitorTab.vue'
 import AgentDetail from '@/components/AgentDetail.vue'
 import SystemTab from '@/components/SystemTab.vue'
@@ -29,6 +29,17 @@ const showHelpModal = ref(false)
 
 // Command Palette state
 const showPalette = ref(false)
+
+// External trigger: any component can increment appState.commandPaletteRequest
+// to open the palette (e.g. the header button in App.vue)
+watch(
+  () => appState.commandPaletteRequest,
+  (newVal, oldVal) => {
+    if (newVal !== oldVal) {
+      showPalette.value = true
+    }
+  },
+)
 
 // ---------------------------------------------------------------------------
 // Keyboard shortcuts

@@ -15,6 +15,17 @@ const { username, logout: doLogout } = useAuth()
 
 const isLoginPage = computed(() => route.name === 'login')
 
+const isMac = computed(() =>
+  /Mac/i.test(
+    (typeof navigator !== 'undefined' ? (navigator.platform || navigator.userAgent) : '') ?? '',
+  ),
+)
+const cmdKHint = computed(() => (isMac.value ? '⌘K' : 'Ctrl+K'))
+
+function openPalette() {
+  appState.commandPaletteRequest++
+}
+
 const themeIcon = computed(() => {
   if (currentTheme.value === 'light') return '☀️'
   if (currentTheme.value === 'dark') return '🌙'
@@ -90,6 +101,13 @@ const activeDesktopTab = computed<DesktopTab>(() => {
         </div>
       </div>
       <div class="header-right">
+        <button
+          v-if="!isLoginPage"
+          class="header-btn icon-only palette-opener-btn"
+          :title="`快速命令 (${cmdKHint})`"
+          aria-label="開啟 Command Palette"
+          @click="openPalette"
+        >⌘<span class="cmd-k-hint">K</span></button>
         <AlertBadge v-if="!isLoginPage" />
         <button class="header-btn icon-only" :title="themeIcon" @click="cycleTheme">{{ themeIcon }}</button>
         <span style="font-size:12px;color:var(--text-muted);margin:0 4px">{{ username }}</span>
@@ -120,4 +138,25 @@ const activeDesktopTab = computed<DesktopTab>(() => {
 @import './assets/css/overhaul.css';
 @import './assets/css/ux-patterns.css';
 @import './assets/css/vue-fixes.css';
+</style>
+
+<style scoped>
+/* Command Palette opener button in the header */
+.palette-opener-btn {
+  font-size: 12px;
+  letter-spacing: -0.01em;
+  padding: 0.25rem 0.45rem;
+  opacity: 0.75;
+  transition: opacity 0.15s;
+}
+
+.palette-opener-btn:hover {
+  opacity: 1;
+}
+
+.cmd-k-hint {
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 1px;
+}
 </style>

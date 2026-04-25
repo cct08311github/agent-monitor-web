@@ -46,6 +46,11 @@ export const appState = reactive({
   chatSending: false,
   /** Consumed by MonitorTab: navigate to this sub-tab, then cleared to null */
   preferredMonitorSubTab: null as string | null,
+  /**
+   * Counter-based signal to open CommandPalette from outside DashboardView.
+   * Any component increments this; DashboardView watches and opens the palette.
+   */
+  commandPaletteRequest: 0,
 })
 
 // Track mobile breakpoint changes reactively
