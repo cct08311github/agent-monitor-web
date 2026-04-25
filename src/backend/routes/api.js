@@ -73,6 +73,7 @@ router.get('/read/metrics', dashboardReadController.getMetrics.bind(dashboardRea
 router.get('/read/errors/recent', dashboardReadController.getRecentErrors.bind(dashboardReadController));
 router.get('/agents/:agentId/sessions', validateAgentId, dashboardReadController.getSessions);
 router.get('/agents/:agentId/sessions/:sessionId', validateAgentId, validateSessionId, dashboardReadController.getSessionContent);
+router.get('/agents/:id/history', agentController.getHistory.bind(agentController));
 router.get('/dashboard', dashboardReadController.getDashboard); // very legacy
 
 // Optimize

@@ -211,6 +211,40 @@ function getAgentActivitySummary() {
 }
 
 /**
+ * Retrieve per-agent cost/token history for the past N hours.
+ * @param {string} agentId - agent identifier (validated by caller)
+ * @param {number} [hours=24] - lookback window 1-168
+ * @returns {Array<{timestamp:string, cost:number, input_tokens:number, output_tokens:number}>}
+ */
+function getAgentHistory(agentId, hours = 24) {
+    const parsedHours = parseInt(hours, 10);
+    if (!Number.isInteger(parsedHours) || parsedHours < 1 || parsedHours > 168) {
+        return [];
+    }
+    if (typeof agentId !== 'string' || agentId.length === 0) {
+        return [];
+    }
+    const modifier = `-${parsedHours} hours`;
+    try {
+        const stmt = db.prepare(`
+            SELECT timestamp, cost, input_tokens, output_tokens
+            FROM agent_metrics
+            WHERE agent_id = ? AND timestamp >= datetime('now', ?)
+            ORDER BY timestamp ASC
+        `);
+        return stmt.all(agentId, modifier).map(r => ({
+            timestamp: r.timestamp,
+            cost: r.cost ?? 0,
+            input_tokens: r.input_tokens ?? 0,
+            output_tokens: r.output_tokens ?? 0,
+        }));
+    } catch (e) {
+        logger.error('tsdb_get_agent_history_error', { msg: e.message });
+        return [];
+    }
+}
+
+/**
  * Close the TSDB database connection, flushing WAL to main file.
  * Safe to call multiple times.
  */
@@ -231,6 +265,7 @@ module.exports = {
     getAgentTopTokens,
     getCostHistory,
     getAgentActivitySummary,
+    getAgentHistory,
     recordAlert,
     getAlertHistory,
     close,
