@@ -415,6 +415,27 @@ function truncateRequestId(id: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Clipboard helpers
+// ---------------------------------------------------------------------------
+
+async function copyToClipboard(text: string, successMsg: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text)
+    showToast(successMsg, 'success')
+  } catch {
+    showToast('❌ 複製失敗', 'error')
+  }
+}
+
+async function copyRequestId(id: string): Promise<void> {
+  return copyToClipboard(id, '✅ requestId 已複製')
+}
+
+async function copyRowJson(row: ApiError): Promise<void> {
+  return copyToClipboard(JSON.stringify(row, null, 2), '✅ row 已複製')
+}
+
+// ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
 
@@ -597,6 +618,7 @@ onUnmounted(() => {
               <th class="obs-th obs-th--num">Duration</th>
               <th class="obs-th">Request ID</th>
               <th class="obs-th obs-th--err">Error</th>
+              <th class="obs-th obs-th--actions">動作</th>
             </tr>
           </thead>
           <tbody>
@@ -614,6 +636,22 @@ onUnmounted(() => {
                 {{ truncateRequestId(e.requestId) }}
               </td>
               <td class="obs-td obs-td--errmsg" :title="e.error">{{ e.error }}</td>
+              <td class="obs-td obs-td--actions">
+                <button
+                  class="obs-btn obs-btn--secondary obs-btn--copy"
+                  :title="`Copy requestId: ${e.requestId}`"
+                  @click="copyRequestId(e.requestId)"
+                >
+                  📋 ID
+                </button>
+                <button
+                  class="obs-btn obs-btn--secondary obs-btn--copy"
+                  title="Copy row as JSON"
+                  @click="copyRowJson(e)"
+                >
+                  📋 JSON
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -1203,5 +1241,35 @@ onUnmounted(() => {
   font-size: 12px;
   color: var(--color-warn, #fbbf24);
   margin-right: auto;
+}
+
+/* ── Copy buttons in errors table ────────────────────────────────────────── */
+
+.obs-th--actions,
+.obs-td--actions {
+  white-space: nowrap;
+  width: 1px; /* shrink column to content */
+}
+
+.obs-td--actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 6px 8px;
+}
+
+.obs-btn--copy {
+  padding: 3px 7px;
+  font-size: 11px;
+  line-height: 1.4;
+  border-radius: 4px;
+  gap: 3px;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
+.obs-btn--copy:not(:disabled):hover {
+  opacity: 1;
+  background: var(--color-surface-3, #3a3a3a);
 }
 </style>

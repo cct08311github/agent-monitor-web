@@ -932,6 +932,133 @@ describe('ObservabilityTab', () => {
     })
   })
 
+  // ── Copy buttons ─────────────────────────────────────────────────────────
+
+  describe('copy buttons', () => {
+    function setupClipboard(rejectWith?: Error) {
+      const mockWriteText = rejectWith
+        ? vi.fn().mockRejectedValue(rejectWith)
+        : vi.fn().mockResolvedValue(undefined)
+
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: mockWriteText },
+        writable: true,
+        configurable: true,
+      })
+
+      return { mockWriteText }
+    }
+
+    it('renders copy ID and copy JSON buttons in each error row', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      // errorsFixture has 2 rows; each row has 2 copy buttons
+      const copyBtns = wrapper.findAll('.obs-btn--copy')
+      expect(copyBtns.length).toBe(4) // 2 rows × 2 buttons
+      wrapper.unmount()
+    })
+
+    it('📋 ID button calls writeText with the full requestId (not truncated)', async () => {
+      setupMockBothSuccess()
+      const { mockWriteText } = setupClipboard()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      // First row: requestId = 'abcdef1234567890' (displayed as 'abcdef12')
+      const copyBtns = wrapper.findAll('.obs-btn--copy')
+      const idBtn = copyBtns[0]
+      await idBtn.trigger('click')
+      await flushPromises()
+
+      expect(mockWriteText).toHaveBeenCalledWith('abcdef1234567890')
+      wrapper.unmount()
+    })
+
+    it('📋 JSON button calls writeText with valid JSON containing all ApiError fields', async () => {
+      setupMockBothSuccess()
+      const { mockWriteText } = setupClipboard()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      // First row JSON button (index 1 within the row = global index 1)
+      const copyBtns = wrapper.findAll('.obs-btn--copy')
+      const jsonBtn = copyBtns[1]
+      await jsonBtn.trigger('click')
+      await flushPromises()
+
+      expect(mockWriteText).toHaveBeenCalledTimes(1)
+      const writtenText = mockWriteText.mock.calls[0][0] as string
+      const parsed = JSON.parse(writtenText) as Record<string, unknown>
+      expect(parsed.requestId).toBe('abcdef1234567890')
+      expect(parsed.method).toBe('GET')
+      expect(parsed.path).toBe('/api/read/metrics')
+      expect(parsed.statusCode).toBe(500)
+      expect(parsed.error).toBe('Internal Server Error')
+      expect(parsed.durationMs).toBe(123)
+      expect(parsed.timestamp).toBe(1700000000000)
+      wrapper.unmount()
+    })
+
+    it('ID copy success shows success toast "✅ requestId 已複製"', async () => {
+      setupMockBothSuccess()
+      setupClipboard()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const idBtn = wrapper.findAll('.obs-btn--copy')[0]
+      await idBtn.trigger('click')
+      await flushPromises()
+
+      expect(mockShowToast).toHaveBeenCalledWith('✅ requestId 已複製', 'success')
+      wrapper.unmount()
+    })
+
+    it('JSON copy success shows success toast "✅ row 已複製"', async () => {
+      setupMockBothSuccess()
+      setupClipboard()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const jsonBtn = wrapper.findAll('.obs-btn--copy')[1]
+      await jsonBtn.trigger('click')
+      await flushPromises()
+
+      expect(mockShowToast).toHaveBeenCalledWith('✅ row 已複製', 'success')
+      wrapper.unmount()
+    })
+
+    it('clipboard failure shows error toast "❌ 複製失敗"', async () => {
+      setupMockBothSuccess()
+      setupClipboard(new Error('Clipboard permission denied'))
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const idBtn = wrapper.findAll('.obs-btn--copy')[0]
+      await idBtn.trigger('click')
+      await flushPromises()
+
+      expect(mockShowToast).toHaveBeenCalledWith('❌ 複製失敗', 'error')
+      wrapper.unmount()
+    })
+
+    it('second row copy ID button uses second row requestId', async () => {
+      setupMockBothSuccess()
+      const { mockWriteText } = setupClipboard()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      // Second row: requestId = 'fedcba0987654321'; copy ID btn is index 2 (0-indexed)
+      const copyBtns = wrapper.findAll('.obs-btn--copy')
+      await copyBtns[2].trigger('click')
+      await flushPromises()
+
+      expect(mockWriteText).toHaveBeenCalledWith('fedcba0987654321')
+      wrapper.unmount()
+    })
+  })
+
   // ── formatExportTimestamp helper ────────────────────────────────────────
 
   describe('formatExportTimestamp', () => {
