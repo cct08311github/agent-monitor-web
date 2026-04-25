@@ -149,12 +149,21 @@ export function useDashboard() {
     },
   )
 
+  // Track whether we were in a reconnecting state to fire toast only on recovery
+  let _wasReconnecting = false
+
   function startSSE(): void {
     connect('/api/read/stream', {
       onOpen() {
+        const wasReconnecting = _wasReconnecting
+        _wasReconnecting = false
         connectionStatus.value = 'connected'
         appState.sseStatus = 'connected'
         appState.sseReconnectAttempt = 0
+        // Toast only on recovery — not on initial connect
+        if (wasReconnecting) {
+          showToast('連線已恢復', 'success')
+        }
       },
       onMessage(event) {
         try {
@@ -181,6 +190,7 @@ export function useDashboard() {
         appState.sseStatus = 'disconnected'
       },
       onReconnecting(attempt) {
+        _wasReconnecting = true
         connectionStatus.value = 'reconnecting'
         appState.sseStatus = 'reconnecting'
         appState.sseReconnectAttempt = attempt

@@ -180,7 +180,7 @@ async function deleteJob(id: string, name: string): Promise<void> {
   }
 }
 
-async function runJob(id: string): Promise<void> {
+async function runJob(id: string, name?: string): Promise<void> {
   showToast('正在執行任務...', 'info')
   try {
     const data = (await api.post(`/api/cron/jobs/${id}/run`)) as {
@@ -189,7 +189,8 @@ async function runJob(id: string): Promise<void> {
       error?: string
     }
     if (data.success) {
-      showToast('✅ ' + (data.message ?? '任務已觸發（在背景執行中）'), 'success')
+      const label = name ? `已觸發: ${name}` : (data.message ?? '任務已觸發（在背景執行中）')
+      showToast(label, 'success')
       await fetchJobs()
     } else {
       throw new Error(data.error ?? '執行失敗')
@@ -393,7 +394,7 @@ function getNextRunCountdown(job: CronJob): string {
                   font-size: 12px;
                   cursor: pointer;
                 "
-                @click="runJob(job.id)"
+                @click="runJob(job.id, job.name)"
               >
                 ▶️ 執行
               </button>

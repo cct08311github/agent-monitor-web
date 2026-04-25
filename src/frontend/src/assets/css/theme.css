@@ -29,6 +29,11 @@
     --red-light: rgba(239, 95, 95, 0.08);
     --purple: #a78bfa;
     --purple-light: rgba(167, 139, 250, 0.08);
+    /* Toast semantic aliases (mapped to existing semantic vars) */
+    --color-success: var(--green);
+    --color-info: var(--accent);
+    --color-warning: var(--orange);
+    --color-danger: var(--red);
     /* Depth */
     --shadow-sm: none;
     --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.4);

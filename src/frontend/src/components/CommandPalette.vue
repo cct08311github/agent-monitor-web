@@ -4,6 +4,9 @@ import { appState } from '@/stores/appState'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useTheme } from '@/composables/useTheme'
 import { createFocusTrap } from '@/lib/focusTrap'
+import { useToast } from '@/composables/useToast'
+
+const toast = useToast()
 
 // ---------------------------------------------------------------------------
 // Recents persistence constants
@@ -399,11 +402,19 @@ watch(query, () => {
 // Actions
 // ---------------------------------------------------------------------------
 
+function _maybeToastCommand(cmd: Command): void {
+  // Only toast for non-navigation commands to avoid noise on simple tab switches
+  if (cmd.category !== 'Navigation') {
+    toast.success(`已執行: ${cmd.label}`)
+  }
+}
+
 function runSelected() {
   const cmd = filteredCommands.value[selectedIndex.value]
   if (cmd) {
     pushRecent(cmd.id)
     cmd.handler()
+    _maybeToastCommand(cmd)
     emit('close')
   }
 }
@@ -411,6 +422,7 @@ function runSelected() {
 function runCommand(cmd: Command) {
   pushRecent(cmd.id)
   cmd.handler()
+  _maybeToastCommand(cmd)
   emit('close')
 }
 
