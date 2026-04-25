@@ -5,6 +5,7 @@ import { showToast } from '@/composables/useToast'
 import { confirm } from '@/composables/useConfirm'
 import TaskDetailModal from '@/components/TaskDetailModal.vue'
 import AddTaskModal from '@/components/AddTaskModal.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -526,11 +527,12 @@ onUnmounted(() => {
     <!-- Task Table -->
     <div class="taskhub-grid" :class="{ 'th-hide-domain': domain !== 'all' }">
       <div v-if="loading" class="th-loading">載入中...</div>
-      <div v-else-if="tasks.length === 0" class="empty-state">
-        <div class="empty-state-icon"><span class="empty-icon-inner">📋</span></div>
-        <div class="empty-state-title">沒有符合的任務</div>
-        <div class="empty-state-desc">嘗試調整篩選條件，或新增一個任務</div>
-      </div>
+      <EmptyState
+        v-else-if="tasks.length === 0"
+        variant="tasks"
+        title="沒有符合的任務"
+        description="嘗試調整篩選條件，或新增一個任務"
+      />
       <table v-else class="th-task-table">
         <thead>
           <tr>

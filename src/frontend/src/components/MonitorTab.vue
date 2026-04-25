@@ -14,6 +14,7 @@ import ObservabilityTab from '@/components/ObservabilityTab.vue'
 import AgentCompareModal from '@/components/AgentCompareModal.vue'
 import AgentConstellation from '@/components/AgentConstellation.vue'
 import ActivityHeatmap from '@/components/ActivityHeatmap.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { useActivityAccumulator } from '@/composables/useActivityAccumulator'
 import type { CompareAgentLike } from '@/utils/agentCompare'
 import type { SubAgentLayout } from '@/utils/constellation'
@@ -290,15 +291,12 @@ const heatmapData = computed<Map<string, number> | null>(() => {
       </div>
 
       <!-- Empty state -->
-      <div v-if="isEmpty" class="empty-state">
-        <div class="empty-state-icon">🔍</div>
-        <div class="empty-state-title">
-          {{ searchQuery ? '找不到符合的 Agent' : '沒有 Agent' }}
-        </div>
-        <div class="empty-state-desc">
-          {{ searchQuery ? '請嘗試其他關鍵字' : '目前沒有已註冊的 Agent' }}
-        </div>
-      </div>
+      <EmptyState
+        v-if="isEmpty"
+        variant="agents"
+        :title="searchQuery ? '找不到符合的 Agent' : '沒有 Agent'"
+        :description="searchQuery ? '請嘗試其他關鍵字' : '目前沒有已註冊的 Agent'"
+      />
     </template>
 
     <!-- Sub-Agents tab -->

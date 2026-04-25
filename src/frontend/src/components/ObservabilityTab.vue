@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import Skeleton from './Skeleton.vue'
 import SnoozeMenu from './SnoozeMenu.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { api } from '@/composables/useApi'
 import { showToast } from '@/composables/useToast'
 import { useToast } from '@/composables/useToast'
@@ -743,13 +744,12 @@ onUnmounted(() => {
       </div>
 
       <!-- Empty state -->
-      <div v-else-if="!loadingMetrics && metrics.length === 0" class="obs-empty-state">
-        <div class="obs-empty-icon" aria-hidden="true">📊</div>
-        <div class="obs-empty-title">No metrics yet</div>
-        <div class="obs-empty-desc">
-          Metrics accumulate as API endpoints receive traffic.
-        </div>
-      </div>
+      <EmptyState
+        v-else-if="!loadingMetrics && metrics.length === 0"
+        variant="alerts"
+        title="No metrics yet"
+        description="Metrics accumulate as API endpoints receive traffic."
+      />
 
       <!-- Table -->
       <div v-else class="obs-table-wrap">
@@ -897,21 +897,20 @@ onUnmounted(() => {
       </div>
 
       <!-- Empty state (no alerts at all, or all snoozed) -->
-      <div v-else-if="!alertsLoading && partitionedAlerts.active.length === 0 && alerts.length === 0" class="obs-empty-state">
-        <div class="obs-empty-icon" aria-hidden="true">🟢</div>
-        <div class="obs-empty-title">目前無 alert</div>
-        <div class="obs-empty-desc">所有系統指標正常，無警報觸發。</div>
-      </div>
+      <EmptyState
+        v-else-if="!alertsLoading && partitionedAlerts.active.length === 0 && alerts.length === 0"
+        variant="alerts"
+        title="目前無 alert"
+        description="所有系統指標正常，無警報觸發。"
+      />
 
       <!-- All snoozed (but there are alerts) -->
-      <div
+      <EmptyState
         v-else-if="!alertsLoading && partitionedAlerts.active.length === 0 && alerts.length > 0"
-        class="obs-empty-state"
-      >
-        <div class="obs-empty-icon" aria-hidden="true">☕</div>
-        <div class="obs-empty-title">所有 alert 已 snooze</div>
-        <div class="obs-empty-desc">{{ partitionedAlerts.snoozed.length }} 個 alert 暫時隱藏中，到期後自動恢復。</div>
-      </div>
+        variant="alerts"
+        title="所有 alert 已 snooze"
+        :description="`${partitionedAlerts.snoozed.length} 個 alert 暫時隱藏中，到期後自動恢復。`"
+      />
 
       <!-- Active alerts table -->
       <div v-else class="obs-table-wrap">

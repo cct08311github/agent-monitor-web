@@ -12,6 +12,7 @@ import { buildMarkers, formatRelative } from '@/utils/cronTimeline'
 import type { TimelineMarker } from '@/utils/cronTimeline'
 import { humanizeCron } from '@/utils/cronHumanizer'
 import CronNextFires from '@/components/CronNextFires.vue'
+import EmptyState from '@/components/EmptyState.vue'
 
 // ---------------------------------------------------------------------------
 // State
@@ -243,13 +244,12 @@ function getNextRunCountdown(job: CronJob): string {
     </div>
 
     <!-- Empty state: no jobs at all -->
-    <div v-else-if="!hasJobs" class="empty-state">
-      <div class="empty-state-icon">
-        <span class="empty-icon-inner">⏰</span>
-      </div>
-      <div class="empty-state-title">沒有 Cron 任務</div>
-      <div class="empty-state-desc">目前沒有已排程的定時任務</div>
-    </div>
+    <EmptyState
+      v-else-if="!hasJobs"
+      variant="cron"
+      title="沒有 Cron 任務"
+      description="目前沒有已排程的定時任務"
+    />
 
     <!-- Jobs exist: show filter bar + grid -->
     <template v-else>
@@ -348,15 +348,12 @@ function getNextRunCountdown(job: CronJob): string {
       </div>
 
       <!-- Empty state: jobs exist but none match filters -->
-      <div v-if="!hasResults" class="empty-state">
-        <div class="empty-state-icon">
-          <span class="empty-icon-inner">🔍</span>
-        </div>
-        <div class="empty-state-title">沒有符合條件</div>
-        <div class="empty-state-desc">
-          {{ isFiltered ? '請嘗試調整搜尋或篩選條件' : '目前沒有已排程的定時任務' }}
-        </div>
-      </div>
+      <EmptyState
+        v-if="!hasResults"
+        variant="cron"
+        title="沒有符合條件"
+        :description="isFiltered ? '請嘗試調整搜尋或篩選條件' : '目前沒有已排程的定時任務'"
+      />
 
       <!-- Cron job grid -->
       <div v-else class="cron-grid">

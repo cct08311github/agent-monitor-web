@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import SubAgentCard from '@/components/SubAgentCard.vue'
+import EmptyState from '@/components/EmptyState.vue'
 
 defineProps<{
   subagents: Record<string, unknown>[]
@@ -15,8 +16,11 @@ defineProps<{
         :subagent="sub"
       />
     </template>
-    <div v-else style="color: var(--text-muted); padding: 20px; text-align: center">
-      沒有 Sub-Agents
-    </div>
+    <EmptyState
+      v-else
+      variant="agents"
+      title="沒有 Sub-Agents"
+      description="尚無子 Agent 運行中"
+    />
   </div>
 </template>
