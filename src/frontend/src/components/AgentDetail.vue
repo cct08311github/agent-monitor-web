@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { api } from '@/composables/useApi'
 import { appState } from '@/stores/appState'
 import { formatTokens, formatTWD, getAgentEmoji, getStatusInfo } from '@/utils/format'
 import SessionViewer from '@/components/SessionViewer.vue'
 import Skeleton from '@/components/Skeleton.vue'
 import { showToast } from '@/composables/useToast'
+import { useAgentAliases } from '@/composables/useAgentAliases'
 
 // ── History trend ─────────────────────────────────────────────────────────────
 
@@ -25,6 +26,42 @@ const emit = defineEmits<{
   (e: 'chat', agentId: string): void
   (e: 'model-switch', agentId: string, model: string): void
 }>()
+
+// ── Agent alias (rename) ──────────────────────────────────────────────────────
+
+const { getAlias, setAlias, displayName } = useAgentAliases()
+
+const isRenaming = ref(false)
+const editingAlias = ref('')
+const renameInputRef = ref<HTMLInputElement | null>(null)
+
+const currentDisplayName = computed(() => displayName(props.agentId))
+
+function startRename(): void {
+  editingAlias.value = getAlias(props.agentId) ?? ''
+  isRenaming.value = true
+  nextTick(() => {
+    renameInputRef.value?.focus()
+    renameInputRef.value?.select()
+  })
+}
+
+function commitRename(): void {
+  if (!isRenaming.value) return
+  isRenaming.value = false
+  setAlias(props.agentId, editingAlias.value)
+  const name = editingAlias.value.trim()
+  if (name) {
+    showToast(`已更名: ${name}`, 'success')
+  } else {
+    showToast('已清除別名', 'info')
+  }
+}
+
+function cancelRename(): void {
+  isRenaming.value = false
+  editingAlias.value = ''
+}
 
 // ── Session list ──────────────────────────────────────────────────────────────
 
@@ -214,7 +251,33 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
     <!-- Section header with back button -->
     <div class="section-header">
       <button class="ctrl-btn" @click="$emit('close')">← 返回</button>
-      <h2>{{ getAgentEmoji(agentId) }} {{ agentId }}</h2>
+      <div class="agent-detail-title">
+        <span class="agent-detail-emoji">{{ getAgentEmoji(agentId) }}</span>
+        <template v-if="!isRenaming">
+          <h2 :title="agentId" class="agent-detail-name">{{ currentDisplayName }}</h2>
+          <button
+            class="rename-btn"
+            title="重新命名此 Agent"
+            aria-label="重新命名此 Agent"
+            @click="startRename"
+          >✏️</button>
+        </template>
+        <template v-else>
+          <input
+            ref="renameInputRef"
+            v-model="editingAlias"
+            class="rename-input"
+            :placeholder="agentId"
+            maxlength="40"
+            @keydown.enter="commitRename"
+            @keydown.esc="cancelRename"
+            @blur="commitRename"
+          />
+        </template>
+        <small v-if="currentDisplayName !== agentId" class="agent-detail-original-id" :title="agentId">
+          {{ agentId }}
+        </small>
+      </div>
     </div>
 
     <div id="detailContent">
@@ -223,7 +286,7 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
         <div class="detail-card-title">基本資訊</div>
         <div class="detail-row">
           <span class="detail-row-label">Agent</span>
-          <span class="detail-row-value">{{ agentId }}</span>
+          <span class="detail-row-value" :title="agentId">{{ currentDisplayName }}</span>
         </div>
         <div class="detail-row">
           <span class="detail-row-label">狀態</span>
@@ -595,5 +658,56 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
   font-size: 12px;
   color: var(--text-muted, #6c7086);
   padding: 4px 0;
+}
+
+/* ── Agent rename UI ──────────────────────────────────────────────────────── */
+.agent-detail-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.agent-detail-emoji {
+  flex-shrink: 0;
+}
+.agent-detail-name {
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.agent-detail-original-id {
+  font-size: 11px;
+  color: var(--text-muted, #6c7086);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+}
+.rename-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  opacity: 0.4;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+.rename-btn:hover {
+  opacity: 1;
+}
+.rename-input {
+  font-size: inherit;
+  font-family: inherit;
+  background: var(--bg-card, rgba(0,0,0,0.15));
+  border: 1px solid var(--accent, #7c3aed);
+  border-radius: 4px;
+  color: inherit;
+  padding: 2px 6px;
+  min-width: 0;
+  width: 180px;
+  outline: none;
 }
 </style>

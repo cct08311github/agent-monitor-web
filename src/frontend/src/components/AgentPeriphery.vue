@@ -2,6 +2,7 @@
 import type { Agent } from '@/types/api'
 import { formatTokens, formatTWD, getStatusInfo } from '@/utils/format'
 import { appState } from '@/stores/appState'
+import { useAgentAliases } from '@/composables/useAgentAliases'
 
 defineProps<{
   agents: Agent[]
@@ -11,6 +12,8 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'agent-click', id: string): void
 }>()
+
+const { displayName } = useAgentAliases()
 
 function getTokens(a: Agent): number {
   const ext = a as unknown as Record<string, unknown>
@@ -51,7 +54,7 @@ function getLastActivity(a: Agent): string {
         @keydown.enter="emit('agent-click', agent.id)"
       >
         <span :class="['periphery-dot', getStatusInfo(agent.status).class]"></span>
-        <span class="periphery-name">{{ agent.id }}</span>
+        <span class="periphery-name" :title="agent.id">{{ displayName(agent.id) }}</span>
         <span class="periphery-model">
           {{ (agent.model ?? '').split('/').pop() || 'N/A' }}
         </span>
