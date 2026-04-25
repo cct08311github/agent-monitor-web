@@ -58,6 +58,7 @@ async function loadSessions() {
 onMounted(() => {
   loadSessions()
   fetchAgentHistory()
+  refreshBookmarks()
 })
 
 function openSession(sessionId: string) {
@@ -173,6 +174,22 @@ const filteredSessions = computed(() => {
   if (!q) return sessions.value
   return sessions.value.filter((s) => s.id.toLowerCase().includes(q))
 })
+
+// ── Session bookmarks ─────────────────────────────────────────────────────────
+
+import { loadBookmarks, toggleBookmark, partition } from '@/utils/sessionBookmarks'
+
+const bookmarks = ref<string[]>([])
+
+function refreshBookmarks() {
+  bookmarks.value = loadBookmarks(props.agentId)
+}
+
+function onToggleBookmark(sessionId: string) {
+  bookmarks.value = toggleBookmark(props.agentId, sessionId)
+}
+
+const partitionedSessions = computed(() => partition(filteredSessions.value, bookmarks.value))
 
 // ── Model usage ───────────────────────────────────────────────────────────────
 
@@ -348,19 +365,65 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
             v-if="filteredSessions.length === 0 && sessionSearchQuery.trim().length > 0"
             class="sessions-empty-search"
           >無符合 session</div>
-          <button
-            v-for="s in filteredSessions"
+          <!-- Pinned (bookmarked) sessions -->
+          <template v-if="partitionedSessions.pinned.length > 0">
+            <div
+              v-for="s in partitionedSessions.pinned"
+              :key="`pin-${s.id}`"
+              class="session-row session-row--pinned"
+              role="group"
+            >
+              <button
+                type="button"
+                class="btn-reset session-row-main"
+                @click="openSession(s.id)"
+              >
+                <span class="detail-row-label" style="font-family:monospace;font-size:11px">{{ s.id.slice(-16) }}</span>
+                <span class="detail-row-value" style="color:var(--text-muted);font-size:11px">
+                  {{ s.messageCount }} 則{{ s.lastTs ? ' · ' + s.lastTs.slice(0, 10) : '' }}
+                </span>
+              </button>
+              <span
+                class="session-star session-star--on"
+                role="button"
+                tabindex="0"
+                :title="'取消釘選'"
+                :aria-pressed="true"
+                @click.stop="onToggleBookmark(s.id)"
+                @keydown.enter.stop="onToggleBookmark(s.id)"
+                @keydown.space.stop.prevent="onToggleBookmark(s.id)"
+              >★</span>
+            </div>
+            <div v-if="partitionedSessions.rest.length > 0" class="session-separator" aria-hidden="true"></div>
+          </template>
+          <!-- Rest of sessions -->
+          <div
+            v-for="s in partitionedSessions.rest"
             :key="s.id"
-            type="button"
-            class="btn-reset detail-row"
-            style="display:flex;width:100%;border-radius:4px;padding:2px 4px;margin:-2px -4px"
-            @click="openSession(s.id)"
+            class="session-row"
+            role="group"
           >
-            <span class="detail-row-label" style="font-family:monospace;font-size:11px">{{ s.id.slice(-16) }}</span>
-            <span class="detail-row-value" style="color:var(--text-muted);font-size:11px">
-              {{ s.messageCount }} 則{{ s.lastTs ? ' · ' + s.lastTs.slice(0, 10) : '' }}
-            </span>
-          </button>
+            <button
+              type="button"
+              class="btn-reset session-row-main"
+              @click="openSession(s.id)"
+            >
+              <span class="detail-row-label" style="font-family:monospace;font-size:11px">{{ s.id.slice(-16) }}</span>
+              <span class="detail-row-value" style="color:var(--text-muted);font-size:11px">
+                {{ s.messageCount }} 則{{ s.lastTs ? ' · ' + s.lastTs.slice(0, 10) : '' }}
+              </span>
+            </button>
+            <span
+              class="session-star"
+              role="button"
+              tabindex="0"
+              :title="'釘選 session'"
+              :aria-pressed="false"
+              @click.stop="onToggleBookmark(s.id)"
+              @keydown.enter.stop="onToggleBookmark(s.id)"
+              @keydown.space.stop.prevent="onToggleBookmark(s.id)"
+            >★</span>
+          </div>
         </div>
       </div>
     </div>
@@ -477,6 +540,44 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
 .diagnose-message {
   flex: 1;
   color: var(--text-primary);
+}
+.session-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+}
+.session-row:hover .session-star {
+  visibility: visible;
+}
+.session-row--pinned {
+  background: rgba(255, 215, 0, 0.06);
+}
+.session-row-main {
+  flex: 1;
+  display: flex;
+  text-align: left;
+}
+.session-star {
+  cursor: pointer;
+  user-select: none;
+  font-size: 14px;
+  padding: 0 6px;
+  color: var(--text-muted);
+  visibility: hidden;
+  flex-shrink: 0;
+}
+.session-star--on {
+  visibility: visible;
+  color: gold;
+}
+.session-separator {
+  margin: 6px 0;
+  border-top: 1px dashed var(--border-color, rgba(0,0,0,0.15));
+  opacity: 0.6;
 }
 .sessions-empty-search {
   font-size: 12px;
