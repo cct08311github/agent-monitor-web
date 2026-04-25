@@ -95,7 +95,8 @@ async function buildDashboardPayload() {
 
     if (!isFresh(cache.agents)) {
         fetches.push(
-            execFilePromise(ocBin, ['agents', 'list'], { timeout: 15_000 }).catch(() => ({ stdout: '' }))
+            execFilePromise(ocBin, ['agents', 'list'], { timeout: 15_000 })
+                .catch((err) => ({ stdout: (err && err.stdout) || '', stderr: (err && err.stderr) || '' }))
                 .then(async (agentsResult) => {
                     const agentList = parseAgentsList(agentsResult.stdout || '');
                     const agents = await Promise.all(
@@ -117,7 +118,8 @@ async function buildDashboardPayload() {
 
     if (!isFresh(cache.cron)) {
         fetches.push(
-            execFilePromise(ocBin, ['cron', 'list', '--json'], { timeout: 15_000 }).catch(() => ({ stdout: '{"jobs":[]}' }))
+            execFilePromise(ocBin, ['cron', 'list', '--json'], { timeout: 15_000 })
+                .catch((err) => ({ stdout: (err && err.stdout) || '{"jobs":[]}', stderr: (err && err.stderr) || '' }))
                 .then((cronResult) => {
                     let cronJobs = [];
                     try {
