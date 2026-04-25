@@ -4,10 +4,12 @@
 const mockAlertEngine = { getRecent: jest.fn() };
 const mockErrorBuffer = { getRecent: jest.fn() };
 const mockApiMetrics  = { getStats: jest.fn() };
+const mockTsdbService = { getLatestAgentCounts: jest.fn() };
 
 jest.mock('../src/backend/services/alertEngine',  () => mockAlertEngine);
 jest.mock('../src/backend/services/errorBuffer',  () => mockErrorBuffer);
 jest.mock('../src/backend/services/apiMetrics',   () => mockApiMetrics);
+jest.mock('../src/backend/services/tsdbService',  () => mockTsdbService);
 
 let buildHealthSummary;
 
@@ -17,6 +19,7 @@ beforeEach(() => {
     jest.mock('../src/backend/services/alertEngine',  () => mockAlertEngine);
     jest.mock('../src/backend/services/errorBuffer',  () => mockErrorBuffer);
     jest.mock('../src/backend/services/apiMetrics',   () => mockApiMetrics);
+    jest.mock('../src/backend/services/tsdbService',  () => mockTsdbService);
 
     ({ buildHealthSummary } = require('../src/backend/services/healthCompositeService'));
 
@@ -24,6 +27,7 @@ beforeEach(() => {
     mockAlertEngine.getRecent.mockReturnValue([]);
     mockErrorBuffer.getRecent.mockReturnValue([]);
     mockApiMetrics.getStats.mockReturnValue({});
+    mockTsdbService.getLatestAgentCounts.mockReturnValue(null);
 });
 
 // ── Helper ────────────────────────────────────────────────────────────────────
@@ -180,5 +184,51 @@ describe('buildHealthSummary', () => {
 
         expect(result.p99_max_ms).toBe(300);
         expect(result.status).toBe('ok');
+    });
+
+    // ── Agent counts ─────────────────────────────────────────────────────────
+
+    test('agents_total_count and agents_active_count are 0 when getLatestAgentCounts returns null', () => {
+        mockTsdbService.getLatestAgentCounts.mockReturnValue(null);
+
+        const result = buildHealthSummary({ now: NOW });
+
+        expect(result.agents_total_count).toBe(0);
+        expect(result.agents_active_count).toBe(0);
+    });
+
+    test('agents_total_count and agents_active_count reflect real values from tsdbService', () => {
+        mockTsdbService.getLatestAgentCounts.mockReturnValue({ total: 5, active: 3 });
+
+        const result = buildHealthSummary({ now: NOW });
+
+        expect(result.agents_total_count).toBe(5);
+        expect(result.agents_active_count).toBe(3);
+    });
+
+    test('agents counts fall back to 0/0 when getLatestAgentCounts throws', () => {
+        mockTsdbService.getLatestAgentCounts.mockImplementation(() => { throw new Error('db gone'); });
+
+        // buildHealthSummary uses optional-chaining fallback; internally tsdbService.getLatestAgentCounts
+        // already catches, but simulate the case where the mock/function itself throws by
+        // replacing the function reference temporarily
+        const savedFn = mockTsdbService.getLatestAgentCounts;
+        mockTsdbService.getLatestAgentCounts = undefined;
+
+        const result = buildHealthSummary({ now: NOW });
+
+        expect(result.agents_total_count).toBe(0);
+        expect(result.agents_active_count).toBe(0);
+
+        mockTsdbService.getLatestAgentCounts = savedFn;
+    });
+
+    test('result always includes agents_total_count and agents_active_count keys', () => {
+        mockTsdbService.getLatestAgentCounts.mockReturnValue({ total: 10, active: 0 });
+
+        const result = buildHealthSummary({ now: NOW });
+
+        expect(result).toHaveProperty('agents_total_count', 10);
+        expect(result).toHaveProperty('agents_active_count', 0);
     });
 });

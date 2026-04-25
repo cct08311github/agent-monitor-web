@@ -61,6 +61,7 @@ const cleanupStmt = db.prepare(`DELETE FROM system_metrics WHERE timestamp < dat
 const cleanupAgentsStmt = db.prepare(`DELETE FROM agent_metrics WHERE timestamp < datetime('now', '-7 days')`);
 const cleanupAlertsStmt = db.prepare('DELETE FROM alerts WHERE ts < ?');
 
+const selectLatestAgentCountsStmt = db.prepare('SELECT total_agents, active_agents FROM system_metrics ORDER BY timestamp DESC LIMIT 1');
 const selectSystemHistoryStmt = db.prepare('SELECT timestamp, cpu, memory, disk, total_agents, active_agents FROM system_metrics ORDER BY timestamp DESC LIMIT ?');
 const selectAgentTopTokensStmt = db.prepare(`
     SELECT agent_id,
@@ -245,6 +246,22 @@ function getAgentHistory(agentId, hours = 24) {
 }
 
 /**
+ * Get the most recent agent counts from system_metrics.
+ * Returns { total, active } or null if no rows exist.
+ * Silent fallback: never throws.
+ */
+function getLatestAgentCounts() {
+    try {
+        const row = selectLatestAgentCountsStmt.get();
+        if (!row) return null;
+        return {
+            total: Number(row.total_agents) || 0,
+            active: Number(row.active_agents) || 0,
+        };
+    } catch (e) { return null; }
+}
+
+/**
  * Close the TSDB database connection, flushing WAL to main file.
  * Safe to call multiple times.
  */
@@ -266,6 +283,7 @@ module.exports = {
     getCostHistory,
     getAgentActivitySummary,
     getAgentHistory,
+    getLatestAgentCounts,
     recordAlert,
     getAlertHistory,
     close,
