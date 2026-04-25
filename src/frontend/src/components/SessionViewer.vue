@@ -9,6 +9,7 @@ import {
   saveAnnotation,
   type SessionAnnotation,
 } from '@/utils/sessionAnnotations'
+import { buildStory, storyIcon } from '@/utils/sessionStory'
 
 const props = defineProps<{
   agentId: string
@@ -131,6 +132,11 @@ function promptAnnotate(msgIndex: number): void {
   }
 }
 
+// Story / Raw toggle
+const viewMode = ref<'raw' | 'story'>('raw')
+
+const story = computed(() => buildStory(messages.value))
+
 // Replay mode internal state
 const replayMode = ref(false)
 
@@ -158,7 +164,15 @@ function closeReplay(): void {
       <!-- Header -->
       <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border-color);flex-shrink:0">
         <h3 style="margin:0;font-size:14px;font-weight:600">💬 {{ sessionId.slice(-12) }}</h3>
-        <button class="modal-close ctrl-btn" @click="$emit('close')" aria-label="關閉">✕</button>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button
+            v-if="!loading && !error && messages.length > 0"
+            class="sv-story-toggle-btn ctrl-btn"
+            :aria-label="viewMode === 'story' ? '切換回原始訊息' : '切換到敘事模式'"
+            @click="viewMode = viewMode === 'story' ? 'raw' : 'story'"
+          >{{ viewMode === 'story' ? '📜 Raw' : '📖 Story' }}</button>
+          <button class="modal-close ctrl-btn" @click="$emit('close')" aria-label="關閉">✕</button>
+        </div>
       </div>
 
       <!-- Search bar -->
@@ -195,7 +209,22 @@ function closeReplay(): void {
           找不到符合「{{ searchQuery }}」的訊息
         </div>
 
-        <!-- Messages -->
+        <!-- Story mode -->
+        <template v-else-if="viewMode === 'story'">
+          <div v-if="story.length === 0" style="color:var(--text-muted);text-align:center;padding:24px">無敘事可生成</div>
+          <div v-else class="story-list">
+            <div
+              v-for="step in story"
+              :key="step.index"
+              :class="['story-step', `story-step--${step.type}`]"
+            >
+              <span class="story-icon">{{ storyIcon(step.type) }}</span>
+              <span class="story-text">{{ step.text }}</span>
+            </div>
+          </div>
+        </template>
+
+        <!-- Messages (raw mode) -->
         <template v-else>
           <div
             v-for="{ msg, originalIndex } in filteredMessages"
@@ -315,5 +344,77 @@ function closeReplay(): void {
   background: var(--blue, #5a5aeb);
   color: #fff;
   border-color: var(--blue, #5a5aeb);
+}
+
+/* Story toggle button */
+.sv-story-toggle-btn {
+  font-size: 13px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-muted);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.sv-story-toggle-btn:hover {
+  background: var(--blue, #5a5aeb);
+  color: #fff;
+  border-color: var(--blue, #5a5aeb);
+}
+
+/* Story list */
+.story-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.story-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.story-icon {
+  flex-shrink: 0;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.story-text {
+  flex: 1;
+  word-break: break-word;
+}
+
+.story-step--intro {
+  background: color-mix(in srgb, var(--blue, #5a5aeb) 12%, transparent);
+  color: var(--text-primary);
+}
+
+.story-step--thought {
+  background: color-mix(in srgb, var(--bg-muted) 80%, transparent);
+  color: var(--text-primary);
+}
+
+.story-step--action {
+  background: color-mix(in srgb, #a855f7 12%, transparent);
+  color: var(--text-primary);
+}
+
+.story-step--error {
+  background: color-mix(in srgb, #ef4444 12%, transparent);
+  color: var(--text-primary);
+}
+
+.story-step--result {
+  background: color-mix(in srgb, #22c55e 12%, transparent);
+  color: var(--text-primary);
 }
 </style>
