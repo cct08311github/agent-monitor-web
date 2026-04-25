@@ -1040,3 +1040,94 @@ describe('SystemTab — Wall of Fame Card', () => {
     wrapper.unmount()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Daily Digest Card
+// ---------------------------------------------------------------------------
+
+describe('SystemTab — Daily Digest card', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockAppState.latestDashboard = null
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  // 1. Render — card present and contains pre element
+  it('renders Daily Digest card with pre element', async () => {
+    mockGet.mockResolvedValue(makeHistoryResponse([]))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const card = wrapper.find('[data-testid="digest-card"]')
+    expect(card.exists()).toBe(true)
+    expect(wrapper.text()).toContain('Daily Digest')
+
+    const pre = wrapper.find('[data-testid="digest-pre"]')
+    expect(pre.exists()).toBe(true)
+    // pre content should be 5 lines
+    const lines = pre.text().trim().split('\n')
+    expect(lines).toHaveLength(5)
+    wrapper.unmount()
+  })
+
+  // 2. Copy button — calls navigator.clipboard.writeText
+  it('copy button calls clipboard.writeText with digest text', async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', {
+      clipboard: { writeText: writeTextMock },
+    })
+    mockGet.mockResolvedValue(makeHistoryResponse([]))
+
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const copyBtn = wrapper.find('[data-testid="digest-copy-btn"]')
+    expect(copyBtn.exists()).toBe(true)
+    await copyBtn.trigger('click')
+    await flushPromises()
+
+    expect(writeTextMock).toHaveBeenCalledOnce()
+    const calledWith = writeTextMock.mock.calls[0][0] as string
+    expect(calledWith).toContain('Daily Digest')
+    wrapper.unmount()
+  })
+
+  // 3. Download button — triggers blob URL anchor click
+  it('download button creates a Blob URL and triggers download', async () => {
+    const clickMock = vi.fn()
+    const revokeMock = vi.fn()
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn().mockReturnValue('blob:mock-url'),
+      revokeObjectURL: revokeMock,
+    })
+    const fakeAnchor = {
+      href: '',
+      download: '',
+      click: clickMock,
+    }
+    // Use vi.spyOn with a simple implementation that only intercepts 'a' tags
+    const originalCreate = document.createElement.bind(document)
+    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      if (tag === 'a') return fakeAnchor as unknown as HTMLElement
+      return originalCreate(tag)
+    })
+
+    mockGet.mockResolvedValue(makeHistoryResponse([]))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const downloadBtn = wrapper.find('[data-testid="digest-download-btn"]')
+    expect(downloadBtn.exists()).toBe(true)
+    await downloadBtn.trigger('click')
+
+    expect(clickMock).toHaveBeenCalledOnce()
+    expect(fakeAnchor.download).toMatch(/^digest-\d{4}-\d{2}-\d{2}\.txt$/)
+    expect(revokeMock).toHaveBeenCalledOnce()
+
+    createElementSpy.mockRestore()
+    wrapper.unmount()
+  })
+})

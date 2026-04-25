@@ -12,6 +12,7 @@ import {
 } from '@/utils/costHeatmap'
 import { buildForecast } from '@/utils/costForecast'
 import type { Forecast } from '@/utils/costForecast'
+import { buildDigest } from '@/utils/dailyDigest'
 import {
   topByCost,
   topByTokens,
@@ -243,6 +244,44 @@ function insightSeverityClass(severity: InsightSeverity): string {
     case 'warning': return 'insight-item--warning'
     default: return 'insight-item--info'
   }
+}
+
+// ---------------------------------------------------------------------------
+// Daily Digest
+// ---------------------------------------------------------------------------
+
+const digest = computed(() =>
+  buildDigest({
+    agents: (appState.latestDashboard?.agents ?? []).map(a => ({
+      id: a.id,
+      status: a.status,
+      costs: { today: a.costUSD, month: a.costUSD },
+    })),
+    subagents: (appState.latestDashboard?.subagents ?? []).map(s => ({
+      status: s.status,
+    })),
+    alerts: [],
+    errorCount: 0,
+  }),
+)
+
+function copyDigest(): void {
+  navigator.clipboard.writeText(digest.value).then(() => {
+    showToast('✅ 已複製')
+  }).catch(() => {
+    showToast('❌ 複製失敗')
+  })
+}
+
+function downloadDigest(): void {
+  const date = new Date().toISOString().slice(0, 10)
+  const blob = new Blob([digest.value], { type: 'text/plain; charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `digest-${date}.txt`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 // ---------------------------------------------------------------------------
@@ -1049,6 +1088,30 @@ watch(tokenChartRef, (el) => {
         </div>
       </div>
     </div>
+
+    <!-- ---------------------------------------------------------------- -->
+    <!-- Daily Digest Card                                                 -->
+    <!-- ---------------------------------------------------------------- -->
+    <div class="digest-card" data-testid="digest-card">
+      <div class="digest-card-header">
+        <h2 class="digest-card-title">📊 Daily Digest</h2>
+        <div class="digest-actions">
+          <button
+            class="ctrl-btn"
+            style="font-size:12px"
+            data-testid="digest-copy-btn"
+            @click="copyDigest"
+          >📋 複製</button>
+          <button
+            class="ctrl-btn"
+            style="font-size:12px;margin-left:6px"
+            data-testid="digest-download-btn"
+            @click="downloadDigest"
+          >⬇️ 下載</button>
+        </div>
+      </div>
+      <pre class="digest-pre" data-testid="digest-pre">{{ digest }}</pre>
+    </div>
   </div>
 </template>
 
@@ -1580,5 +1643,49 @@ watch(tokenChartRef, (el) => {
   text-align: center;
   color: var(--text-muted, #94a3b8);
   font-size: 13px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Daily Digest Card                                                    */
+/* ------------------------------------------------------------------ */
+
+.digest-card {
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 20px;
+  background: var(--surface-base, #fff);
+}
+
+.digest-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.digest-card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+}
+
+.digest-actions {
+  display: flex;
+  align-items: center;
+}
+
+.digest-pre {
+  margin: 0;
+  padding: 12px;
+  border-radius: 6px;
+  background: var(--surface-raised, #f8fafc);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-primary, #1e293b);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 </style>
