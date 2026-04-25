@@ -18,10 +18,17 @@ vi.mock('@/composables/useToast', () => ({
 }))
 
 // appState with minimal shape — SystemTab reads latestDashboard.sys and agents
+const mockAppState = {
+  latestDashboard: null as {
+    agents?: Array<{ id: string; costUSD: number; tokenUsage: number }>
+    sys?: { cpu: number; memory: number; disk: number }
+  } | null,
+  currentExchangeRate: 32.0,
+}
+
 vi.mock('@/stores/appState', () => ({
-  appState: {
-    latestDashboard: null,
-    currentExchangeRate: 32.0,
+  get appState() {
+    return mockAppState
   },
 }))
 
@@ -905,6 +912,131 @@ describe('SystemTab — Cost Forecast card', () => {
     const basis = wrapper.find('[data-testid="forecast-basis"]')
     expect(basis.exists()).toBe(true)
     expect(basis.text()).toContain('天資料')
+    wrapper.unmount()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// SystemTab — Wall of Fame Card
+// ---------------------------------------------------------------------------
+
+describe('SystemTab — Wall of Fame Card', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockAppState.latestDashboard = null
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    mockAppState.latestDashboard = null
+  })
+
+  // 1. Wall of Fame card renders in the DOM
+  it('renders Wall of Fame card container', async () => {
+    mockGet.mockResolvedValue(makeHistoryResponse([]))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const card = wrapper.find('[data-testid="wof-card"]')
+    expect(card.exists()).toBe(true)
+    expect(wrapper.text()).toContain('Wall of Fame')
+    wrapper.unmount()
+  })
+
+  // 2. Three leaderboard boards are rendered
+  it('renders three leaderboard boards: cost, tokens, activity', async () => {
+    mockGet.mockResolvedValue(makeHistoryResponse([]))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="wof-board-cost"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="wof-board-tokens"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="wof-board-activity"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  // 3. Empty state shown when no agents and no activity
+  it('shows empty state for all three boards when no data', async () => {
+    mockGet.mockResolvedValue(makeHistoryResponse([]))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="wof-empty-cost"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="wof-empty-tokens"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="wof-empty-activity"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  // 4. Cost leaderboard shows top agents from appState
+  it('shows top cost agents from appState.latestDashboard.agents', async () => {
+    mockAppState.latestDashboard = {
+      agents: [
+        { id: 'agent-alpha', costUSD: 1.5, tokenUsage: 100 },
+        { id: 'agent-beta', costUSD: 0.5, tokenUsage: 50 },
+      ],
+    }
+    mockGet.mockResolvedValue(makeHistoryResponse([]))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const costBoard = wrapper.find('[data-testid="wof-board-cost"]')
+    expect(costBoard.text()).toContain('agent-alpha')
+    expect(costBoard.text()).toContain('agent-beta')
+    // alpha should come before beta (higher cost)
+    const text = costBoard.text()
+    expect(text.indexOf('agent-alpha')).toBeLessThan(text.indexOf('agent-beta'))
+    wrapper.unmount()
+  })
+
+  // 5. Token leaderboard shows top agents
+  it('shows top token agents from appState.latestDashboard.agents', async () => {
+    mockAppState.latestDashboard = {
+      agents: [
+        { id: 'token-king', costUSD: 0.1, tokenUsage: 50000 },
+        { id: 'token-low', costUSD: 0.1, tokenUsage: 1000 },
+      ],
+    }
+    mockGet.mockResolvedValue(makeHistoryResponse([]))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const tokensBoard = wrapper.find('[data-testid="wof-board-tokens"]')
+    expect(tokensBoard.text()).toContain('token-king')
+    expect(tokensBoard.text()).toContain('token-low')
+    const text = tokensBoard.text()
+    expect(text.indexOf('token-king')).toBeLessThan(text.indexOf('token-low'))
+    wrapper.unmount()
+  })
+
+  // 6. Activity leaderboard shows top activity agents
+  it('shows top activity agents from agentActivityData', async () => {
+    mockGet.mockResolvedValue(
+      makeHistoryResponse([
+        makeActivity({ agent_id: 'busy-agent', active_minutes: 120 }),
+        makeActivity({ agent_id: 'lazy-agent', active_minutes: 10 }),
+      ]),
+    )
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const activityBoard = wrapper.find('[data-testid="wof-board-activity"]')
+    expect(activityBoard.text()).toContain('busy-agent')
+    expect(activityBoard.text()).toContain('lazy-agent')
+    const text = activityBoard.text()
+    expect(text.indexOf('busy-agent')).toBeLessThan(text.indexOf('lazy-agent'))
+    wrapper.unmount()
+  })
+
+  // 7. Empty state shows 無資料 text
+  it('shows "無資料" text in empty state boards', async () => {
+    mockGet.mockResolvedValue(makeHistoryResponse([]))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const wofText = wrapper.find('[data-testid="wof-card"]').text()
+    // At least cost and tokens boards should show 無資料 (no appState agents)
+    const count = (wofText.match(/無資料/g) ?? []).length
+    expect(count).toBeGreaterThanOrEqual(2)
     wrapper.unmount()
   })
 })
