@@ -105,6 +105,22 @@ export interface AlertConfigResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Response shape adapter
+// ---------------------------------------------------------------------------
+
+// Backend uses sendOk(res, body) which spreads body onto top level: { success: true, ...body }.
+// Older drafts of this component assumed { success: true, data: { ... } }. Support both.
+function unwrapField<T>(resp: unknown, key: string): T | undefined {
+  if (!resp || typeof resp !== 'object') return undefined
+  const r = resp as Record<string, unknown>
+  if (r.data && typeof r.data === 'object' && key in (r.data as Record<string, unknown>)) {
+    return (r.data as Record<string, unknown>)[key] as T
+  }
+  if (key in r) return r[key] as T
+  return undefined
+}
+
+// ---------------------------------------------------------------------------
 // Auto-refresh interval constants
 // ---------------------------------------------------------------------------
 
@@ -244,7 +260,8 @@ async function fetchMetrics(): Promise<void> {
   try {
     const data = (await api.get('/api/read/metrics')) as ApiMetricsResponse
     if (data.success) {
-      metrics.value = Object.entries(data.data.metrics).map(([endpoint, stats]) => ({
+      const metricsMap = (unwrapField<Record<string, Omit<ApiMetric, 'endpoint'>>>(data, 'metrics') ?? {})
+      metrics.value = Object.entries(metricsMap).map(([endpoint, stats]) => ({
         endpoint,
         ...stats,
       }))
@@ -265,7 +282,7 @@ async function fetchErrors(): Promise<void> {
   try {
     const data = (await api.get('/api/read/errors/recent?limit=20')) as ApiErrorsResponse
     if (data.success) {
-      errors.value = data.data.errors
+      errors.value = unwrapField<ApiError[]>(data, 'errors') ?? []
     } else {
       errorsError.value = 'Errors API returned unsuccessful response'
     }
@@ -283,7 +300,7 @@ async function fetchAlerts(): Promise<void> {
   try {
     const data = (await api.get('/api/alerts/recent?limit=20')) as AlertsRecentResponse
     if (data.success) {
-      alerts.value = data.data.alerts
+      alerts.value = unwrapField<AlertRecord[]>(data, 'alerts') ?? []
     } else {
       alertsError.value = 'Alerts API returned unsuccessful response'
     }
@@ -305,7 +322,7 @@ async function fetchAlertTimeline(): Promise<void> {
       `/api/alerts/history?from=${from}&to=${to}&limit=500`,
     )) as AlertsHistoryResponse
     if (data.success) {
-      timeline.value = data.data.alerts
+      timeline.value = unwrapField<AlertRecord[]>(data, 'alerts') ?? []
     } else {
       timelineError.value = 'Timeline API returned unsuccessful response'
     }
@@ -323,7 +340,7 @@ async function fetchAlertConfig(): Promise<void> {
   try {
     const data = (await api.get('/api/alerts/config')) as AlertConfigResponse
     if (data.success) {
-      alertConfig.value = data.data.config
+      alertConfig.value = unwrapField<AlertConfig>(data, 'config') ?? null
     } else {
       configError.value = 'Alert config API returned unsuccessful response'
     }
@@ -341,7 +358,7 @@ async function fetchAlertHistory(): Promise<void> {
   try {
     const data = (await api.get('/api/alerts/history?limit=200')) as AlertsHistoryResponse
     if (data.success) {
-      alertHistory.value = data.data.alerts
+      alertHistory.value = unwrapField<AlertRecord[]>(data, 'alerts') ?? []
     } else {
       historyError.value = 'Alert history API returned unsuccessful response'
     }
