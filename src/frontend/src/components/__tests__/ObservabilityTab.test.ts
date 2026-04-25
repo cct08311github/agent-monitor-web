@@ -6,6 +6,7 @@ import type {
   AlertsRecentResponse,
   AlertConfigResponse,
   AlertsHistoryResponse,
+  HourBucket,
 } from '../ObservabilityTab.vue'
 import { formatExportTimestamp } from '@/lib/time'
 
@@ -425,8 +426,8 @@ describe('ObservabilityTab', () => {
       await refreshBtn?.trigger('click')
       await flushPromises()
 
-      // metrics + errors + alerts/recent + alerts/config = 4 calls
-      expect(mockGet).toHaveBeenCalledTimes(4)
+      // metrics + errors + alerts/recent + alerts/config + timeline = 5 calls
+      expect(mockGet).toHaveBeenCalledTimes(5)
       wrapper.unmount()
     })
 
@@ -510,8 +511,8 @@ describe('ObservabilityTab', () => {
       vi.advanceTimersByTime(10_000)
       await flushPromises()
 
-      // Should have fetched metrics + errors + alerts/recent + alerts/config = 4 calls
-      expect(mockGet).toHaveBeenCalledTimes(4)
+      // Should have fetched metrics + errors + alerts/recent + alerts/config + timeline = 5 calls
+      expect(mockGet).toHaveBeenCalledTimes(5)
       wrapper.unmount()
     })
   })
@@ -612,7 +613,7 @@ describe('ObservabilityTab', () => {
   // ── Auto-refresh covers alerts ───────────────────────────────────────────
 
   describe('auto-refresh with alerts', () => {
-    it('auto-refresh triggers all 4 endpoint fetches', async () => {
+    it('auto-refresh triggers all 5 endpoint fetches', async () => {
       setupMockBothSuccess()
       const wrapper = mount(ObservabilityTab)
       await flushPromises()
@@ -621,8 +622,8 @@ describe('ObservabilityTab', () => {
       vi.advanceTimersByTime(10_000)
       await flushPromises()
 
-      // metrics + errors + alerts/recent + alerts/config = 4 calls
-      expect(mockGet).toHaveBeenCalledTimes(4)
+      // metrics + errors + alerts/recent + alerts/config + timeline = 5 calls
+      expect(mockGet).toHaveBeenCalledTimes(5)
       wrapper.unmount()
     })
   })
@@ -1122,6 +1123,184 @@ describe('ObservabilityTab', () => {
     })
   })
 
+  // ── Alert timeline chart ─────────────────────────────────────────────────
+
+  describe('alert timeline chart', () => {
+    // Build a timeline fixture with known distribution:
+    // - 2 critical alerts in the most recent hour (bucket 23, i=23 in the array)
+    // - 1 warning alert in the second-most-recent hour (bucket 22)
+    // - 1 critical 3 hours ago (bucket 20)
+    function makeTimelineFixture(): AlertsHistoryResponse {
+      const now = Date.now()
+      return {
+        success: true,
+        data: {
+          alerts: [
+            // 2 criticals in current hour
+            { rule: 'cpu_critical', severity: 'critical', message: 'A', meta: {}, ts: now - 1_000 },
+            { rule: 'cpu_critical', severity: 'critical', message: 'B', meta: {}, ts: now - 2_000 },
+            // 1 warning 1–2 hours ago
+            { rule: 'mem_warn', severity: 'warning', message: 'C', meta: {}, ts: now - 1 * 3_600_000 - 60_000 },
+            // 1 critical 3–4 hours ago
+            { rule: 'cpu_critical', severity: 'critical', message: 'D', meta: {}, ts: now - 3 * 3_600_000 - 60_000 },
+          ],
+          total: 4,
+        },
+      }
+    }
+
+    function setupMockWithTimeline() {
+      const tlFixture = makeTimelineFixture()
+      mockGet.mockImplementation((url: string) => {
+        if (url.includes('/api/read/metrics')) return Promise.resolve(emptyMetricsFixture)
+        if (url.includes('/api/read/errors/recent')) return Promise.resolve(emptyErrorsFixture)
+        if (url.includes('/api/alerts/recent')) return Promise.resolve(emptyAlertsFixture)
+        if (url.includes('/api/alerts/config')) return Promise.resolve(alertConfigFixture)
+        if (url.includes('/api/alerts/history')) return Promise.resolve(tlFixture)
+        return Promise.reject(new Error('Unknown URL'))
+      })
+      return tlFixture
+    }
+
+    it('timelineBuckets always returns exactly 24 buckets', async () => {
+      setupMockWithTimeline()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      // SVG should contain 24 <g> elements (one per hour bucket)
+      const bucketGroups = wrapper.findAll('[data-testid^="timeline-bucket-"]')
+      expect(bucketGroups).toHaveLength(24)
+      wrapper.unmount()
+    })
+
+    it('renders SVG element when timeline has data', async () => {
+      setupMockWithTimeline()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const svg = wrapper.find('[data-testid="timeline-svg"]')
+      expect(svg.exists()).toBe(true)
+      wrapper.unmount()
+    })
+
+    it('shows empty state when timeline has no alerts', async () => {
+      mockGet.mockImplementation((url: string) => {
+        if (url.includes('/api/read/metrics')) return Promise.resolve(emptyMetricsFixture)
+        if (url.includes('/api/read/errors/recent')) return Promise.resolve(emptyErrorsFixture)
+        if (url.includes('/api/alerts/recent')) return Promise.resolve(emptyAlertsFixture)
+        if (url.includes('/api/alerts/config')) return Promise.resolve(alertConfigFixture)
+        if (url.includes('/api/alerts/history')) return Promise.resolve(emptyHistoryFixture)
+        return Promise.reject(new Error('Unknown URL'))
+      })
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const emptyEl = wrapper.find('[data-testid="timeline-empty"]')
+      expect(emptyEl.exists()).toBe(true)
+      expect(emptyEl.text()).toContain('最近 24 小時無 alert')
+      wrapper.unmount()
+    })
+
+    it('shows error state and retry button when timeline fetch fails', async () => {
+      mockGet.mockImplementation((url: string) => {
+        if (url.includes('/api/read/metrics')) return Promise.resolve(emptyMetricsFixture)
+        if (url.includes('/api/read/errors/recent')) return Promise.resolve(emptyErrorsFixture)
+        if (url.includes('/api/alerts/recent')) return Promise.resolve(emptyAlertsFixture)
+        if (url.includes('/api/alerts/config')) return Promise.resolve(alertConfigFixture)
+        if (url.includes('/api/alerts/history'))
+          return Promise.reject(new Error('Timeline fetch failed'))
+        return Promise.reject(new Error('Unknown URL'))
+      })
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Timeline fetch failed')
+      const retryBtn = wrapper.find('[data-testid="timeline-retry"]')
+      expect(retryBtn.exists()).toBe(true)
+      wrapper.unmount()
+    })
+
+    it('retry button in timeline error state calls fetchAlertTimeline again', async () => {
+      mockGet.mockImplementation((url: string) => {
+        if (url.includes('/api/read/metrics')) return Promise.resolve(emptyMetricsFixture)
+        if (url.includes('/api/read/errors/recent')) return Promise.resolve(emptyErrorsFixture)
+        if (url.includes('/api/alerts/recent')) return Promise.resolve(emptyAlertsFixture)
+        if (url.includes('/api/alerts/config')) return Promise.resolve(alertConfigFixture)
+        if (url.includes('/api/alerts/history'))
+          return Promise.reject(new Error('Timeline fetch failed'))
+        return Promise.reject(new Error('Unknown URL'))
+      })
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      setupMockWithTimeline()
+      mockGet.mockClear()
+      const retryBtn = wrapper.find('[data-testid="timeline-retry"]')
+      await retryBtn.trigger('click')
+      await flushPromises()
+
+      expect(mockGet).toHaveBeenCalledWith(expect.stringContaining('/api/alerts/history'))
+      wrapper.unmount()
+    })
+
+    it('auto-refresh includes timeline fetch', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      mockGet.mockClear()
+      vi.advanceTimersByTime(10_000)
+      await flushPromises()
+
+      // timeline uses /api/alerts/history with from/to params
+      const timelineCalls = (mockGet.mock.calls as string[][]).filter((args) =>
+        args[0].includes('/api/alerts/history') && args[0].includes('from='),
+      )
+      expect(timelineCalls.length).toBeGreaterThanOrEqual(1)
+      wrapper.unmount()
+    })
+
+    it('manual Refresh button includes timeline fetch', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      mockGet.mockClear()
+      const refreshBtn = wrapper.findAll('button').find((b) => b.text().includes('Refresh'))
+      await refreshBtn?.trigger('click')
+      await flushPromises()
+
+      const timelineCalls = (mockGet.mock.calls as string[][]).filter((args) =>
+        args[0].includes('/api/alerts/history') && args[0].includes('from='),
+      )
+      expect(timelineCalls.length).toBeGreaterThanOrEqual(1)
+      wrapper.unmount()
+    })
+
+    it('HourBucket type has correct shape (TypeScript export check)', () => {
+      const bucket: HourBucket = { hourStart: Date.now(), critical: 2, warning: 1 }
+      expect(bucket.critical).toBe(2)
+      expect(bucket.warning).toBe(1)
+      expect(typeof bucket.hourStart).toBe('number')
+    })
+
+    it('fetchAlertTimeline uses from/to/limit=500 query params', async () => {
+      setupMockWithTimeline()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const timelineCalls = (mockGet.mock.calls as string[][]).filter((args) =>
+        args[0].includes('/api/alerts/history'),
+      )
+      expect(timelineCalls.length).toBeGreaterThan(0)
+      const url = timelineCalls[0][0]
+      expect(url).toContain('from=')
+      expect(url).toContain('to=')
+      expect(url).toContain('limit=500')
+      wrapper.unmount()
+    })
+  })
+
   // ── formatExportTimestamp helper ────────────────────────────────────────
 
   describe('formatExportTimestamp', () => {
@@ -1289,20 +1468,22 @@ describe('ObservabilityTab', () => {
       wrapper.unmount()
     })
 
-    it('auto-refresh does NOT fetch history when collapsed', async () => {
+    it('auto-refresh does NOT fetch history-panel (limit=200) when collapsed', async () => {
       setupMockBothSuccess()
       const wrapper = mount(ObservabilityTab)
       await flushPromises()
 
       // History is collapsed by default — do not expand
+      // Note: timeline (from/to params) is still fetched; only the history panel (limit=200) should not be
       mockGet.mockClear()
       vi.advanceTimersByTime(10_000)
       await flushPromises()
 
-      const historyCalls = (mockGet.mock.calls as string[][]).filter((args) =>
-        args[0].includes('/api/alerts/history'),
+      // Filter for the history-panel call (uses limit=200 without from/to params)
+      const historyPanelCalls = (mockGet.mock.calls as string[][]).filter((args) =>
+        args[0].includes('/api/alerts/history') && args[0].includes('limit=200') && !args[0].includes('from='),
       )
-      expect(historyCalls.length).toBe(0)
+      expect(historyPanelCalls.length).toBe(0)
       wrapper.unmount()
     })
 
@@ -1321,12 +1502,13 @@ describe('ObservabilityTab', () => {
       await refreshBtn?.trigger('click')
       await flushPromises()
 
-      // metrics + errors + alerts/recent + config + history = 5 calls
-      expect(mockGet).toHaveBeenCalledTimes(5)
-      const historyCalls = (mockGet.mock.calls as string[][]).filter((args) =>
-        args[0].includes('/api/alerts/history'),
+      // metrics + errors + alerts/recent + config + timeline + history = 6 calls
+      expect(mockGet).toHaveBeenCalledTimes(6)
+      // history panel call: limit=200 without from/to
+      const historyPanelCalls = (mockGet.mock.calls as string[][]).filter((args) =>
+        args[0].includes('/api/alerts/history') && args[0].includes('limit=200') && !args[0].includes('from='),
       )
-      expect(historyCalls.length).toBe(1)
+      expect(historyPanelCalls.length).toBe(1)
       wrapper.unmount()
     })
 
