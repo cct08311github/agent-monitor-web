@@ -15,6 +15,7 @@ const DEFAULT_CONFIG = {
         cost_today_high:   { enabled: true, threshold: 5,    severity: 'warning',  label: '今日成本偏高 (USD)' },
         error_rate_high:   { enabled: true, threshold: 5,    severity: 'warning',  label: '5xx Error 激增（5 分鐘內）' },
         latency_p99_high:  { enabled: true, threshold: 2000, severity: 'warning',  label: 'API p99 latency 過高' },
+        rate_limit_high:   { enabled: true, threshold: 10,   severity: 'warning',  label: 'Rate-limit 高頻觸發' },
     }
 };
 
@@ -31,6 +32,8 @@ let costRuleState = {};
 // Hysteresis state for observability-based rules.
 let errorRateState = false;
 let latencyP99State = false;
+// Hysteresis state for rate-limit alert.
+let rateLimitState = {};
 
 function loadConfig() {
     try {
@@ -143,9 +146,14 @@ function evaluate(payload) {
         }
     }
 
+    // Fetch apiMetrics stats once — shared by latency_p99_high and rate_limit_high
+    const apiStats = (rules.latency_p99_high?.enabled || rules.rate_limit_high?.enabled)
+        ? apiMetrics.getStats()
+        : null;
+
     // p99 latency alert — hysteresis: rising edge only, reset when no endpoint exceeds threshold
     if (rules.latency_p99_high?.enabled) {
-        const stats = apiMetrics.getStats();
+        const stats = apiStats;
         const latencyThreshold = rules.latency_p99_high.threshold;
         let worstEndpoint = null;
         let worstP99 = 0;
@@ -168,6 +176,30 @@ function evaluate(payload) {
         }
     }
 
+    // Rate-limit alert — hysteresis: fire once per crossing, reset when below threshold
+    if (rules.rate_limit_high?.enabled) {
+        const stats = apiStats;
+        let maxKey = null;
+        let maxCount = 0;
+        for (const k of Object.keys(stats)) {
+            const c = stats[k]?.errorCount?.['429'] ?? 0;
+            if (c > maxCount) { maxCount = c; maxKey = k; }
+        }
+        const threshold = rules.rate_limit_high.threshold;
+        if (maxCount > threshold && !rateLimitState.rate_limit_high) {
+            if (canFire('rate_limit_high')) {
+                fired.push(fire('rate_limit_high',
+                    `${maxKey} 觸發 ${maxCount} 次 rate-limit — 超過閾值 ${threshold}`,
+                    'warning',
+                    { endpoint: maxKey, count: maxCount, threshold }
+                ));
+                rateLimitState.rate_limit_high = true;
+            }
+        } else if (maxCount <= threshold && rateLimitState.rate_limit_high) {
+            rateLimitState.rate_limit_high = false;
+        }
+    }
+
     return fired;
 }
 
@@ -180,6 +212,7 @@ function resetForTesting() {
     costRuleState = {};
     errorRateState = false;
     latencyP99State = false;
+    rateLimitState = {};
     config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
     try { if (fs.existsSync(CONFIG_PATH)) fs.unlinkSync(CONFIG_PATH); } catch (e) { /* ignore */ }
 }

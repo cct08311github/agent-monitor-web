@@ -393,5 +393,99 @@ describe('AlertEngine', () => {
                 expect(alerts.some(a => a.rule === 'latency_p99_high')).toBe(false);
             });
         });
+
+        describe('rate_limit_high', () => {
+            // Helper: build a stats object with one 429-heavy endpoint
+            function makeRateLimitStats(count429, endpoint = 'GET /api/resource') {
+                return {
+                    [endpoint]: {
+                        count: 50,
+                        p50: 80, p95: 150, p99: 200,
+                        min: 20, max: 300, mean: 90,
+                        errorCount: { '4xx': 2, '5xx': 0, '429': count429 },
+                    },
+                };
+            }
+
+            it('fires when 429 count exceeds threshold', () => {
+                jest.spyOn(apiMetrics, 'getStats').mockReturnValue(makeRateLimitStats(15));
+
+                const alerts = alertEngine.evaluate(basePayload);
+                const alert = alerts.find(a => a.rule === 'rate_limit_high');
+                expect(alert).toBeDefined();
+                expect(alert.severity).toBe('warning');
+                expect(alert.meta.endpoint).toBe('GET /api/resource');
+                expect(alert.meta.count).toBe(15);
+                expect(alert.meta.threshold).toBe(10);
+            });
+
+            it('does NOT fire when count is exactly at threshold (> not >=)', () => {
+                jest.spyOn(apiMetrics, 'getStats').mockReturnValue(makeRateLimitStats(10));
+
+                const alerts = alertEngine.evaluate(basePayload);
+                expect(alerts.some(a => a.rule === 'rate_limit_high')).toBe(false);
+            });
+
+            it('does NOT re-fire while still above threshold (hysteresis latch)', () => {
+                jest.spyOn(apiMetrics, 'getStats').mockReturnValue(makeRateLimitStats(20));
+
+                alertEngine.evaluate(basePayload); // first fire + latch=true
+                const second = alertEngine.evaluate(basePayload); // still above — latch blocks
+                expect(second.some(a => a.rule === 'rate_limit_high')).toBe(false);
+            });
+
+            it('fires again after latch reset + cooldown expired (re-crossing)', () => {
+                jest.useFakeTimers();
+                jest.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+                try {
+                    jest.spyOn(apiMetrics, 'getStats')
+                        .mockReturnValueOnce(makeRateLimitStats(20))  // first: above threshold → fire + latch
+                        .mockReturnValueOnce(makeRateLimitStats(0))   // second: below threshold → reset latch
+                        .mockReturnValue(makeRateLimitStats(20));     // subsequent: above threshold again
+
+                    alertEngine.evaluate(basePayload); // fire #1 + latch=true
+                    alertEngine.evaluate(basePayload); // drop → latch=false
+                    jest.advanceTimersByTime(6 * 60 * 1000); // past 5min cooldown
+                    const third = alertEngine.evaluate(basePayload);
+                    expect(third.some(a => a.rule === 'rate_limit_high')).toBe(true);
+                } finally {
+                    jest.useRealTimers();
+                }
+            });
+
+            it('does not fire when disabled', () => {
+                alertEngine.updateConfig({ rules: { rate_limit_high: { enabled: false } } });
+                jest.spyOn(apiMetrics, 'getStats').mockReturnValue(makeRateLimitStats(100));
+
+                const alerts = alertEngine.evaluate(basePayload);
+                expect(alerts.some(a => a.rule === 'rate_limit_high')).toBe(false);
+            });
+
+            it('picks the endpoint with the highest 429 count when multiple endpoints exist', () => {
+                jest.spyOn(apiMetrics, 'getStats').mockReturnValue({
+                    'GET /api/low': {
+                        count: 30, p50: 80, p95: 150, p99: 200, min: 20, max: 300, mean: 90,
+                        errorCount: { '4xx': 1, '5xx': 0, '429': 5 },
+                    },
+                    'POST /api/heavy': {
+                        count: 50, p50: 100, p95: 200, p99: 300, min: 40, max: 400, mean: 120,
+                        errorCount: { '4xx': 3, '5xx': 0, '429': 25 },
+                    },
+                });
+
+                const alerts = alertEngine.evaluate(basePayload);
+                const alert = alerts.find(a => a.rule === 'rate_limit_high');
+                expect(alert).toBeDefined();
+                expect(alert.meta.endpoint).toBe('POST /api/heavy');
+                expect(alert.meta.count).toBe(25);
+            });
+
+            it('does NOT fire when stats is empty', () => {
+                jest.spyOn(apiMetrics, 'getStats').mockReturnValue({});
+
+                const alerts = alertEngine.evaluate(basePayload);
+                expect(alerts.some(a => a.rule === 'rate_limit_high')).toBe(false);
+            });
+        });
     });
 });
