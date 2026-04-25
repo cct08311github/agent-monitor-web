@@ -592,6 +592,82 @@ describe('CronTab', () => {
     })
   })
 
+  // ── Up Next timeline card ──────────────────────────────────────────────────
+
+  describe('Up Next timeline card', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('renders the Up Next card when jobs exist', async () => {
+      mockGet.mockResolvedValue(jobsResponse([makeJob()]))
+      const wrapper = mount(CronTab)
+      await flushPromises()
+
+      expect(wrapper.find('.cron-timeline-card').exists()).toBe(true)
+      expect(wrapper.find('.cron-timeline-title').text()).toContain('Up Next')
+      wrapper.unmount()
+    })
+
+    it('shows empty state text when no markers fire within 24h', async () => {
+      vi.useFakeTimers()
+      const NOW = 1_700_000_000_000
+      vi.setSystemTime(NOW)
+
+      // nextRunAtMs is 48h from now → beyond 24h window
+      const job = makeJob({
+        enabled: true,
+        state: { nextRunAtMs: NOW + 48 * 3_600_000, lastRunAtMs: undefined, lastStatus: undefined },
+      })
+      mockGet.mockResolvedValue(jobsResponse([job]))
+      const wrapper = mount(CronTab)
+      await flushPromises()
+
+      expect(wrapper.find('.cron-timeline-empty').exists()).toBe(true)
+      expect(wrapper.find('.cron-timeline-empty').text()).toContain('24 小時無 cron 觸發')
+      wrapper.unmount()
+    })
+
+    it('badge count equals number of markers within 24h', async () => {
+      vi.useFakeTimers()
+      const NOW = 1_700_000_000_000
+      vi.setSystemTime(NOW)
+
+      const jobs = [
+        makeJob({ id: 'a', name: 'A', enabled: true, state: { nextRunAtMs: NOW + 1 * 3_600_000, lastRunAtMs: undefined, lastStatus: undefined } }),
+        makeJob({ id: 'b', name: 'B', enabled: true, state: { nextRunAtMs: NOW + 2 * 3_600_000, lastRunAtMs: undefined, lastStatus: undefined } }),
+        makeJob({ id: 'c', name: 'C', enabled: false, state: { nextRunAtMs: NOW + 3 * 3_600_000, lastRunAtMs: undefined, lastStatus: undefined } }),
+      ]
+      mockGet.mockResolvedValue(jobsResponse(jobs))
+      const wrapper = mount(CronTab)
+      await flushPromises()
+
+      // only 2 enabled jobs within 24h; disabled one excluded
+      expect(wrapper.find('.cron-timeline-badge').text()).toBe('2')
+      wrapper.unmount()
+    })
+
+    it('renders SVG axis when markers exist', async () => {
+      vi.useFakeTimers()
+      const NOW = 1_700_000_000_000
+      vi.setSystemTime(NOW)
+
+      const job = makeJob({
+        enabled: true,
+        state: { nextRunAtMs: NOW + 6 * 3_600_000, lastRunAtMs: undefined, lastStatus: undefined },
+      })
+      mockGet.mockResolvedValue(jobsResponse([job]))
+      const wrapper = mount(CronTab)
+      await flushPromises()
+
+      expect(wrapper.find('.cron-timeline-svg').exists()).toBe(true)
+      // should render circles for markers
+      const circles = wrapper.findAll('circle')
+      expect(circles.length).toBeGreaterThanOrEqual(1)
+      wrapper.unmount()
+    })
+  })
+
   // ── / shortcut focuses search input ───────────────────────────────────────
 
   describe('/ shortcut focuses search input', () => {
