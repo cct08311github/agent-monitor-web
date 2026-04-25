@@ -50,6 +50,7 @@ vi.mock('@/components/OptimizeTab.vue', () => ({ default: { template: '<div />' 
 vi.mock('@/components/ChatModal.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('@/components/ModelSwitchModal.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('@/components/HelpModal.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('@/components/CommandPalette.vue', () => ({ default: { template: '<div />' } }))
 
 // ---------------------------------------------------------------------------
 // Stub focusTrap (used by HelpModal through child)
@@ -59,6 +60,15 @@ vi.mock('@/lib/focusTrap', () => ({
   createFocusTrap: () => ({
     activate: vi.fn(),
     deactivate: vi.fn(),
+  }),
+}))
+
+vi.mock('@/composables/useTheme', () => ({
+  useTheme: () => ({
+    cycleTheme: vi.fn(),
+    currentTheme: { value: 'auto' },
+    effectiveTheme: { value: 'dark' },
+    setTheme: vi.fn(),
   }),
 }))
 
