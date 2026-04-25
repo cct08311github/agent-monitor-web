@@ -11,6 +11,7 @@ import { formatCountdown } from '@/lib/time'
 import { buildMarkers, formatRelative } from '@/utils/cronTimeline'
 import type { TimelineMarker } from '@/utils/cronTimeline'
 import { humanizeCron } from '@/utils/cronHumanizer'
+import CronNextFires from '@/components/CronNextFires.vue'
 
 // ---------------------------------------------------------------------------
 // State
@@ -376,6 +377,7 @@ function getNextRunCountdown(job: CronJob): string {
                   {{ job.schedule?.expr ?? 'Once' }}
                   <small v-if="job.schedule?.expr" class="cron-human">· {{ humanizeCron(job.schedule.expr) }}</small>
                 </div>
+                <CronNextFires v-if="job.schedule?.expr" :expression="job.schedule.expr" />
               </div>
             </div>
 
