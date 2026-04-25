@@ -583,3 +583,133 @@ describe('SessionViewer — annotation', () => {
     wrapper.unmount()
   })
 })
+
+// ---------------------------------------------------------------------------
+// 9. Story mode (Session Storyteller)
+// ---------------------------------------------------------------------------
+
+describe('SessionViewer — Story mode', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorageMock.clear()
+  })
+
+  it('renders Story toggle button when messages are loaded', async () => {
+    const msgs = makeMessages({ role: 'user', text: 'Hello' }, { role: 'assistant', text: 'Hi' })
+    mockGet.mockResolvedValue({ success: true, messages: msgs })
+
+    const wrapper = mountViewer()
+    await flushPromises()
+    await nextTick()
+
+    expect(wrapper.find('.sv-story-toggle-btn').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('does not render Story toggle button while loading', () => {
+    mockGet.mockReturnValue(new Promise(() => {}))
+    const wrapper = mountViewer()
+    expect(wrapper.find('.sv-story-toggle-btn').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('default mode is raw — messages are visible, story-list is not', async () => {
+    const msgs = makeMessages({ role: 'user', text: 'test message' }, { role: 'assistant', text: 'ok' })
+    mockGet.mockResolvedValue({ success: true, messages: msgs })
+
+    const wrapper = mountViewer()
+    await flushPromises()
+    await nextTick()
+
+    expect(wrapper.find('.sv-message').exists()).toBe(true)
+    expect(wrapper.find('.story-list').exists()).toBe(false)
+    expect(wrapper.find('.sv-story-toggle-btn').text()).toContain('Story')
+    wrapper.unmount()
+  })
+
+  it('clicking Story toggle switches to story mode — story-list renders', async () => {
+    const msgs: SessionMessage[] = [
+      { role: 'user', text: 'Write me a script please' },
+      { role: 'assistant', toolUses: ['write_file'] },
+      { role: 'assistant', text: 'Done! Script written.' },
+    ]
+    mockGet.mockResolvedValue({ success: true, messages: msgs })
+
+    const wrapper = mountViewer()
+    await flushPromises()
+    await nextTick()
+
+    await wrapper.find('.sv-story-toggle-btn').trigger('click')
+    await nextTick()
+
+    expect(wrapper.find('.story-list').exists()).toBe(true)
+    expect(wrapper.find('.sv-message').exists()).toBe(false)
+    // button label should now say "Raw"
+    expect(wrapper.find('.sv-story-toggle-btn').text()).toContain('Raw')
+    wrapper.unmount()
+  })
+
+  it('story mode shows story steps with icons and text', async () => {
+    const msgs: SessionMessage[] = [
+      { role: 'user', text: 'Summarize this for me' },
+      { role: 'assistant', text: 'Here is the summary.' },
+    ]
+    mockGet.mockResolvedValue({ success: true, messages: msgs })
+
+    const wrapper = mountViewer()
+    await flushPromises()
+    await nextTick()
+
+    await wrapper.find('.sv-story-toggle-btn').trigger('click')
+    await nextTick()
+
+    const steps = wrapper.findAll('.story-step')
+    expect(steps.length).toBeGreaterThan(0)
+    // Each step has an icon and text
+    for (const step of steps) {
+      expect(step.find('.story-icon').exists()).toBe(true)
+      expect(step.find('.story-text').exists()).toBe(true)
+    }
+    wrapper.unmount()
+  })
+
+  it('shows empty story message when story generates no steps', async () => {
+    // Only mid-conversation user messages with no assistant messages → no steps
+    const msgs: SessionMessage[] = [
+      { role: 'user' },
+      { role: 'user' },
+    ]
+    mockGet.mockResolvedValue({ success: true, messages: msgs })
+
+    const wrapper = mountViewer()
+    await flushPromises()
+    await nextTick()
+
+    await wrapper.find('.sv-story-toggle-btn').trigger('click')
+    await nextTick()
+
+    expect(wrapper.text()).toContain('無敘事可生成')
+    wrapper.unmount()
+  })
+
+  it('toggling back from story to raw re-shows messages', async () => {
+    const msgs = makeMessages({ role: 'user', text: 'hello' }, { role: 'assistant', text: 'world' })
+    mockGet.mockResolvedValue({ success: true, messages: msgs })
+
+    const wrapper = mountViewer()
+    await flushPromises()
+    await nextTick()
+
+    // Switch to story
+    await wrapper.find('.sv-story-toggle-btn').trigger('click')
+    await nextTick()
+    expect(wrapper.find('.story-list').exists()).toBe(true)
+
+    // Switch back to raw
+    await wrapper.find('.sv-story-toggle-btn').trigger('click')
+    await nextTick()
+    expect(wrapper.find('.sv-message').exists()).toBe(true)
+    expect(wrapper.find('.story-list').exists()).toBe(false)
+    wrapper.unmount()
+  })
+})
