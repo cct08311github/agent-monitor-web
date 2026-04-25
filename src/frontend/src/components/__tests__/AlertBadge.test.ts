@@ -741,4 +741,233 @@ describe('AlertBadge', () => {
       wrapper.unmount()
     })
   })
+
+  // ── Snooze ─────────────────────────────────────────────────────────────────
+
+  describe('snooze', () => {
+    interface NotificationLike {
+      new (title: string, opts?: NotificationOptions): void
+      permission: NotificationPermission
+      requestPermission: () => Promise<NotificationPermission>
+    }
+
+    let NotificationMock: ReturnType<typeof vi.fn>
+    let requestPermissionMock: ReturnType<typeof vi.fn>
+
+    function makeLocalStorageStub(initial: Record<string, string> = {}): Storage {
+      const store = new Map<string, string>(Object.entries(initial))
+      return {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => { store.set(k, v) },
+        removeItem: (k: string) => { store.delete(k) },
+        clear: () => { store.clear() },
+        get length() { return store.size },
+        key: (i: number) => [...store.keys()][i] ?? null,
+      } as Storage
+    }
+
+    function setPermission(perm: NotificationPermission): void {
+      Object.defineProperty(NotificationMock, 'permission', {
+        value: perm,
+        writable: true,
+        configurable: true,
+      })
+      requestPermissionMock.mockResolvedValue(perm)
+    }
+
+    beforeEach(() => {
+      NotificationMock = vi.fn()
+      requestPermissionMock = vi.fn()
+      ;(NotificationMock as unknown as NotificationLike).requestPermission =
+        requestPermissionMock as unknown as () => Promise<NotificationPermission>
+      setPermission('granted')
+
+      vi.stubGlobal('Notification', NotificationMock)
+      vi.stubGlobal('localStorage', makeLocalStorageStub({ oc_desktop_notif_enabled: '1' }))
+    })
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    // 1. setSnooze stores epoch ms in localStorage
+    it('setSnooze stores epoch ms in localStorage', async () => {
+      mockGet.mockResolvedValue(emptyResponse())
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      // Open popover then click snooze 30 min button
+      await wrapper.find('.alert-badge-wrapper').trigger('focusin')
+      await wrapper.vm.$nextTick()
+
+      await wrapper.find('.snooze-btn').trigger('click') // first btn = 30 min
+      await wrapper.vm.$nextTick()
+
+      const stored = localStorage.getItem('oc_alert_notif_snooze_until')
+      expect(stored).not.toBeNull()
+      const storedMs = parseInt(stored!, 10)
+      expect(storedMs).toBeGreaterThan(NOW)
+      // Should be ~30 min in future
+      expect(storedMs).toBeCloseTo(NOW + 30 * 60_000, -3)
+      wrapper.unmount()
+    })
+
+    // 2. isSnoozed=true → desktop notification does not fire
+    it('does not fire Notification when snoozed', async () => {
+      // Pre-seed snooze in localStorage (60 min from now)
+      const snoozeUntilMs = NOW + 60 * 60_000
+      vi.stubGlobal('localStorage', makeLocalStorageStub({
+        oc_desktop_notif_enabled: '1',
+        oc_alert_notif_snooze_until: String(snoozeUntilMs),
+      }))
+
+      mockGet.mockResolvedValue(alertsResponse([makeAlert('critical')]))
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      expect(NotificationMock).not.toHaveBeenCalled()
+      wrapper.unmount()
+    })
+
+    // 3. After snooze expires, isSnoozed becomes false (fake timer advances)
+    it('isSnoozed becomes false after expiry when timer advances', async () => {
+      // Snooze for 1 minute from now
+      const snoozeUntilMs = NOW + 60_000
+      vi.stubGlobal('localStorage', makeLocalStorageStub({
+        oc_desktop_notif_enabled: '1',
+        oc_alert_notif_snooze_until: String(snoozeUntilMs),
+      }))
+
+      mockGet.mockResolvedValue(emptyResponse())
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      // Advance system time past expiry and tick the interval
+      vi.setSystemTime(NOW + 61_000)
+      vi.advanceTimersByTime(2_000) // fire nowInterval ticks
+      await wrapper.vm.$nextTick()
+
+      // Open popover — snooze status header should not be shown
+      await wrapper.find('.alert-badge-wrapper').trigger('focusin')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.snooze-status').exists()).toBe(false)
+      wrapper.unmount()
+    })
+
+    // 4. cancelSnooze clears state and localStorage, notifications resume
+    it('cancelSnooze clears snooze and allows notifications again', async () => {
+      const snoozeUntilMs = NOW + 60 * 60_000
+      vi.stubGlobal('localStorage', makeLocalStorageStub({
+        oc_desktop_notif_enabled: '1',
+        oc_alert_notif_snooze_until: String(snoozeUntilMs),
+      }))
+
+      mockGet.mockResolvedValue(emptyResponse())
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      // Open popover — snooze status should be visible
+      await wrapper.find('.alert-badge-wrapper').trigger('focusin')
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('.snooze-status').exists()).toBe(true)
+
+      // Click cancel
+      await wrapper.find('.snooze-cancel-btn').trigger('click')
+      await wrapper.vm.$nextTick()
+
+      // Snooze status should be gone
+      expect(wrapper.find('.snooze-status').exists()).toBe(false)
+
+      // localStorage key should be removed
+      expect(localStorage.getItem('oc_alert_notif_snooze_until')).toBeNull()
+      wrapper.unmount()
+    })
+
+    // 5. Persisted snooze loads on mount (unexpired)
+    it('loads unexpired snooze from localStorage on mount', async () => {
+      const snoozeUntilMs = NOW + 30 * 60_000
+      vi.stubGlobal('localStorage', makeLocalStorageStub({
+        oc_desktop_notif_enabled: '1',
+        oc_alert_notif_snooze_until: String(snoozeUntilMs),
+      }))
+
+      mockGet.mockResolvedValue(emptyResponse())
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      // Open popover
+      await wrapper.find('.alert-badge-wrapper').trigger('focusin')
+      await wrapper.vm.$nextTick()
+
+      // Should show snooze status
+      expect(wrapper.find('.snooze-status').exists()).toBe(true)
+      expect(wrapper.find('.snooze-status').text()).toContain('靜音中')
+      wrapper.unmount()
+    })
+
+    // 6. Expired snooze in localStorage is cleaned up on mount
+    it('cleans up expired snooze from localStorage on mount', async () => {
+      const expiredMs = NOW - 1000 // 1 second ago = expired
+      vi.stubGlobal('localStorage', makeLocalStorageStub({
+        oc_desktop_notif_enabled: '1',
+        oc_alert_notif_snooze_until: String(expiredMs),
+      }))
+
+      mockGet.mockResolvedValue(emptyResponse())
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      // Open popover
+      await wrapper.find('.alert-badge-wrapper').trigger('focusin')
+      await wrapper.vm.$nextTick()
+
+      // Should NOT show snooze status
+      expect(wrapper.find('.snooze-status').exists()).toBe(false)
+      // localStorage key should have been removed
+      expect(localStorage.getItem('oc_alert_notif_snooze_until')).toBeNull()
+      wrapper.unmount()
+    })
+
+    // 7. Snooze buttons only shown when notifications are enabled and not snoozed
+    it('shows snooze buttons row when notifications enabled and not snoozed', async () => {
+      mockGet.mockResolvedValue(emptyResponse())
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      await wrapper.find('.alert-badge-wrapper').trigger('focusin')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.popover-snooze-row').exists()).toBe(true)
+      expect(wrapper.findAll('.snooze-btn')).toHaveLength(3)
+      wrapper.unmount()
+    })
+
+    // 8. Snooze buttons hidden when already snoozed
+    it('hides snooze buttons row when already snoozed', async () => {
+      const snoozeUntilMs = NOW + 60 * 60_000
+      vi.stubGlobal('localStorage', makeLocalStorageStub({
+        oc_desktop_notif_enabled: '1',
+        oc_alert_notif_snooze_until: String(snoozeUntilMs),
+      }))
+
+      mockGet.mockResolvedValue(emptyResponse())
+
+      const wrapper = mount(AlertBadge)
+      await flushPromises()
+
+      await wrapper.find('.alert-badge-wrapper').trigger('focusin')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.popover-snooze-row').exists()).toBe(false)
+      wrapper.unmount()
+    })
+  })
 })

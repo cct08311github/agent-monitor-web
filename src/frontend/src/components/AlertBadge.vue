@@ -46,6 +46,19 @@ let flashTimeout: ReturnType<typeof setTimeout> | null = null
 
 const NOTIF_STORAGE_KEY = 'oc_desktop_notif_enabled'
 
+// ---------------------------------------------------------------------------
+// Snooze state
+// ---------------------------------------------------------------------------
+
+const SNOOZE_KEY = 'oc_alert_notif_snooze_until'
+
+/** epoch ms at which snooze expires, or null if not snoozed */
+const snoozeUntil = ref<number | null>(null)
+
+/** ticks every second so computed snooze display stays fresh */
+const now = ref<number>(Date.now())
+let nowInterval: ReturnType<typeof setInterval> | null = null
+
 // SSR-safe Notification availability
 const notifSupported = typeof Notification !== 'undefined'
 
@@ -53,6 +66,53 @@ const notificationsEnabled = ref<boolean>(false)
 const notificationPermission = ref<NotificationPermission>('default')
 /** IDs of critical alerts that have already triggered a desktop notification */
 const lastCriticalIds = ref<Set<string>>(new Set())
+
+// ---------------------------------------------------------------------------
+// Computed
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Snooze computed
+// ---------------------------------------------------------------------------
+
+const isSnoozed = computed<boolean>(() => snoozeUntil.value !== null && snoozeUntil.value > now.value)
+
+const snoozeRemainingMs = computed<number>(() => {
+  if (snoozeUntil.value === null) return 0
+  return Math.max(0, snoozeUntil.value - now.value)
+})
+
+const snoozeRemainingMinutes = computed<number>(() => Math.ceil(snoozeRemainingMs.value / 60_000))
+
+// ---------------------------------------------------------------------------
+// Snooze methods
+// ---------------------------------------------------------------------------
+
+function setSnooze(minutes: number): void {
+  snoozeUntil.value = now.value + minutes * 60_000
+  persistSnooze()
+}
+
+function cancelSnooze(): void {
+  snoozeUntil.value = null
+  try {
+    localStorage.removeItem(SNOOZE_KEY)
+  } catch {
+    // localStorage may be unavailable; ignore silently
+  }
+}
+
+function persistSnooze(): void {
+  try {
+    if (snoozeUntil.value !== null && snoozeUntil.value > Date.now()) {
+      localStorage.setItem(SNOOZE_KEY, String(snoozeUntil.value))
+    } else {
+      localStorage.removeItem(SNOOZE_KEY)
+    }
+  } catch {
+    // localStorage may be unavailable; ignore silently
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Computed
@@ -152,6 +212,7 @@ watch(recentAlerts, (current) => {
     notificationsEnabled.value &&
     notificationPermission.value === 'granted' &&
     notifSupported &&
+    !isSnoozed.value &&
     newCriticals.length > 0
   ) {
     // Batch: fire a single notification for the entire set of new criticals
@@ -256,6 +317,31 @@ onMounted(() => {
     }
   }
 
+  // Load persisted snooze
+  try {
+    const storedSnooze = localStorage.getItem(SNOOZE_KEY)
+    if (storedSnooze !== null) {
+      const parsed = parseInt(storedSnooze, 10)
+      if (!isNaN(parsed) && parsed > Date.now()) {
+        snoozeUntil.value = parsed
+      } else {
+        // Expired — clean up
+        localStorage.removeItem(SNOOZE_KEY)
+      }
+    }
+  } catch {
+    // localStorage may be unavailable; ignore silently
+  }
+
+  // Tick every second so snooze countdown stays live
+  nowInterval = setInterval(() => {
+    now.value = Date.now()
+    // Auto-clear expired snooze
+    if (snoozeUntil.value !== null && snoozeUntil.value <= now.value) {
+      cancelSnooze()
+    }
+  }, 1_000)
+
   void fetchAlerts()
   interval = setInterval(() => {
     void fetchAlerts()
@@ -266,6 +352,10 @@ onUnmounted(() => {
   if (interval !== null) {
     clearInterval(interval)
     interval = null
+  }
+  if (nowInterval !== null) {
+    clearInterval(nowInterval)
+    nowInterval = null
   }
   if (flashTimeout !== null) {
     clearTimeout(flashTimeout)
@@ -340,7 +430,11 @@ function handleClick(): void {
         aria-label="Recent alerts"
       >
         <div class="popover-header">
-          {{ topAlerts.length > 0 ? '最近 Alerts' : '目前無 alert' }}
+          <span v-if="isSnoozed" class="snooze-status">
+            ⏸ 靜音中（剩 {{ snoozeRemainingMinutes }} 分鐘）
+            <button class="snooze-cancel-btn" @click="cancelSnooze">取消</button>
+          </span>
+          <span v-else>{{ topAlerts.length > 0 ? '最近 Alerts' : '目前無 alert' }}</span>
         </div>
 
         <ul v-if="topAlerts.length > 0" class="popover-list">
@@ -399,6 +493,14 @@ function handleClick(): void {
           >
             已封鎖通知，請到瀏覽器設定允許
           </p>
+        </div>
+
+        <!-- Snooze row — only shown when notifications are enabled and not already snoozed -->
+        <div v-if="notificationsEnabled && !isSnoozed" class="popover-snooze-row">
+          <span class="snooze-label">靜音：</span>
+          <button class="snooze-btn" @click="setSnooze(30)">30 分</button>
+          <button class="snooze-btn" @click="setSnooze(60)">1 小時</button>
+          <button class="snooze-btn" @click="setSnooze(120)">2 小時</button>
         </div>
       </div>
     </Transition>
@@ -615,6 +717,64 @@ function handleClick(): void {
 
 .notif-warning--blocked {
   color: #f87171;
+}
+
+/* ── Snooze status (popover header) ─────────────────────────────────────── */
+
+.snooze-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.65));
+}
+
+.snooze-cancel-btn {
+  background: none;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.2));
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--color-accent, #60a5fa);
+  cursor: pointer;
+  transition: opacity 150ms ease;
+}
+
+.snooze-cancel-btn:hover {
+  opacity: 0.75;
+}
+
+/* ── Snooze buttons row ──────────────────────────────────────────────────── */
+
+.popover-snooze-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px 10px;
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.snooze-label {
+  font-size: 11px;
+  color: var(--text-muted, rgba(255, 255, 255, 0.4));
+  flex-shrink: 0;
+}
+
+.snooze-btn {
+  background: none;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.15));
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.6));
+  cursor: pointer;
+  transition: border-color 150ms ease, color 150ms ease;
+}
+
+.snooze-btn:hover {
+  border-color: var(--color-accent, #60a5fa);
+  color: var(--color-accent, #60a5fa);
 }
 
 /* ── Fade transition ────────────────────────────────────────────────────── */
