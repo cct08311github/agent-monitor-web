@@ -138,6 +138,11 @@ const alertHistory = ref<AlertRecord[]>([])
 const historyLoading = ref(false)
 const historyError = ref<string | null>(null)
 
+// Timeline state
+const timeline = ref<AlertRecord[]>([])
+const timelineLoading = ref(false)
+const timelineError = ref<string | null>(null)
+
 // Editable thresholds state
 const editedConfig = ref<AlertConfig | null>(null)
 const saving = ref(false)
@@ -158,6 +163,37 @@ const sortedMetrics = computed(() => {
     const bStr = String(bVal)
     return sortDesc.value ? bStr.localeCompare(aStr) : aStr.localeCompare(bStr)
   })
+})
+
+// ---------------------------------------------------------------------------
+// Timeline computed
+// ---------------------------------------------------------------------------
+
+export interface HourBucket {
+  hourStart: number
+  critical: number
+  warning: number
+}
+
+const timelineBuckets = computed<HourBucket[]>(() => {
+  const now = Date.now()
+  const buckets: HourBucket[] = []
+  for (let i = 23; i >= 0; i--) {
+    const start = now - i * 3_600_000
+    const end = start + 3_600_000
+    const critical = timeline.value.filter(
+      (a) => a.ts >= start && a.ts < end && a.severity === 'critical',
+    ).length
+    const warning = timeline.value.filter(
+      (a) => a.ts >= start && a.ts < end && a.severity === 'warning',
+    ).length
+    buckets.push({ hourStart: start, critical, warning })
+  }
+  return buckets
+})
+
+const maxBucketCount = computed<number>(() => {
+  return Math.max(1, ...timelineBuckets.value.map((b) => b.critical + b.warning))
 })
 
 // hasDirtyChanges: compare editedConfig vs alertConfig per-rule
@@ -246,6 +282,28 @@ async function fetchAlerts(): Promise<void> {
     alertsError.value = (e as Error).message ?? 'Failed to fetch alerts'
   } finally {
     alertsLoading.value = false
+  }
+}
+
+async function fetchAlertTimeline(): Promise<void> {
+  if (timelineLoading.value) return
+  timelineLoading.value = true
+  timelineError.value = null
+  try {
+    const from = Date.now() - 24 * 3_600_000
+    const to = Date.now()
+    const data = (await api.get(
+      `/api/alerts/history?from=${from}&to=${to}&limit=500`,
+    )) as AlertsHistoryResponse
+    if (data.success) {
+      timeline.value = data.data.alerts
+    } else {
+      timelineError.value = 'Timeline API returned unsuccessful response'
+    }
+  } catch (e) {
+    timelineError.value = (e as Error).message ?? 'Failed to fetch alert timeline'
+  } finally {
+    timelineLoading.value = false
   }
 }
 
@@ -378,7 +436,13 @@ function exportJSON(category: ExportCategory): void {
 }
 
 async function refresh(): Promise<void> {
-  const tasks: Promise<void>[] = [fetchMetrics(), fetchErrors(), fetchAlerts(), fetchAlertConfig()]
+  const tasks: Promise<void>[] = [
+    fetchMetrics(),
+    fetchErrors(),
+    fetchAlerts(),
+    fetchAlertConfig(),
+    fetchAlertTimeline(),
+  ]
   if (historyExpanded.value) tasks.push(fetchAlertHistory())
   await Promise.all(tasks)
   lastUpdated.value = new Date()
@@ -481,6 +545,24 @@ async function copyRowJson(row: ApiError): Promise<void> {
 // ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Timeline chart helpers
+// ---------------------------------------------------------------------------
+
+function critHeight(count: number): number {
+  return Math.round((count / maxBucketCount.value) * 60)
+}
+
+function warnHeight(count: number): number {
+  return Math.round((count / maxBucketCount.value) * 60)
+}
+
+function formatBucketLabel(b: HourBucket): string {
+  const d = new Date(b.hourStart)
+  const h = d.getHours().toString().padStart(2, '0')
+  return `${h}:00 — critical: ${b.critical}, warning: ${b.warning}`
+}
 
 onMounted(() => {
   void refresh()
@@ -820,6 +902,85 @@ onUnmounted(() => {
           </table>
         </div>
       </template>
+    </section>
+
+    <!-- ── Alert 24h Timeline Chart ────────────────────────────────────────── -->
+    <section class="obs-section">
+      <div class="alert-timeline-card">
+        <div class="alert-timeline-title">最近 24 小時 Alert 分布</div>
+
+        <!-- Loading state -->
+        <div v-if="timelineLoading" class="obs-empty-state alert-timeline-empty">
+          <span class="obs-spinner obs-spinner--lg" aria-hidden="true" />
+          <div class="obs-empty-title">載入中…</div>
+        </div>
+
+        <!-- Error state -->
+        <div v-else-if="timelineError" class="obs-error-state">
+          <span class="obs-error-icon" aria-hidden="true">⚠</span>
+          <span>{{ timelineError }}</span>
+          <button
+            class="obs-btn obs-btn--secondary obs-btn--sm"
+            data-testid="timeline-retry"
+            @click="fetchAlertTimeline"
+          >
+            Retry
+          </button>
+        </div>
+
+        <!-- Empty state -->
+        <div
+          v-else-if="timeline.length === 0"
+          class="obs-empty-state alert-timeline-empty"
+          data-testid="timeline-empty"
+        >
+          <div class="obs-empty-icon" aria-hidden="true">📊</div>
+          <div class="obs-empty-title">最近 24 小時無 alert</div>
+          <div class="obs-empty-desc">目前無任何警報記錄。</div>
+        </div>
+
+        <!-- SVG chart -->
+        <template v-else>
+          <svg
+            :viewBox="`0 0 240 80`"
+            preserveAspectRatio="none"
+            class="alert-timeline-svg"
+            aria-label="Alert 24h timeline chart"
+            data-testid="timeline-svg"
+          >
+            <g
+              v-for="(b, i) in timelineBuckets"
+              :key="b.hourStart"
+              :data-testid="`timeline-bucket-${i}`"
+            >
+              <rect
+                :x="i * 10"
+                :y="80 - critHeight(b.critical)"
+                width="9"
+                :height="critHeight(b.critical)"
+                fill="#ef4444"
+              >
+                <title>{{ formatBucketLabel(b) }}</title>
+              </rect>
+              <rect
+                :x="i * 10"
+                :y="80 - critHeight(b.critical) - warnHeight(b.warning)"
+                width="9"
+                :height="warnHeight(b.warning)"
+                fill="#f59e0b"
+              >
+                <title>{{ formatBucketLabel(b) }}</title>
+              </rect>
+            </g>
+          </svg>
+          <div class="alert-timeline-legend">
+            <span class="alert-timeline-legend-item alert-timeline-legend-item--critical">Critical</span>
+            <span class="alert-timeline-legend-item alert-timeline-legend-item--warning">Warning</span>
+          </div>
+        </template>
+
+        <div class="alert-timeline-axis">24h 前 ← → 現在</div>
+      </div>
     </section>
 
     <!-- ── Alert Thresholds (collapsible) ─────────────────────────────────── -->
@@ -1423,5 +1584,72 @@ onUnmounted(() => {
   width: 20px;
   height: 20px;
   border-width: 3px;
+}
+
+/* ── Alert 24h Timeline Chart ────────────────────────────────────────────── */
+
+.alert-timeline-card {
+  background: var(--color-surface-1, #1e1e1e);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.alert-timeline-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text, #e0e0e0);
+}
+
+.alert-timeline-svg {
+  width: 100%;
+  height: 80px;
+  display: block;
+  border-radius: 4px;
+  background: var(--color-surface-2, #1a1a1a);
+}
+
+.alert-timeline-axis {
+  font-size: 11px;
+  color: var(--color-text-muted, #888);
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+.alert-timeline-empty {
+  padding: 24px 16px;
+}
+
+.alert-timeline-legend {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.alert-timeline-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--color-text-muted, #aaa);
+}
+
+.alert-timeline-legend-item::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.alert-timeline-legend-item--critical::before {
+  background: #ef4444;
+}
+
+.alert-timeline-legend-item--warning::before {
+  background: #f59e0b;
 }
 </style>
