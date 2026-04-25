@@ -88,6 +88,14 @@ export interface AlertsRecentResponse {
   }
 }
 
+export interface AlertsHistoryResponse {
+  success: boolean
+  data: {
+    alerts: AlertRecord[]
+    total: number
+  }
+}
+
 export interface AlertConfigResponse {
   success: boolean
   data: {
@@ -122,6 +130,12 @@ const alertConfig = ref<AlertConfig | null>(null)
 const configLoading = ref(false)
 const configError = ref<string | null>(null)
 const thresholdsExpanded = ref(false)
+
+// Alert history state
+const historyExpanded = ref(false)
+const alertHistory = ref<AlertRecord[]>([])
+const historyLoading = ref(false)
+const historyError = ref<string | null>(null)
 
 // Editable thresholds state
 const editedConfig = ref<AlertConfig | null>(null)
@@ -252,6 +266,24 @@ async function fetchAlertConfig(): Promise<void> {
   }
 }
 
+async function fetchAlertHistory(): Promise<void> {
+  if (historyLoading.value) return
+  historyLoading.value = true
+  historyError.value = null
+  try {
+    const data = (await api.get('/api/alerts/history?limit=200')) as AlertsHistoryResponse
+    if (data.success) {
+      alertHistory.value = data.data.alerts
+    } else {
+      historyError.value = 'Alert history API returned unsuccessful response'
+    }
+  } catch (e) {
+    historyError.value = (e as Error).message ?? 'Failed to fetch alert history'
+  } finally {
+    historyLoading.value = false
+  }
+}
+
 // Keep editedConfig in sync when alertConfig is first loaded (or re-fetched after save)
 watch(
   alertConfig,
@@ -345,8 +377,18 @@ function exportJSON(category: ExportCategory): void {
 }
 
 async function refresh(): Promise<void> {
-  await Promise.all([fetchMetrics(), fetchErrors(), fetchAlerts(), fetchAlertConfig()])
+  const tasks: Promise<void>[] = [fetchMetrics(), fetchErrors(), fetchAlerts(), fetchAlertConfig()]
+  if (historyExpanded.value) tasks.push(fetchAlertHistory())
+  await Promise.all(tasks)
   lastUpdated.value = new Date()
+}
+
+async function toggleHistory(): Promise<void> {
+  const wasCollapsed = !historyExpanded.value
+  historyExpanded.value = !historyExpanded.value
+  if (wasCollapsed) {
+    await fetchAlertHistory()
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -703,6 +745,76 @@ onUnmounted(() => {
           </tbody>
         </table>
       </div>
+
+      <!-- History toggle -->
+      <div class="obs-history-toggle-wrap">
+        <button
+          class="obs-btn obs-btn--secondary obs-btn--sm obs-history-toggle"
+          :aria-expanded="historyExpanded"
+          data-testid="history-toggle"
+          @click="toggleHistory"
+        >
+          <span v-show="!historyExpanded">顯示完整歷程 ↓</span>
+          <span v-show="historyExpanded">收合 ↑</span>
+        </button>
+      </div>
+
+      <!-- History section (collapsible) -->
+      <template v-if="historyExpanded">
+        <h3 class="obs-history-title">Alert 完整歷程</h3>
+
+        <!-- Loading state -->
+        <div v-if="historyLoading" class="obs-empty-state">
+          <span class="obs-spinner obs-spinner--lg" aria-hidden="true" />
+          <div class="obs-empty-title">載入中…</div>
+        </div>
+
+        <!-- Error state -->
+        <div v-else-if="historyError" class="obs-error-state">
+          <span class="obs-error-icon" aria-hidden="true">⚠</span>
+          <span>{{ historyError }}</span>
+          <button
+            class="obs-btn obs-btn--secondary obs-btn--sm"
+            data-testid="history-retry"
+            @click="fetchAlertHistory"
+          >
+            Retry
+          </button>
+        </div>
+
+        <!-- Empty state -->
+        <div v-else-if="alertHistory.length === 0" class="obs-empty-state" data-testid="history-empty">
+          <div class="obs-empty-icon" aria-hidden="true">📋</div>
+          <div class="obs-empty-title">無歷程資料</div>
+          <div class="obs-empty-desc">目前無 alert 歷程記錄。</div>
+        </div>
+
+        <!-- History table -->
+        <div v-else class="obs-table-wrap" data-testid="history-table">
+          <table class="obs-table">
+            <thead>
+              <tr>
+                <th class="obs-th">Time</th>
+                <th class="obs-th">Rule</th>
+                <th class="obs-th">Severity</th>
+                <th class="obs-th">Message</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(a, i) in alertHistory" :key="'h-' + a.rule + a.ts + i" class="obs-tr">
+                <td class="obs-td obs-td--mono">{{ fmtTime(a.ts) }}</td>
+                <td class="obs-td obs-td--mono obs-td--rule">{{ a.rule }}</td>
+                <td class="obs-td">
+                  <span :class="['severity-badge', `severity-badge--${a.severity}`]">
+                    {{ a.severity }}
+                  </span>
+                </td>
+                <td class="obs-td obs-td--alertmsg">{{ a.message }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
     </section>
 
     <!-- ── Alert Thresholds (collapsible) ─────────────────────────────────── -->
@@ -1271,5 +1383,35 @@ onUnmounted(() => {
 .obs-btn--copy:not(:disabled):hover {
   opacity: 1;
   background: var(--color-surface-3, #3a3a3a);
+}
+
+/* ── Alert history toggle ─────────────────────────────────────────────────── */
+
+.obs-history-toggle-wrap {
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+}
+
+.obs-history-toggle {
+  font-size: 12px;
+  font-weight: 500;
+  gap: 4px;
+  color: var(--color-text-muted, #888);
+}
+
+.obs-history-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted, #aaa);
+  margin: 0;
+  padding: 4px 0 2px;
+  border-top: 1px solid var(--color-border, #333);
+}
+
+.obs-spinner--lg {
+  width: 20px;
+  height: 20px;
+  border-width: 3px;
 }
 </style>
