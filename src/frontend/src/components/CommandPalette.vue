@@ -35,6 +35,12 @@ interface Command {
   category: 'Navigation' | 'Actions' | 'Shortcut'
   keywords?: string[]
   handler: () => void
+  // modifier flags — only populated for Shortcut category
+  shortcutKey?: string
+  shortcutMeta?: boolean
+  shortcutCtrl?: boolean
+  shortcutShift?: boolean
+  shortcutAlt?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -142,6 +148,7 @@ const STATIC_COMMANDS: Command[] = [
 
 function buildShortcutCommands(): Command[] {
   return getShortcuts().map((s) => {
+    // Plain-text description kept for search/filter compatibility
     let keyDisplay = s.key
     if (s.ctrl) keyDisplay = `Ctrl+${keyDisplay}`
     if (s.shift) keyDisplay = `Shift+${keyDisplay}`
@@ -158,6 +165,12 @@ function buildShortcutCommands(): Command[] {
         // Invoke the shortcut handler with a synthetic event
         s.handler(new KeyboardEvent('keydown', { key: s.key }))
       },
+      // Preserve modifier flags for kbd badge rendering
+      shortcutKey: s.key,
+      shortcutMeta: s.meta,
+      shortcutCtrl: s.ctrl,
+      shortcutShift: s.shift,
+      shortcutAlt: s.alt,
     }
   })
 }
@@ -403,7 +416,21 @@ function flatIndex(cmd: Command): number {
                 @mouseenter="selectedIndex = flatIndex(cmd)"
               >
                 <span class="cp-item-label">{{ cmd.label }}</span>
-                <span v-if="cmd.description" class="cp-item-desc">{{ cmd.description }}</span>
+                <!-- Shortcut commands render key as kbd badges; others stay plain text -->
+                <span
+                  v-if="cmd.description && cmd.category === 'Shortcut' && cmd.shortcutKey"
+                  class="cp-item-desc cp-item-kbd-combo"
+                >
+                  <kbd v-if="cmd.shortcutMeta" class="key-badge">⌘</kbd>
+                  <kbd v-if="cmd.shortcutCtrl" class="key-badge">Ctrl</kbd>
+                  <kbd v-if="cmd.shortcutShift" class="key-badge">⇧</kbd>
+                  <kbd v-if="cmd.shortcutAlt" class="key-badge">⌥</kbd>
+                  <kbd class="key-badge">{{ cmd.shortcutKey.toUpperCase() }}</kbd>
+                </span>
+                <span
+                  v-else-if="cmd.description"
+                  class="cp-item-desc"
+                >{{ cmd.description }}</span>
               </button>
             </div>
           </template>
@@ -596,5 +623,27 @@ function flatIndex(cmd: Command): number {
   font-size: 0.7rem;
   color: var(--color-text, #cdd6f4);
   box-shadow: 0 1px 0 var(--color-border, #313244);
+}
+
+.cp-item-kbd-combo {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.key-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  margin: 0 2px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 11px;
+  background: var(--bg-muted, rgba(0, 0, 0, 0.06));
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.15));
+  border-radius: 3px;
+  line-height: 1.4;
+  color: var(--color-text, #cdd6f4);
+  white-space: nowrap;
 }
 </style>

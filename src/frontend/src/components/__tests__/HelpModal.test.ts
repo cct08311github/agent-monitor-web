@@ -102,9 +102,11 @@ describe('HelpModal', () => {
 
   it('shows shift modifier in display key', () => {
     const wrapper = mount(HelpModal, { ...MOUNT_OPTS, props: { open: true } })
-    const text = document.body.textContent ?? ''
-    // The shortcut with shift:true and key:'?' should display "Shift+?"
-    expect(text).toContain('Shift+?')
+    // With kbd badge rendering, shift+? renders as separate ⇧ and ? badges
+    const badges = Array.from(document.querySelectorAll('kbd.key-badge'))
+    const texts = badges.map((b) => b.textContent?.trim())
+    expect(texts).toContain('⇧')
+    expect(texts).toContain('?')
     wrapper.unmount()
   })
 
@@ -275,6 +277,62 @@ describe('HelpModal', () => {
     await flushPromises()
     const freshInput = document.querySelector('.help-search-input') as HTMLInputElement
     expect(freshInput.value).toBe('')
+    wrapper.unmount()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// kbd badge rendering — Issue #410
+// Isolated describe to avoid Teleport DOM accumulation affecting other tests
+// ---------------------------------------------------------------------------
+
+function cleanBody() {
+  // Remove all child nodes from body (safe: no user content, test-only cleanup)
+  while (document.body.firstChild) {
+    document.body.removeChild(document.body.firstChild)
+  }
+}
+
+describe('HelpModal — kbd badge rendering', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGetShortcuts.mockReturnValue(SAMPLE_SHORTCUTS)
+    cleanBody()
+  })
+
+  afterEach(() => {
+    cleanBody()
+    vi.clearAllMocks()
+  })
+
+  it('renders <kbd class="key-badge"> elements for each shortcut key', () => {
+    const wrapper = mount(HelpModal, { ...MOUNT_OPTS, props: { open: true } })
+    // SAMPLE_SHORTCUTS has 4 entries → at least 4 key-badge elements (one main key each)
+    const badges = document.querySelectorAll('kbd.key-badge')
+    expect(badges.length).toBeGreaterThanOrEqual(4)
+    wrapper.unmount()
+  })
+
+  it('renders separate <kbd> badges for modifier and main key in a combo shortcut', () => {
+    // SAMPLE_SHORTCUTS includes { key: '?', shift: true, ... }
+    // Expect both a ⇧ badge and a ? badge to appear as separate elements
+    const wrapper = mount(HelpModal, { ...MOUNT_OPTS, props: { open: true } })
+    const badges = Array.from(document.querySelectorAll('kbd.key-badge'))
+    const texts = badges.map((b) => b.textContent?.trim())
+    expect(texts).toContain('⇧')
+    expect(texts).toContain('?')
+    wrapper.unmount()
+  })
+
+  it('renders meta (⌘) badge when shortcut has meta modifier', () => {
+    mockGetShortcuts.mockReturnValue([
+      { key: 'k', meta: true, description: 'Command Palette', category: 'General' },
+    ])
+    const wrapper = mount(HelpModal, { ...MOUNT_OPTS, props: { open: true } })
+    const badges = Array.from(document.querySelectorAll('kbd.key-badge'))
+    const texts = badges.map((b) => b.textContent?.trim())
+    expect(texts).toContain('⌘')
+    expect(texts).toContain('K')
     wrapper.unmount()
   })
 })

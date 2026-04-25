@@ -29,6 +29,11 @@ interface DisplayShortcut {
   description: string
   rawKey: string
   rawDescription: string
+  // modifier flags preserved for kbd badge rendering
+  meta?: boolean
+  ctrl?: boolean
+  shift?: boolean
+  alt?: boolean
 }
 
 const groupedShortcuts = computed(() => {
@@ -37,6 +42,7 @@ const groupedShortcuts = computed(() => {
   for (const s of all) {
     const cat = s.category ?? 'General'
     if (!groups[cat]) groups[cat] = []
+    // Build plaintext key for search compatibility (e.g. "Shift+?")
     let displayKey = s.key
     if (s.ctrl) displayKey = `Ctrl+${displayKey}`
     if (s.shift) displayKey = `Shift+${displayKey}`
@@ -47,6 +53,10 @@ const groupedShortcuts = computed(() => {
       description: s.description,
       rawKey: s.key,
       rawDescription: s.description,
+      meta: s.meta,
+      ctrl: s.ctrl,
+      shift: s.shift,
+      alt: s.alt,
     })
   }
   return groups
@@ -146,7 +156,13 @@ onUnmounted(() => {
               <tbody>
                 <tr v-for="(shortcut, i) in shortcuts" :key="i" class="help-row">
                   <td class="help-td-key">
-                    <kbd class="help-kbd">{{ shortcut.key }}</kbd>
+                    <span class="help-kbd-combo">
+                      <kbd v-if="shortcut.meta" class="key-badge">⌘</kbd>
+                      <kbd v-if="shortcut.ctrl" class="key-badge">Ctrl</kbd>
+                      <kbd v-if="shortcut.shift" class="key-badge">⇧</kbd>
+                      <kbd v-if="shortcut.alt" class="key-badge">⌥</kbd>
+                      <kbd class="key-badge">{{ shortcut.rawKey.toUpperCase() }}</kbd>
+                    </span>
                   </td>
                   <td class="help-td-desc">{{ shortcut.description }}</td>
                 </tr>
@@ -327,6 +343,27 @@ onUnmounted(() => {
   color: var(--color-text, #cdd6f4);
   white-space: nowrap;
   box-shadow: 0 1px 0 var(--color-border, #313244);
+}
+
+.help-kbd-combo {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: nowrap;
+}
+
+.key-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  margin: 0 2px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 11px;
+  background: var(--bg-muted, rgba(0, 0, 0, 0.06));
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.15));
+  border-radius: 3px;
+  line-height: 1.4;
+  color: var(--color-text, #cdd6f4);
+  white-space: nowrap;
 }
 
 .help-kbd-inline {
