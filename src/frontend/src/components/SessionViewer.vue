@@ -4,6 +4,11 @@ import { api } from '@/composables/useApi'
 import { showToast } from '@/composables/useToast'
 import { createFocusTrap } from '@/lib/focusTrap'
 import SessionReplay from './SessionReplay.vue'
+import {
+  loadAnnotations,
+  saveAnnotation,
+  type SessionAnnotation,
+} from '@/utils/sessionAnnotations'
 
 const props = defineProps<{
   agentId: string
@@ -27,6 +32,7 @@ const loading = ref(true)
 const error = ref(false)
 const searchQuery = ref('')
 const expandedIndices = ref<Set<number>>(new Set())
+const annotations = ref<SessionAnnotation[]>([])
 
 async function fetchMessages() {
   loading.value = true
@@ -49,6 +55,7 @@ const trap = createFocusTrap()
 
 onMounted(() => {
   fetchMessages()
+  annotations.value = loadAnnotations(props.agentId, props.sessionId)
   if (dialogRef.value) trap.activate(dialogRef.value, () => emit('close'))
 })
 onBeforeUnmount(() => { trap.deactivate() })
@@ -103,6 +110,26 @@ const filteredMessages = computed<Array<{ msg: SessionMessage; originalIndex: nu
       return textMatch || roleMatch || toolMatch
     })
 })
+
+const annotationByIndex = computed<Map<number, SessionAnnotation>>(() => {
+  const map = new Map<number, SessionAnnotation>()
+  for (const a of annotations.value) {
+    map.set(a.msgIndex, a)
+  }
+  return map
+})
+
+function promptAnnotate(msgIndex: number): void {
+  const existing = annotationByIndex.value.get(msgIndex)?.note ?? ''
+  const note = window.prompt('輸入 note (留空刪除)：', existing)
+  if (note === null) return // cancelled
+  annotations.value = saveAnnotation(props.agentId, props.sessionId, msgIndex, note)
+  if (note.trim()) {
+    showToast('📝 annotation 已更新', 'success')
+  } else {
+    showToast('🗑️ 已刪除', 'success')
+  }
+}
 
 // Replay mode internal state
 const replayMode = ref(false)
@@ -176,17 +203,26 @@ function closeReplay(): void {
             class="sv-message"
             :style="`position:relative;margin-bottom:10px;padding:8px 12px;border-radius:8px;font-size:13px;line-height:1.5;max-width:90%;${msg.role === 'user' ? 'margin-left:auto;background:var(--blue);color:#fff;' : 'background:var(--bg-muted);color:var(--text-primary);'}`"
           >
-            <!-- Role label + copy button row -->
+            <!-- Role label + copy button + annotate button row -->
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
               <span style="font-size:10px;font-weight:600;opacity:0.7">
                 {{ msg.role.toUpperCase() }}
               </span>
-              <button
-                class="sv-copy-btn"
-                :aria-label="`複製 ${msg.role} 訊息`"
-                style="background:none;border:none;cursor:pointer;padding:0 2px;font-size:14px;opacity:0.6;line-height:1"
-                @click="copyMessage(msg)"
-              >📋</button>
+              <div style="display:flex;align-items:center;gap:4px">
+                <button
+                  class="sv-annotate-btn"
+                  :class="{ 'sv-annotate-btn--active': annotationByIndex.has(originalIndex) }"
+                  :aria-label="`加註 ${msg.role} 訊息`"
+                  style="background:none;border:none;cursor:pointer;padding:0 2px;font-size:14px;line-height:1"
+                  @click="promptAnnotate(originalIndex)"
+                >📝</button>
+                <button
+                  class="sv-copy-btn"
+                  :aria-label="`複製 ${msg.role} 訊息`"
+                  style="background:none;border:none;cursor:pointer;padding:0 2px;font-size:14px;opacity:0.6;line-height:1"
+                  @click="copyMessage(msg)"
+                >📋</button>
+              </div>
             </div>
             <!-- Text content -->
             <div v-if="msg.text" style="white-space:pre-wrap;word-break:break-word">
@@ -210,6 +246,14 @@ function closeReplay(): void {
             <div v-if="msg.toolUses && msg.toolUses.length > 0" style="margin-top:4px;font-size:11px;opacity:0.75;font-family:monospace">
               🔧 {{ msg.toolUses.join(', ') }}
             </div>
+            <!-- Annotation note block -->
+            <div
+              v-if="annotationByIndex.has(originalIndex)"
+              class="sv-annotation-note"
+              :style="`margin-top:6px;padding:5px 8px;border-radius:5px;font-size:12px;line-height:1.4;${msg.role === 'user' ? 'background:#3a3308;color:#fef9c3;' : 'background:#fef9c3;color:#713f12;'}`"
+            >
+              📝 {{ annotationByIndex.get(originalIndex)?.note }}
+            </div>
           </div>
         </template>
       </div>
@@ -226,6 +270,16 @@ function closeReplay(): void {
 
 <style scoped>
 .sv-copy-btn:hover {
+  opacity: 1 !important;
+}
+
+.sv-annotate-btn {
+  opacity: 0.4;
+  transition: opacity 0.15s;
+}
+
+.sv-annotate-btn:hover,
+.sv-annotate-btn--active {
   opacity: 1 !important;
 }
 
