@@ -18,6 +18,7 @@ import ToastContainer from '@/components/ToastContainer.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AlertBadge from '@/components/AlertBadge.vue'
 import HeartbeatPulse from '@/components/HeartbeatPulse.vue'
+import ConnectionStatus from '@/components/ConnectionStatus.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -242,6 +243,13 @@ function handleTranscript(t: string) {
 
 const voice = useVoiceCommand(handleTranscript)
 
+// ── SSE Reconnect ────────────────────────────────────────────────────────────
+
+/** Called when the user clicks the ConnectionStatus dot while disconnected. */
+function requestSSEReconnect(): void {
+  appState.sseReconnectRequest++
+}
+
 // ── Ambient Mode ────────────────────────────────────────────────────────────
 
 const ambient = useAmbientMode({
@@ -343,6 +351,10 @@ registerShortcut({
           :active-ratio="heartbeatStats.activeRatio"
           :active-count="heartbeatStats.activeCount"
           :total-count="heartbeatStats.totalCount"
+        />
+        <ConnectionStatus
+          v-if="!isLoginPage"
+          :on-reconnect="requestSSEReconnect"
         />
         <AlertBadge v-if="!isLoginPage" />
         <button
