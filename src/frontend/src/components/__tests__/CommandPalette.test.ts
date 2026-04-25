@@ -429,7 +429,8 @@ describe('CommandPalette', () => {
 // ---------------------------------------------------------------------------
 
 describe('CommandPalette — recent commands', () => {
-  const RECENTS_KEY = 'oc_palette_recent'
+  // Updated in #486: key changed from 'oc_palette_recent' to 'oc_command_history' (commandHistory.ts utility)
+  const RECENTS_KEY = 'oc_command_history'
 
   beforeEach(() => {
     mockGetShortcuts.mockReturnValue(SAMPLE_SHORTCUTS)
@@ -538,29 +539,34 @@ describe('CommandPalette — recent commands', () => {
     wrapper.unmount()
   })
 
-  // Case 6: More than 5 unique commands → truncated to 5
-  it('truncates recentIds to RECENTS_MAX (5)', async () => {
-    // Pre-seed 4 existing recents
+  // Case 6: Recents cap — adding a new command to existing recents trims to max (10)
+  it('caps recentIds at RECENTS_MAX (10) — new entry added at front', async () => {
+    // Pre-seed 9 existing recents (with the new key)
     _lsStore[RECENTS_KEY] = JSON.stringify([
       'nav-system',
       'nav-logs',
       'nav-chat',
       'nav-optimize',
+      'nav-observability',
+      'action-help',
+      'shortcut-1-Navigation',
+      'shortcut-?-Actions',
+      'nav-monitor',
     ])
 
     const wrapper = mount(CommandPalette, { ...MOUNT_OPTS, props: { open: true } })
     await flushPromises()
 
-    // Run a 5th unique command (nav-monitor)
-    await setInputValue('前往 監控')
+    // Run a 10th unique command (action-toggle-theme)
+    await setInputValue('theme')
     const item = document.querySelector('.cp-item') as HTMLElement
     item.click()
     await flushPromises()
 
     const calls = localStorageMock.setItem.mock.calls
     const saved = JSON.parse(calls[calls.length - 1][1] as string) as string[]
-    expect(saved.length).toBeLessThanOrEqual(5)
-    expect(saved[0]).toBe('nav-monitor')
+    expect(saved.length).toBeLessThanOrEqual(10)
+    expect(saved[0]).toBe('action-toggle-theme')
     wrapper.unmount()
   })
 
