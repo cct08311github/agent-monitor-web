@@ -156,6 +156,32 @@ vi.mock('@/composables/useToast', () => ({
 }))
 
 // ---------------------------------------------------------------------------
+// Mock useVoiceCommand
+// ---------------------------------------------------------------------------
+
+const { mockVoiceSupported, mockVoiceListening, mockVoiceToggle } = vi.hoisted(() => {
+  const mockVoiceSupported = { value: true }
+  const mockVoiceListening = { value: false }
+  const mockVoiceToggle = vi.fn()
+  return { mockVoiceSupported, mockVoiceListening, mockVoiceToggle }
+})
+
+vi.mock('@/composables/useVoiceCommand', () => ({
+  useVoiceCommand: (_cb?: unknown) => ({
+    supported: mockVoiceSupported,
+    listening: mockVoiceListening,
+    start: vi.fn(),
+    stop: vi.fn(),
+    toggle: mockVoiceToggle,
+  }),
+}))
+
+// Mock parseVoice — don't call the real parser in App tests
+vi.mock('@/utils/voiceParser', () => ({
+  parseVoice: vi.fn(() => ({ type: 'unknown', raw: '' })),
+}))
+
+// ---------------------------------------------------------------------------
 // Import App AFTER all mocks are in place
 // ---------------------------------------------------------------------------
 
@@ -803,6 +829,139 @@ describe('App.vue — Ambient Mode Button', () => {
     await flushPromises()
 
     expect(wrapper.find('.ambient-btn').exists()).toBe(false)
+    wrapper.unmount()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Voice Command Button
+// ---------------------------------------------------------------------------
+
+describe('App.vue — Voice Command Button', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockRouteName.value = 'dashboard'
+    mockAppState.currentDesktopTab = 'monitor'
+    mockAppState.currentDetailAgentId = ''
+    mockAppState.commandPaletteRequest = 0
+    mockAppState.latestDashboard = null
+    mockCompact.value = false
+    capturedShortcuts.length = 0
+    mockVoiceSupported.value = true
+    mockVoiceListening.value = false
+  })
+
+  // ── 1. Renders voice button when not on login page ─────────────────────────
+
+  it('renders voice-btn when not on login page', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.find('.voice-btn').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  // ── 2. Does NOT render on login page ──────────────────────────────────────
+
+  it('does not render voice-btn on login page', async () => {
+    mockRouteName.value = 'login'
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.find('.voice-btn').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  // ── 3. Has correct aria-label ─────────────────────────────────────────────
+
+  it('voice button has aria-label="voice command"', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.find('.voice-btn').attributes('aria-label')).toBe('voice command')
+    wrapper.unmount()
+  })
+
+  // ── 4. Disabled when not supported ───────────────────────────────────────
+
+  it('voice button is disabled when supported is false', async () => {
+    mockVoiceSupported.value = false
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const btn = wrapper.find('.voice-btn')
+    expect(btn.attributes('disabled')).toBeDefined()
+    expect(btn.classes()).toContain('voice-btn--unsupported')
+    wrapper.unmount()
+  })
+
+  // ── 5. Not disabled when supported ───────────────────────────────────────
+
+  it('voice button is NOT disabled when supported is true', async () => {
+    mockVoiceSupported.value = true
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const btn = wrapper.find('.voice-btn')
+    expect(btn.attributes('disabled')).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  // ── 6. Has listening class when listening ─────────────────────────────────
+
+  it('voice button has voice-btn--listening class when listening', async () => {
+    mockVoiceListening.value = true
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.find('.voice-btn').classes()).toContain('voice-btn--listening')
+    wrapper.unmount()
+  })
+
+  // ── 7. Does not have listening class when not listening ───────────────────
+
+  it('voice button does not have voice-btn--listening class when idle', async () => {
+    mockVoiceListening.value = false
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.find('.voice-btn').classes()).not.toContain('voice-btn--listening')
+    wrapper.unmount()
+  })
+
+  // ── 8. Click calls toggle ─────────────────────────────────────────────────
+
+  it('clicking voice-btn calls voice.toggle()', async () => {
+    mockVoiceSupported.value = true
+    const wrapper = mount(App)
+    await flushPromises()
+
+    await wrapper.find('.voice-btn').trigger('click')
+    expect(mockVoiceToggle).toHaveBeenCalledOnce()
+    wrapper.unmount()
+  })
+
+  // ── 9. Title shows unsupported message when not supported ─────────────────
+
+  it('title indicates unsupported when SpeechRecognition is unavailable', async () => {
+    mockVoiceSupported.value = false
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const title = wrapper.find('.voice-btn').attributes('title') ?? ''
+    expect(title).toContain('瀏覽器不支援')
+    wrapper.unmount()
+  })
+
+  // ── 10. Title shows listening message when active ─────────────────────────
+
+  it('title shows listening message when voice is active', async () => {
+    mockVoiceListening.value = true
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const title = wrapper.find('.voice-btn').attributes('title') ?? ''
+    expect(title).toContain('錄音中')
     wrapper.unmount()
   })
 })
