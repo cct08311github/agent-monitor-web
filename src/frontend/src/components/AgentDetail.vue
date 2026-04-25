@@ -4,6 +4,7 @@ import { api } from '@/composables/useApi'
 import { appState } from '@/stores/appState'
 import { formatTokens, formatTWD, getAgentEmoji, getStatusInfo } from '@/utils/format'
 import SessionViewer from '@/components/SessionViewer.vue'
+import Skeleton from '@/components/Skeleton.vue'
 import { showToast } from '@/composables/useToast'
 
 // ── History trend ─────────────────────────────────────────────────────────────
@@ -316,7 +317,9 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
       <!-- History Trend Card -->
       <div class="detail-card">
         <div class="detail-card-title">近 24h 趨勢</div>
-        <div v-if="historyLoading" style="color:var(--text-muted);font-size:12px;padding:4px 0">載入中…</div>
+        <div v-if="historyLoading" style="padding:4px 0">
+          <Skeleton :rows="4" height="22px" />
+        </div>
         <div v-else-if="historyError" style="color:var(--error);font-size:12px;padding:4px 0">
           ⚠️ 載入失敗
           <button type="button" class="btn-reset" style="text-decoration:underline;margin-left:4px;color:inherit" @click="fetchAgentHistory">重試</button>
@@ -354,7 +357,9 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
             class="session-search-input"
           >
         </div>
-        <div v-if="sessionsLoading" style="color:var(--text-muted);font-size:12px;padding:4px 0">載入中…</div>
+        <div v-if="sessionsLoading" style="padding:4px 0">
+          <Skeleton :rows="4" height="22px" />
+        </div>
         <div v-else-if="sessionsError" style="color:var(--error);font-size:12px;padding:4px 0">
           ⚠️ 載入失敗
           <button type="button" class="btn-reset" style="text-decoration:underline;margin-left:4px;color:inherit" @click="loadSessions">重試</button>

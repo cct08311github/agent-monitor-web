@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import Skeleton from './Skeleton.vue'
 import { api } from '@/composables/useApi'
 import { showToast } from '@/composables/useToast'
 import { formatTs, formatExportTimestamp } from '@/lib/time'
@@ -908,8 +909,7 @@ onUnmounted(() => {
 
         <!-- Loading state -->
         <div v-if="historyLoading" class="obs-empty-state">
-          <span class="obs-spinner obs-spinner--lg" aria-hidden="true" />
-          <div class="obs-empty-title">載入中…</div>
+          <Skeleton :rows="3" height="20px" />
         </div>
 
         <!-- Error state -->
@@ -967,8 +967,7 @@ onUnmounted(() => {
 
         <!-- Loading state -->
         <div v-if="timelineLoading" class="obs-empty-state alert-timeline-empty">
-          <span class="obs-spinner obs-spinner--lg" aria-hidden="true" />
-          <div class="obs-empty-title">載入中…</div>
+          <Skeleton :rows="3" height="20px" />
         </div>
 
         <!-- Error state -->

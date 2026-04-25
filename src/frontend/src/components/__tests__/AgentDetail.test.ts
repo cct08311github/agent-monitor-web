@@ -413,3 +413,31 @@ describe('AgentDetail — sessions search', () => {
     wrapper.unmount()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Skeleton loading state
+// ---------------------------------------------------------------------------
+
+describe('AgentDetail — skeleton loading states', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('shows skeleton while sessionsLoading is true (before promise resolves)', () => {
+    // Never resolves — keeps loading state active
+    mockGet.mockReturnValue(new Promise(() => {}))
+    const wrapper = mountDetail()
+    expect(wrapper.find('[role="status"][aria-label="loading"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('hides skeleton after sessions finish loading', async () => {
+    setupDefaultMocks()
+    const wrapper = mountDetail()
+    await flushPromises()
+    await nextTick()
+    // After loading completes the skeleton should be gone
+    expect(wrapper.findAll('[role="status"][aria-label="loading"]')).toHaveLength(0)
+    wrapper.unmount()
+  })
+})
