@@ -2,6 +2,32 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 
 // ---------------------------------------------------------------------------
+// Mock localStorage
+// ---------------------------------------------------------------------------
+
+const _lsStore: Record<string, string> = {}
+
+const localStorageMock = {
+  getItem: vi.fn((key: string): string | null => _lsStore[key] ?? null),
+  setItem: vi.fn((key: string, value: string): void => {
+    _lsStore[key] = value
+  }),
+  removeItem: vi.fn((key: string): void => {
+    delete _lsStore[key]
+  }),
+  clear: vi.fn((): void => {
+    for (const key of Object.keys(_lsStore)) {
+      delete _lsStore[key]
+    }
+  }),
+}
+
+Object.defineProperty(globalThis, 'localStorage', {
+  value: localStorageMock,
+  writable: true,
+})
+
+// ---------------------------------------------------------------------------
 // Mock useKeyboardShortcuts
 // ---------------------------------------------------------------------------
 
@@ -100,6 +126,7 @@ describe('CommandPalette', () => {
     mockDeactivate.mockReset()
     appState.currentDesktopTab = 'monitor'
     appState.preferredMonitorSubTab = null
+    localStorageMock.clear()
   })
 
   afterEach(() => {
@@ -363,5 +390,180 @@ describe('CommandPalette', () => {
     const wrapper = mount(CommandPalette, { ...MOUNT_OPTS, props: { open: true } })
     wrapper.unmount()
     expect(mockDeactivate).toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Recent commands — Issue #389
+// ---------------------------------------------------------------------------
+
+describe('CommandPalette — recent commands', () => {
+  const RECENTS_KEY = 'oc_palette_recent'
+
+  beforeEach(() => {
+    mockGetShortcuts.mockReturnValue(SAMPLE_SHORTCUTS)
+    mockCycleTheme.mockReset()
+    mockActivate.mockReset()
+    mockDeactivate.mockReset()
+    appState.currentDesktopTab = 'monitor'
+    appState.preferredMonitorSubTab = null
+    localStorageMock.clear()
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+    mockGetShortcuts.mockReturnValue(SAMPLE_SHORTCUTS)
+  })
+
+  // Case 1: Empty query + recents → 'Recent' category displays at top
+  it('shows Recent group at top when query empty and recents exist', async () => {
+    // Pre-seed one recent: action-toggle-theme
+    _lsStore[RECENTS_KEY] = JSON.stringify(['action-toggle-theme'])
+
+    const wrapper = mount(CommandPalette, { ...MOUNT_OPTS, props: { open: true } })
+    await flushPromises()
+
+    const headers = Array.from(document.querySelectorAll('.cp-group-header')).map(
+      (h) => h.textContent?.trim(),
+    )
+    expect(headers[0]).toBe('Recent')
+    expect(headers).toContain('Navigation')
+    wrapper.unmount()
+  })
+
+  // Case 2: Empty query + no recents → no Recent category
+  it('does not show Recent group when no recents exist', async () => {
+    const wrapper = mount(CommandPalette, { ...MOUNT_OPTS, props: { open: true } })
+    await flushPromises()
+
+    const headers = Array.from(document.querySelectorAll('.cp-group-header')).map(
+      (h) => h.textContent?.trim(),
+    )
+    expect(headers).not.toContain('Recent')
+    wrapper.unmount()
+  })
+
+  // Case 3: Non-empty query → Recent category not shown
+  it('does not show Recent group when query is non-empty', async () => {
+    _lsStore[RECENTS_KEY] = JSON.stringify(['action-toggle-theme'])
+
+    const wrapper = mount(CommandPalette, { ...MOUNT_OPTS, props: { open: true } })
+    await flushPromises()
+
+    await setInputValue('監控')
+
+    const headers = Array.from(document.querySelectorAll('.cp-group-header')).map(
+      (h) => h.textContent?.trim(),
+    )
+    expect(headers).not.toContain('Recent')
+    wrapper.unmount()
+  })
+
+  // Case 4: Running a command via click → recentIds pushed (localStorage.setItem called with id)
+  it('pushes command id to localStorage when command is executed via click', async () => {
+    const wrapper = mount(CommandPalette, { ...MOUNT_OPTS, props: { open: true } })
+    await flushPromises()
+
+    // Filter to theme command
+    await setInputValue('theme')
+    const item = document.querySelector('.cp-item') as HTMLElement
+    expect(item).not.toBeNull()
+    item.click()
+    await flushPromises()
+
+    expect(localStorageMock.setItem).toHaveBeenCalledWith(
+      RECENTS_KEY,
+      expect.stringContaining('action-toggle-theme'),
+    )
+    wrapper.unmount()
+  })
+
+  // Case 5: Running same command twice → recentIds deduplicated, newest first
+  it('deduplicates recentIds when same command run twice', async () => {
+    const wrapper = mount(CommandPalette, { ...MOUNT_OPTS, props: { open: true } })
+    await flushPromises()
+
+    // Click theme command twice (re-open by toggling props)
+    await setInputValue('theme')
+    let item = document.querySelector('.cp-item') as HTMLElement
+    item.click()
+    await flushPromises()
+
+    // Re-open palette
+    await wrapper.setProps({ open: false })
+    await wrapper.setProps({ open: true })
+    await flushPromises()
+
+    await setInputValue('theme')
+    item = document.querySelector('.cp-item') as HTMLElement
+    item.click()
+    await flushPromises()
+
+    // Get the last call's second argument
+    const calls = localStorageMock.setItem.mock.calls
+    const lastSaved = JSON.parse(calls[calls.length - 1][1] as string) as string[]
+    expect(lastSaved.filter((id) => id === 'action-toggle-theme').length).toBe(1)
+    expect(lastSaved[0]).toBe('action-toggle-theme')
+    wrapper.unmount()
+  })
+
+  // Case 6: More than 5 unique commands → truncated to 5
+  it('truncates recentIds to RECENTS_MAX (5)', async () => {
+    // Pre-seed 4 existing recents
+    _lsStore[RECENTS_KEY] = JSON.stringify([
+      'nav-system',
+      'nav-logs',
+      'nav-chat',
+      'nav-optimize',
+    ])
+
+    const wrapper = mount(CommandPalette, { ...MOUNT_OPTS, props: { open: true } })
+    await flushPromises()
+
+    // Run a 5th unique command (nav-monitor)
+    await setInputValue('前往 監控')
+    const item = document.querySelector('.cp-item') as HTMLElement
+    item.click()
+    await flushPromises()
+
+    const calls = localStorageMock.setItem.mock.calls
+    const saved = JSON.parse(calls[calls.length - 1][1] as string) as string[]
+    expect(saved.length).toBeLessThanOrEqual(5)
+    expect(saved[0]).toBe('nav-monitor')
+    wrapper.unmount()
+  })
+
+  // Case 7: Loads recents from localStorage on mount
+  it('loads recents from localStorage on mount', async () => {
+    _lsStore[RECENTS_KEY] = JSON.stringify(['nav-system'])
+
+    const wrapper = mount(CommandPalette, { ...MOUNT_OPTS, props: { open: true } })
+    await flushPromises()
+
+    const headers = Array.from(document.querySelectorAll('.cp-group-header')).map(
+      (h) => h.textContent?.trim(),
+    )
+    expect(headers[0]).toBe('Recent')
+
+    // The recent item should appear in the Recent group
+    const firstGroupItems = document.querySelectorAll('.cp-group:first-child .cp-item')
+    const texts = Array.from(firstGroupItems).map((el) => el.textContent)
+    expect(texts.some((t) => t?.includes('前往 系統'))).toBe(true)
+    wrapper.unmount()
+  })
+
+  // Case 8: Malformed JSON in localStorage → silent fallback, no Recent group
+  it('silently falls back to empty recents when localStorage JSON is malformed', async () => {
+    _lsStore[RECENTS_KEY] = 'not-valid-json{'
+
+    const wrapper = mount(CommandPalette, { ...MOUNT_OPTS, props: { open: true } })
+    await flushPromises()
+
+    // Should not throw; Recent group should not appear
+    const headers = Array.from(document.querySelectorAll('.cp-group-header')).map(
+      (h) => h.textContent?.trim(),
+    )
+    expect(headers).not.toContain('Recent')
+    wrapper.unmount()
   })
 })

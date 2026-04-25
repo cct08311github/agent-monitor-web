@@ -1,9 +1,16 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { appState } from '@/stores/appState'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useTheme } from '@/composables/useTheme'
 import { createFocusTrap } from '@/lib/focusTrap'
+
+// ---------------------------------------------------------------------------
+// Recents persistence constants
+// ---------------------------------------------------------------------------
+
+const RECENTS_KEY = 'oc_palette_recent'
+const RECENTS_MAX = 5
 
 // ---------------------------------------------------------------------------
 // Props & emits
@@ -156,6 +163,42 @@ function buildShortcutCommands(): Command[] {
 }
 
 // ---------------------------------------------------------------------------
+// Recents state & persistence
+// ---------------------------------------------------------------------------
+
+const recentIds = ref<string[]>([])
+
+function loadRecents(): void {
+  try {
+    const raw = localStorage.getItem(RECENTS_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        recentIds.value = parsed as string[]
+      }
+    }
+  } catch {
+    // Silent fallback — localStorage unavailable or JSON malformed
+    recentIds.value = []
+  }
+}
+
+function pushRecent(id: string): void {
+  // Dedupe: remove any existing occurrence then prepend
+  const updated = [id, ...recentIds.value.filter((r) => r !== id)].slice(0, RECENTS_MAX)
+  recentIds.value = updated
+  try {
+    localStorage.setItem(RECENTS_KEY, JSON.stringify(updated))
+  } catch {
+    // Silent fallback — storage quota or private browsing
+  }
+}
+
+onMounted(() => {
+  loadRecents()
+})
+
+// ---------------------------------------------------------------------------
 // Search state
 // ---------------------------------------------------------------------------
 
@@ -167,22 +210,49 @@ const dialogRef = ref<HTMLDivElement | null>(null)
 /** All available commands — rebuilt on each open to capture latest shortcuts */
 const allCommands = ref<Command[]>([])
 
-const filteredCommands = computed<Command[]>(() => {
-  if (!query.value.trim()) return allCommands.value
+/** Recent commands: map recentIds → actual commands, filtering out unknown ids */
+const recentCommands = computed<Command[]>(() => {
+  return recentIds.value
+    .map((id) => allCommands.value.find((cmd) => cmd.id === id))
+    .filter((cmd): cmd is Command => cmd !== undefined)
+})
 
-  const q = query.value.toLowerCase()
+const filteredCommands = computed<Command[]>(() => {
+  const q = query.value.trim()
+  if (!q) {
+    // Empty query: recent commands first, then all other commands (no duplication)
+    const recentIdSet = new Set(recentIds.value)
+    const nonRecent = allCommands.value.filter((cmd) => !recentIdSet.has(cmd.id))
+    return [...recentCommands.value, ...nonRecent]
+  }
+
+  const ql = q.toLowerCase()
   return allCommands.value.filter((cmd) => {
-    if (cmd.label.toLowerCase().includes(q)) return true
-    if (cmd.description?.toLowerCase().includes(q)) return true
-    if (cmd.keywords?.some((kw) => kw.toLowerCase().includes(q))) return true
+    if (cmd.label.toLowerCase().includes(ql)) return true
+    if (cmd.description?.toLowerCase().includes(ql)) return true
+    if (cmd.keywords?.some((kw) => kw.toLowerCase().includes(ql))) return true
     return false
   })
 })
 
-/** Group filtered commands by category, preserving insertion order */
+/** Group filtered commands by category, preserving insertion order.
+ *  When query is empty and recents exist, prepend a synthetic 'Recent' group. */
 const groupedCommands = computed<Array<{ category: string; commands: Command[] }>>(() => {
+  const q = query.value.trim()
   const groups = new Map<string, Command[]>()
-  for (const cmd of filteredCommands.value) {
+
+  if (!q && recentCommands.value.length > 0) {
+    // Synthetic Recent group first
+    groups.set('Recent', [...recentCommands.value])
+  }
+
+  // Build remaining groups from filteredCommands (non-recent when query empty)
+  const recentIdSet = new Set(recentIds.value)
+  const commandsToGroup = !q
+    ? allCommands.value.filter((cmd) => !recentIdSet.has(cmd.id))
+    : filteredCommands.value
+
+  for (const cmd of commandsToGroup) {
     const existing = groups.get(cmd.category)
     if (existing) {
       existing.push(cmd)
@@ -190,6 +260,7 @@ const groupedCommands = computed<Array<{ category: string; commands: Command[] }
       groups.set(cmd.category, [cmd])
     }
   }
+
   return Array.from(groups.entries()).map(([category, commands]) => ({ category, commands }))
 })
 
@@ -257,12 +328,14 @@ watch(query, () => {
 function runSelected() {
   const cmd = filteredCommands.value[selectedIndex.value]
   if (cmd) {
+    pushRecent(cmd.id)
     cmd.handler()
     emit('close')
   }
 }
 
 function runCommand(cmd: Command) {
+  pushRecent(cmd.id)
   cmd.handler()
   emit('close')
 }
