@@ -7,6 +7,7 @@ import { useKonamiCode } from '@/composables/useKonamiCode'
 import { showToast } from '@/composables/useToast'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useCompactMode } from '@/composables/useCompactMode'
+import { usePomodoro } from '@/composables/usePomodoro'
 import { appState } from '@/stores/appState'
 import ToastContainer from '@/components/ToastContainer.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -80,6 +81,25 @@ function celebrate() {
 
 useKonamiCode(celebrate)
 
+// ── Pomodoro timer ──────────────────────────────────────────────────────────
+
+const pomo = usePomodoro((nextPhase) => {
+  showToast(
+    nextPhase === 'break'
+      ? '🍅 Focus 結束！休息 5 分鐘'
+      : '☕ 休息結束！繼續專注 25 分鐘',
+    'success',
+  )
+})
+
+registerShortcut({
+  key: 'p',
+  shift: true,
+  handler: () => pomo.toggle(),
+  description: 'Pomodoro 開關',
+  category: 'Actions',
+})
+
 // ── Compact mode keyboard shortcut ─────────────────────────────────────────
 
 registerShortcut({
@@ -145,6 +165,18 @@ registerShortcut({
           @click="openPalette"
         >⌘<span class="cmd-k-hint">K</span></button>
         <AlertBadge v-if="!isLoginPage" />
+        <button
+          v-if="!isLoginPage"
+          class="header-btn pomo-btn"
+          :class="{
+            'pomo-focus': pomo.phase.value === 'focus',
+            'pomo-break': pomo.phase.value === 'break',
+          }"
+          :title="`Pomodoro: ${pomo.phase.value} (Shift+P)`"
+          aria-label="Pomodoro timer"
+          @click="pomo.toggle()"
+          @contextmenu.prevent="pomo.reset()"
+        >🍅 {{ pomo.phase.value === 'idle' ? '25:00' : pomo.remainingDisplay.value }}</button>
         <button
           class="header-btn icon-only"
           :title="`Compact 模式 (${compact ? 'ON' : 'OFF'})`"
@@ -250,6 +282,27 @@ registerShortcut({
   font-size: 11px;
   font-weight: 600;
   margin-left: 1px;
+}
+
+/* ── Pomodoro button ──────────────────────────────────────────────────────── */
+
+.pomo-btn {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  letter-spacing: 0.01em;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+  white-space: nowrap;
+}
+
+.pomo-btn.pomo-focus {
+  color: #e55;
+  border-color: #e55;
+}
+
+.pomo-btn.pomo-break {
+  color: #2a9;
+  border-color: #2a9;
 }
 
 .header-theme-select {

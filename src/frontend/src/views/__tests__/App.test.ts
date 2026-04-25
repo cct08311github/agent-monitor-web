@@ -517,3 +517,148 @@ describe('App.vue — Compact Mode Toggle', () => {
     wrapper.unmount()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Pomodoro Timer
+// ---------------------------------------------------------------------------
+
+const {
+  mockPomoPhase,
+  mockPomoRunning,
+  mockPomoRemainingDisplay,
+  mockPomoToggle,
+  mockPomoReset,
+} = vi.hoisted(() => {
+  const mockPomoPhase = { value: 'idle' as 'idle' | 'focus' | 'break' }
+  const mockPomoRunning = { value: false }
+  const mockPomoRemainingDisplay = { value: '25:00' }
+  const mockPomoToggle = vi.fn()
+  const mockPomoReset = vi.fn()
+  return {
+    mockPomoPhase,
+    mockPomoRunning,
+    mockPomoRemainingDisplay,
+    mockPomoToggle,
+    mockPomoReset,
+  }
+})
+
+vi.mock('@/composables/usePomodoro', () => ({
+  usePomodoro: (_cb?: unknown) => ({
+    phase: mockPomoPhase,
+    running: mockPomoRunning,
+    remainingDisplay: mockPomoRemainingDisplay,
+    toggle: mockPomoToggle,
+    reset: mockPomoReset,
+    start: vi.fn(),
+    pause: vi.fn(),
+    elapsed: { value: 0 },
+    remaining: { value: 1500 },
+    targetSecs: { value: 1500 },
+  }),
+}))
+
+describe('App.vue — Pomodoro Timer', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockRouteName.value = 'dashboard'
+    mockAppState.currentDesktopTab = 'monitor'
+    mockAppState.currentDetailAgentId = ''
+    mockAppState.commandPaletteRequest = 0
+    mockCompact.value = false
+    capturedShortcuts.length = 0
+    mockPomoPhase.value = 'idle'
+    mockPomoRunning.value = false
+    mockPomoRemainingDisplay.value = '25:00'
+  })
+
+  // ── 1. Renders pomo button ─────────────────────────────────────────────────
+
+  it('renders pomo-btn button in header when not on login page', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.find('.pomo-btn').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  // ── 2. Shows 25:00 when idle ───────────────────────────────────────────────
+
+  it('displays 25:00 when phase is idle', async () => {
+    mockPomoPhase.value = 'idle'
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.find('.pomo-btn').text()).toContain('25:00')
+    wrapper.unmount()
+  })
+
+  // ── 3. Shows remainingDisplay when not idle ────────────────────────────────
+
+  it('displays remainingDisplay when phase is focus', async () => {
+    mockPomoPhase.value = 'focus'
+    mockPomoRemainingDisplay.value = '24:35'
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.find('.pomo-btn').text()).toContain('24:35')
+    wrapper.unmount()
+  })
+
+  // ── 4. Click calls toggle ──────────────────────────────────────────────────
+
+  it('clicking pomo-btn calls pomo.toggle()', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    await wrapper.find('.pomo-btn').trigger('click')
+    expect(mockPomoToggle).toHaveBeenCalledOnce()
+    wrapper.unmount()
+  })
+
+  // ── 5. Right-click calls reset ─────────────────────────────────────────────
+
+  it('right-clicking pomo-btn calls pomo.reset()', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    await wrapper.find('.pomo-btn').trigger('contextmenu')
+    expect(mockPomoReset).toHaveBeenCalledOnce()
+    wrapper.unmount()
+  })
+
+  // ── 6. Accessibility: aria-label ──────────────────────────────────────────
+
+  it('pomo-btn has aria-label="Pomodoro timer"', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.find('.pomo-btn').attributes('aria-label')).toBe('Pomodoro timer')
+    wrapper.unmount()
+  })
+
+  // ── 7. Shift+P shortcut is registered ─────────────────────────────────────
+
+  it('registers Shift+P shortcut for Pomodoro toggle', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const pomoShortcut = capturedShortcuts.find(
+      (s) => s.key === 'p' && s.shift === true,
+    )
+    expect(pomoShortcut).toBeDefined()
+    expect(pomoShortcut?.category).toBe('Actions')
+    wrapper.unmount()
+  })
+
+  // ── 8. Hidden on login page ────────────────────────────────────────────────
+
+  it('does not render pomo-btn on login page', async () => {
+    mockRouteName.value = 'login'
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.find('.pomo-btn').exists()).toBe(false)
+    wrapper.unmount()
+  })
+})
