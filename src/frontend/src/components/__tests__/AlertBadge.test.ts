@@ -1137,4 +1137,132 @@ describe('AlertBadge', () => {
       wrapper.unmount()
     })
   })
+
+  // ── Alert cleared celebration ──────────────────────────────────────────────
+
+  describe('alert cleared celebration', () => {
+    // Minimal localStorage stub to avoid side-effects in this suite
+    function makeLocalStorageStub(initial: Record<string, string> = {}): Storage {
+      const store = new Map<string, string>(Object.entries(initial))
+      return {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => { store.set(k, v) },
+        removeItem: (k: string) => { store.delete(k) },
+        clear: () => { store.clear() },
+        get length() { return store.size },
+        key: (i: number) => [...store.keys()][i] ?? null,
+      } as Storage
+    }
+
+    beforeEach(() => {
+      vi.stubGlobal('localStorage', makeLocalStorageStub())
+    })
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    // 1. alerts >0 → 0 triggers celebratingClear and overlay renders
+    it('shows celebration overlay when alerts count transitions from >0 to 0', async () => {
+      // First poll returns 1 alert
+      mockGet.mockResolvedValueOnce(alertsResponse([makeAlert('warning')]))
+      const wrapper = mount(AlertBadge, { attachTo: document.body })
+      await flushPromises()
+
+      expect(wrapper.find('.alert-badge').exists()).toBe(true)
+
+      // Second poll returns 0 alerts
+      mockGet.mockResolvedValueOnce(emptyResponse())
+      vi.advanceTimersByTime(30_000)
+      await flushPromises()
+
+      // Overlay should appear in the teleport target (document.body)
+      const overlay = document.body.querySelector('.alert-celebrate-overlay')
+      expect(overlay).not.toBeNull()
+      wrapper.unmount()
+    })
+
+    // 2. alerts 0 → 0 does not trigger celebration
+    it('does not show celebration overlay when alerts stay at 0', async () => {
+      mockGet.mockResolvedValue(emptyResponse())
+      const wrapper = mount(AlertBadge, { attachTo: document.body })
+      await flushPromises()
+
+      // Second poll also returns 0
+      vi.advanceTimersByTime(30_000)
+      await flushPromises()
+
+      const overlay = document.body.querySelector('.alert-celebrate-overlay')
+      expect(overlay).toBeNull()
+      wrapper.unmount()
+    })
+
+    // 3. alerts >0 → >0 (reduced but non-zero) does not trigger celebration
+    it('does not show celebration overlay when count decreases but stays above 0', async () => {
+      mockGet.mockResolvedValueOnce(
+        alertsResponse([makeAlert('warning', -100), makeAlert('warning', -200)]),
+      )
+      const wrapper = mount(AlertBadge, { attachTo: document.body })
+      await flushPromises()
+
+      // Count drops from 2 → 1 (still non-zero)
+      mockGet.mockResolvedValueOnce(alertsResponse([makeAlert('warning', -100)]))
+      vi.advanceTimersByTime(30_000)
+      await flushPromises()
+
+      const overlay = document.body.querySelector('.alert-celebrate-overlay')
+      expect(overlay).toBeNull()
+      wrapper.unmount()
+    })
+
+    // 4. showToast is called with success type on cleared
+    it('calls showToast with success type when alerts are cleared', async () => {
+      // Spy on the module-level showToast
+      const { showToast: showToastFn } = await import('@/composables/useToast')
+      const spy = vi.spyOn({ showToast: showToastFn }, 'showToast')
+
+      // We need to spy on the imported binding — mock the module instead
+      const toastModule = await import('@/composables/useToast')
+      const toastSpy = vi.spyOn(toastModule, 'showToast')
+
+      mockGet.mockResolvedValueOnce(alertsResponse([makeAlert('critical')]))
+      const wrapper = mount(AlertBadge, { attachTo: document.body })
+      await flushPromises()
+
+      mockGet.mockResolvedValueOnce(emptyResponse())
+      vi.advanceTimersByTime(30_000)
+      await flushPromises()
+
+      expect(toastSpy).toHaveBeenCalledWith(
+        expect.stringContaining('cleared'),
+        'success',
+      )
+
+      toastSpy.mockRestore()
+      spy.mockRestore()
+      wrapper.unmount()
+    })
+
+    // 5. celebration overlay disappears after 3 seconds
+    it('hides celebration overlay after 3 seconds', async () => {
+      mockGet.mockResolvedValueOnce(alertsResponse([makeAlert('warning')]))
+      const wrapper = mount(AlertBadge, { attachTo: document.body })
+      await flushPromises()
+
+      mockGet.mockResolvedValueOnce(emptyResponse())
+      vi.advanceTimersByTime(30_000)
+      await flushPromises()
+
+      // Verify overlay is present
+      expect(document.body.querySelector('.alert-celebrate-overlay')).not.toBeNull()
+
+      // Advance past 3-second celebration window
+      vi.advanceTimersByTime(3_001)
+      await wrapper.vm.$nextTick()
+
+      const overlay = document.body.querySelector('.alert-celebrate-overlay')
+      expect(overlay).toBeNull()
+      wrapper.unmount()
+    })
+  })
 })
