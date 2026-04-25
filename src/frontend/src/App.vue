@@ -12,6 +12,7 @@ import { appState } from '@/stores/appState'
 import ToastContainer from '@/components/ToastContainer.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AlertBadge from '@/components/AlertBadge.vue'
+import HeartbeatPulse from '@/components/HeartbeatPulse.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -100,6 +101,19 @@ registerShortcut({
   category: 'Actions',
 })
 
+// ── Heartbeat Pulse ─────────────────────────────────────────────────────────
+
+const heartbeatStats = computed(() => {
+  const agents = appState.latestDashboard?.agents ?? []
+  const total = agents.length
+  const active = agents.filter((a: any) => String(a?.status ?? '').toLowerCase().includes('active')).length
+  return {
+    activeCount: active,
+    totalCount: total,
+    activeRatio: total > 0 ? active / total : 0,
+  }
+})
+
 // ── Compact mode keyboard shortcut ─────────────────────────────────────────
 
 registerShortcut({
@@ -164,6 +178,12 @@ registerShortcut({
           aria-label="開啟 Command Palette"
           @click="openPalette"
         >⌘<span class="cmd-k-hint">K</span></button>
+        <HeartbeatPulse
+          v-if="!isLoginPage"
+          :active-ratio="heartbeatStats.activeRatio"
+          :active-count="heartbeatStats.activeCount"
+          :total-count="heartbeatStats.totalCount"
+        />
         <AlertBadge v-if="!isLoginPage" />
         <button
           v-if="!isLoginPage"
