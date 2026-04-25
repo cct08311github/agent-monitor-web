@@ -6,6 +6,12 @@ import { useDebouncedRef } from '@/composables/useDebouncedRef'
 import { useLogPause } from '@/composables/useLogPause'
 import { formatTs } from '@/lib/time'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import {
+  loadSearches,
+  saveSearch,
+  deleteSearch,
+  type SavedSearch,
+} from '@/utils/savedSearches'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -524,6 +530,62 @@ function deleteSelectedPreset(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Saved searches (pill bar — localStorage key: oc_saved_log_searches)
+// ---------------------------------------------------------------------------
+
+const savedList = ref<SavedSearch[]>(loadSearches())
+
+/** True when there is at least one search criterion worth saving */
+const canSaveSearch = computed<boolean>(() => {
+  return (
+    filterText.value.trim().length > 0 ||
+    errorOnly.value ||
+    warnOnly.value
+  )
+})
+
+function promptSaveSearch(): void {
+  const name = window.prompt('請輸入搜尋名稱：')
+  if (name === null) return // cancelled
+  const trimmed = name.trim()
+  if (!trimmed) {
+    showToast('搜尋名稱不得為空', 'error')
+    return
+  }
+  // Map LogsTab filter state → SavedSearch.level for clarity
+  const level = errorOnly.value ? 'error' : warnOnly.value ? 'warn' : undefined
+  saveSearch({
+    name: trimmed,
+    query: filterText.value,
+    level,
+  })
+  savedList.value = loadSearches()
+  showToast(`已儲存搜尋: ${trimmed}`, 'success')
+}
+
+function applySearch(s: SavedSearch): void {
+  filterText.value = s.query
+  debouncedFilter.value = s.query
+  if (s.level === 'error') {
+    errorOnly.value = true
+    warnOnly.value = false
+  } else if (s.level === 'warn') {
+    warnOnly.value = true
+    errorOnly.value = false
+  } else {
+    errorOnly.value = false
+    warnOnly.value = false
+  }
+  hasNewMessages.value = false
+}
+
+function removeSearch(s: SavedSearch): void {
+  deleteSearch(s.id)
+  savedList.value = loadSearches()
+  showToast(`已刪除: ${s.name}`, 'info')
+}
+
+// ---------------------------------------------------------------------------
 // Filter actions
 // ---------------------------------------------------------------------------
 
@@ -595,6 +657,11 @@ defineExpose({
   applyPreset,
   deletePreset,
   loadPresets,
+  // saved-searches seam
+  savedList,
+  canSaveSearch,
+  applySearch,
+  removeSearch,
 })
 </script>
 
@@ -684,6 +751,41 @@ defineExpose({
             🗑️ 刪除
           </button>
         </div>
+
+        <!-- Saved-search save button -->
+        <button
+          class="ctrl-btn log-save-search-btn"
+          :disabled="!canSaveSearch"
+          title="儲存目前搜尋為命名 preset"
+          @click="promptSaveSearch"
+        >
+          🔖 儲存搜尋
+        </button>
+      </div>
+
+      <!-- Saved-search pill bar -->
+      <div
+        v-if="savedList.length > 0"
+        class="saved-search-pills"
+        role="list"
+        aria-label="已儲存的搜尋"
+      >
+        <button
+          v-for="s in savedList"
+          :key="s.id"
+          class="saved-pill"
+          role="listitem"
+          :title="`套用: ${s.name}`"
+          @click="applySearch(s)"
+        >
+          {{ s.name }}
+          <span
+            class="saved-pill-x"
+            role="button"
+            :aria-label="`刪除搜尋: ${s.name}`"
+            @click.stop="removeSearch(s)"
+          >✕</span>
+        </button>
       </div>
     </div>
 
@@ -826,5 +928,74 @@ defineExpose({
 .log-preset-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* Saved-search save button */
+.log-save-search-btn {
+  font-size: 11px;
+  padding: 2px 7px;
+}
+
+.log-save-search-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Saved-search pill bar */
+.saved-search-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 0 2px;
+}
+
+.saved-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 10px;
+  font-size: 12px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border, #3f3f46);
+  background: var(--color-surface, #18181b);
+  color: var(--color-text, #e4e4e7);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.saved-pill:hover {
+  background: var(--color-surface-hover, #27272a);
+  border-color: var(--color-accent, #6366f1);
+}
+
+.saved-pill-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 10px;
+  border-radius: 50%;
+  opacity: 0;
+  cursor: pointer;
+  background: transparent;
+  transition: opacity 100ms ease, background-color 100ms ease;
+}
+
+.saved-pill:hover .saved-pill-x {
+  opacity: 1;
+}
+
+.saved-pill-x:hover {
+  background: var(--color-error, #ef4444);
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .saved-pill,
+  .saved-pill-x {
+    transition: none;
+  }
 }
 </style>
