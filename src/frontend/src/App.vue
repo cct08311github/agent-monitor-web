@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { useAuth } from '@/composables/useAuth'
+import { useKonamiCode } from '@/composables/useKonamiCode'
+import { showToast } from '@/composables/useToast'
 import { appState } from '@/stores/appState'
 import ToastContainer from '@/components/ToastContainer.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -48,6 +50,31 @@ const activeDesktopTab = computed<DesktopTab>(() => {
   if (t === 'detail') return 'monitor'
   return (t as DesktopTab) ?? 'monitor'
 })
+
+// ── Konami Code Easter Egg ──────────────────────────────────────────────────
+
+const EMOJIS = ['🎉', '🎊', '✨', '🥳', '🦞', '🐾', '🚀', '💫']
+
+const celebrating = ref(false)
+
+function emojiStyle(i: number): Record<string, string> {
+  const left = ((i * 37 + 11) % 90) + 5 // pseudo-random 5–95%
+  const delay = ((i * 0.4) % 2).toFixed(2) // 0–2s stagger
+  return {
+    left: `${left}%`,
+    animationDelay: `${delay}s`,
+  }
+}
+
+function celebrate() {
+  showToast('🎉 Konami unlocked! 50 PRs strong!', 'success')
+  celebrating.value = true
+  setTimeout(() => {
+    celebrating.value = false
+  }, 5000)
+}
+
+useKonamiCode(celebrate)
 </script>
 
 <template>
@@ -133,6 +160,16 @@ const activeDesktopTab = computed<DesktopTab>(() => {
     <!-- Global UI overlays -->
     <ToastContainer />
     <ConfirmDialog />
+
+    <!-- Konami Code Easter Egg -->
+    <div v-if="celebrating" class="konami-celebrate" aria-hidden="true">
+      <span
+        v-for="i in 12"
+        :key="i"
+        class="konami-emoji"
+        :style="emojiStyle(i)"
+      >{{ EMOJIS[i % EMOJIS.length] }}</span>
+    </div>
   </div>
 </template>
 
@@ -188,5 +225,45 @@ const activeDesktopTab = computed<DesktopTab>(() => {
   border-color: var(--accent);
   color: var(--accent);
   outline: none;
+}
+
+/* ── Konami Code Easter Egg ───────────────────────────────────────────────── */
+
+.konami-celebrate {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  border: 6px solid transparent;
+  animation: konami-rainbow 1s linear infinite;
+}
+
+.konami-emoji {
+  position: absolute;
+  top: -10%;
+  font-size: clamp(1.5rem, 3vw, 2.5rem);
+  animation: konami-fall 4s ease-in forwards;
+  user-select: none;
+}
+
+@keyframes konami-fall {
+  0% {
+    top: -10%;
+    opacity: 1;
+  }
+  100% {
+    top: 110%;
+    opacity: 0;
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes konami-rainbow {
+  from {
+    filter: hue-rotate(0deg);
+  }
+  to {
+    filter: hue-rotate(360deg);
+  }
 }
 </style>
