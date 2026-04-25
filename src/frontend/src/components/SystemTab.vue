@@ -10,6 +10,19 @@ import { showToast } from '@/composables/useToast'
 // Types
 // ---------------------------------------------------------------------------
 
+interface HealthFull {
+  status: 'ok' | 'degraded' | 'critical'
+  uptime_ms: number
+  alerts_recent_count: number
+  alerts_critical_count: number
+  alerts_warning_count: number
+  errors_recent_count: number
+  p99_max_ms: number
+  agents_active_count: number
+  agents_total_count: number
+  ts: number
+}
+
 interface HistoryPoint {
   cpu: number
   memory: number
@@ -51,6 +64,10 @@ const tokenChartRef = ref<HTMLCanvasElement | null>(null)
 // ---------------------------------------------------------------------------
 // Data state
 // ---------------------------------------------------------------------------
+
+const health = ref<HealthFull | null>(null)
+const healthLoading = ref(true)
+const healthError = ref(false)
 
 const sysHistoryData = ref<HistoryPoint[]>([])
 const costHistoryData = ref<CostHistoryPoint[]>([])
@@ -95,6 +112,28 @@ const topAgentActivity = computed<AgentActivitySummary[]>(() => {
   return [...agentActivityData.value]
     .sort((a, b) => b.active_minutes - a.active_minutes)
     .slice(0, 10)
+})
+
+// ---------------------------------------------------------------------------
+// Health computed helpers
+// ---------------------------------------------------------------------------
+
+const healthStatusClass = computed<string>(() => {
+  switch (health.value?.status) {
+    case 'ok': return 'health-status--ok'
+    case 'degraded': return 'health-status--degraded'
+    case 'critical': return 'health-status--critical'
+    default: return ''
+  }
+})
+
+const healthStatusLabel = computed<string>(() => {
+  switch (health.value?.status) {
+    case 'ok': return 'OK'
+    case 'degraded': return 'DEGRADED'
+    case 'critical': return 'CRITICAL'
+    default: return '—'
+  }
 })
 
 // ---------------------------------------------------------------------------
@@ -347,6 +386,22 @@ function redrawCharts(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Fetch health/full composite status
+// ---------------------------------------------------------------------------
+
+async function fetchHealth(): Promise<void> {
+  try {
+    healthError.value = false
+    const data = (await api.get('/api/read/health/full')) as HealthFull
+    health.value = data
+  } catch {
+    healthError.value = true
+  } finally {
+    healthLoading.value = false
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Fetch history data
 // ---------------------------------------------------------------------------
 
@@ -415,13 +470,18 @@ function setupThemeObserver(): void {
 // Lifecycle
 // ---------------------------------------------------------------------------
 
+let _healthInterval: ReturnType<typeof setInterval> | null = null
+
 onMounted(() => {
+  fetchHealth()
+  _healthInterval = setInterval(fetchHealth, 15000)
   fetchHistory()
   setupResizeObserver()
   setupThemeObserver()
 })
 
 onUnmounted(() => {
+  if (_healthInterval) { clearInterval(_healthInterval); _healthInterval = null }
   if (_resizeTimer) { clearTimeout(_resizeTimer); _resizeTimer = null }
   resizeObserver?.disconnect()
   themeObserver?.disconnect()
@@ -441,6 +501,64 @@ watch(tokenChartRef, (el) => {
 
 <template>
   <div class="system-tab">
+    <!-- ---------------------------------------------------------------- -->
+    <!-- 系統健康 Card (health/full composite status)                      -->
+    <!-- ---------------------------------------------------------------- -->
+    <div class="health-card">
+      <div class="health-card-header">
+        <h2 class="health-card-title">🩺 系統健康</h2>
+        <span
+          v-if="!healthLoading && !healthError && health"
+          class="health-status-pill"
+          :class="healthStatusClass"
+        >{{ healthStatusLabel }}</span>
+      </div>
+
+      <!-- Loading state -->
+      <div v-if="healthLoading" class="health-loading" data-testid="health-loading">
+        <span class="health-loading-spinner" />
+        載入中…
+      </div>
+
+      <!-- Error state -->
+      <div v-else-if="healthError" class="health-error" data-testid="health-error">
+        ⚠️ 健康狀態載入失敗
+        <button class="ctrl-btn" style="margin-left:8px;font-size:12px" @click="fetchHealth">重試</button>
+      </div>
+
+      <!-- Data state -->
+      <div v-else-if="health" class="health-metrics" data-testid="health-metrics">
+        <div class="health-metric-row">
+          <span class="health-metric-label">運行時間</span>
+          <span class="health-metric-value">{{ formatRelativeTime(Date.now() - health.uptime_ms) }}</span>
+        </div>
+        <div class="health-metric-row">
+          <span class="health-metric-label">Active Agents</span>
+          <span class="health-metric-value">{{ health.agents_active_count }} / {{ health.agents_total_count }}</span>
+        </div>
+        <div class="health-metric-row">
+          <span class="health-metric-label">近期告警</span>
+          <span class="health-metric-value">{{ health.alerts_recent_count }}</span>
+        </div>
+        <div class="health-metric-row">
+          <span class="health-metric-label">Critical 告警</span>
+          <span class="health-metric-value health-metric-value--critical">{{ health.alerts_critical_count }}</span>
+        </div>
+        <div class="health-metric-row">
+          <span class="health-metric-label">Warning 告警</span>
+          <span class="health-metric-value health-metric-value--warning">{{ health.alerts_warning_count }}</span>
+        </div>
+        <div class="health-metric-row">
+          <span class="health-metric-label">近期錯誤</span>
+          <span class="health-metric-value">{{ health.errors_recent_count }}</span>
+        </div>
+        <div class="health-metric-row">
+          <span class="health-metric-label">P99 延遲</span>
+          <span class="health-metric-value">{{ health.p99_max_ms }} ms</span>
+        </div>
+      </div>
+    </div>
+
     <div class="system-layout">
       <!-- Left column: system resources + sparkline -->
       <div class="system-left">
@@ -563,6 +681,120 @@ watch(tokenChartRef, (el) => {
 </template>
 
 <style scoped>
+/* ------------------------------------------------------------------ */
+/* Health Card                                                          */
+/* ------------------------------------------------------------------ */
+
+.health-card {
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  background: var(--surface-base, #fff);
+}
+
+.health-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.health-card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+}
+
+.health-status-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.health-status--ok {
+  background: var(--green, #22c55e);
+  color: #fff;
+}
+
+.health-status--degraded {
+  background: var(--amber, #f59e0b);
+  color: #fff;
+}
+
+.health-status--critical {
+  background: var(--red, #ef4444);
+  color: #fff;
+}
+
+.health-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.health-metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  padding: 2px 0;
+}
+
+.health-metric-label {
+  color: var(--text-muted, #64748b);
+}
+
+.health-metric-value {
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+  font-variant-numeric: tabular-nums;
+}
+
+.health-metric-value--critical {
+  color: var(--red, #ef4444);
+}
+
+.health-metric-value--warning {
+  color: var(--amber, #f59e0b);
+}
+
+.health-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted, #94a3b8);
+  padding: 8px 0;
+}
+
+.health-loading-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border-color, #e2e8f0);
+  border-top-color: var(--accent, #3b82f6);
+  border-radius: 50%;
+  animation: health-spin 0.7s linear infinite;
+}
+
+@keyframes health-spin {
+  to { transform: rotate(360deg); }
+}
+
+.health-error {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: var(--red, #ef4444);
+  padding: 6px 0;
+}
+
 .activity-table-wrap {
   border-radius: 6px;
   overflow: hidden;
