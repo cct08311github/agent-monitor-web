@@ -68,6 +68,31 @@ export function formatCountdown(targetMs: number, now: number = Date.now()): str
 }
 
 /**
+ * Format a duration in milliseconds into a human-readable Chinese string.
+ * Used for Session Replay total-duration and delta hints.
+ *
+ * Rules:
+ *  - < 60 000 ms  → 'N 秒'
+ *  - < 3 600 000  → 'N 分 N 秒'
+ *  - else         → 'N 小時 N 分'
+ *
+ * @param ms - duration in milliseconds (non-negative)
+ */
+export function formatDuration(ms: number): string {
+  const totalSec = Math.max(0, Math.floor(ms / 1000))
+  const totalMin = Math.floor(totalSec / 60)
+  const totalHr = Math.floor(totalMin / 60)
+
+  if (totalHr > 0) {
+    return `${totalHr} 小時 ${totalMin % 60} 分`
+  }
+  if (totalMin > 0) {
+    return `${totalMin} 分 ${totalSec % 60} 秒`
+  }
+  return `${totalSec} 秒`
+}
+
+/**
  * Format a Date into YYYYMMDD-HHMMSS (local timezone).
  * Used as a safe filename timestamp component — only [A-Za-z0-9-] chars.
  */

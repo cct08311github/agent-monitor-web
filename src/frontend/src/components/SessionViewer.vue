@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { api } from '@/composables/useApi'
 import { showToast } from '@/composables/useToast'
 import { createFocusTrap } from '@/lib/focusTrap'
+import SessionReplay from './SessionReplay.vue'
 
 const props = defineProps<{
   agentId: string
@@ -102,10 +103,30 @@ const filteredMessages = computed<Array<{ msg: SessionMessage; originalIndex: nu
       return textMatch || roleMatch || toolMatch
     })
 })
+
+// Replay mode internal state
+const replayMode = ref(false)
+
+function openReplay(): void {
+  replayMode.value = true
+}
+
+function closeReplay(): void {
+  replayMode.value = false
+}
 </script>
 
 <template>
-  <div class="modal-overlay" style="display:flex" @click="handleOverlayClick">
+  <!-- Session Replay mode — replaces viewer while active -->
+  <SessionReplay
+    v-if="replayMode"
+    :agent-id="agentId"
+    :session-id="sessionId"
+    @close="closeReplay"
+  />
+
+  <!-- Standard viewer -->
+  <div v-else class="modal-overlay" style="display:flex" @click="handleOverlayClick">
     <div ref="dialogRef" class="modal-content" role="dialog" aria-modal="true" style="max-width:700px;width:95%;max-height:80vh;display:flex;flex-direction:column">
       <!-- Header -->
       <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border-color);flex-shrink:0">
@@ -192,6 +213,13 @@ const filteredMessages = computed<Array<{ msg: SessionMessage; originalIndex: nu
           </div>
         </template>
       </div>
+
+      <!-- Footer: Replay button -->
+      <div v-if="!loading && !error && messages.length > 0" class="sv-footer">
+        <button class="sv-replay-btn ctrl-btn" aria-label="開啟 Replay 模式" @click="openReplay">
+          Replay 模式 ▶
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -207,6 +235,31 @@ const filteredMessages = computed<Array<{ msg: SessionMessage; originalIndex: nu
 
 .sv-search-input:focus {
   outline: none;
+  border-color: var(--blue, #5a5aeb);
+}
+
+.sv-footer {
+  padding: 8px 16px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.sv-replay-btn {
+  font-size: 13px;
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-muted);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.sv-replay-btn:hover {
+  background: var(--blue, #5a5aeb);
+  color: #fff;
   border-color: var(--blue, #5a5aeb);
 }
 </style>
