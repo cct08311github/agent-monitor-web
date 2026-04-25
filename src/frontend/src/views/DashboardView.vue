@@ -9,6 +9,7 @@ import OptimizeTab from '@/components/OptimizeTab.vue'
 import ChatModal from '@/components/ChatModal.vue'
 import ModelSwitchModal from '@/components/ModelSwitchModal.vue'
 import HelpModal from '@/components/HelpModal.vue'
+import CommandPalette from '@/components/CommandPalette.vue'
 import { appState } from '@/stores/appState'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 
@@ -25,6 +26,9 @@ const showModelModal = ref(false)
 
 // Help modal state
 const showHelpModal = ref(false)
+
+// Command Palette state
+const showPalette = ref(false)
 
 // ---------------------------------------------------------------------------
 // Keyboard shortcuts
@@ -60,6 +64,27 @@ registerShortcut({
     showHelpModal.value = true
   },
   description: '顯示快捷鍵清單',
+  category: 'Actions',
+})
+
+// Command Palette — Cmd+K (macOS) and Ctrl+K (Windows/Linux)
+registerShortcut({
+  key: 'k',
+  meta: true,
+  handler: () => {
+    showPalette.value = true
+  },
+  description: '開啟命令面板',
+  category: 'Actions',
+})
+
+registerShortcut({
+  key: 'k',
+  ctrl: true,
+  handler: () => {
+    showPalette.value = true
+  },
+  description: '開啟命令面板',
   category: 'Actions',
 })
 
@@ -148,6 +173,13 @@ function openModelSwitch(agentId: string, model: string) {
 
     <!-- Help Modal -->
     <HelpModal :open="showHelpModal" @close="showHelpModal = false" />
+
+    <!-- Command Palette -->
+    <CommandPalette
+      :open="showPalette"
+      @close="showPalette = false"
+      @open-help="showHelpModal = true"
+    />
   </div>
 </template>
 
