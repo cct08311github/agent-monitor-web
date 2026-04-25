@@ -12,6 +12,7 @@ const { mockRouteName, mockAppState } = vi.hoisted(() => {
     currentDesktopTab: 'monitor' as string,
     currentDetailAgentId: '',
     commandPaletteRequest: 0,
+    latestDashboard: null as { agents: Array<{ status: string }> } | null,
   }
   return { mockRouteName, mockAppState }
 })
@@ -77,6 +78,10 @@ vi.mock('@/components/ConfirmDialog.vue', () => ({
 
 vi.mock('@/components/AlertBadge.vue', () => ({
   default: defineComponent({ template: '<div class="alert-badge-stub" />' }),
+}))
+
+vi.mock('@/components/HeartbeatPulse.vue', () => ({
+  default: defineComponent({ template: '<span class="heartbeat-pulse-stub" />' }),
 }))
 
 // ---------------------------------------------------------------------------
@@ -167,6 +172,7 @@ describe('App.vue — Command Palette opener button', () => {
     mockAppState.commandPaletteRequest = 0
     mockAppState.currentDesktopTab = 'monitor'
     mockAppState.currentDetailAgentId = ''
+    mockAppState.latestDashboard = null
     mockCompact.value = false
     capturedShortcuts.length = 0
   })
@@ -299,6 +305,7 @@ describe('App.vue — Theme select dropdown', () => {
     vi.clearAllMocks()
     mockRouteName.value = 'dashboard'
     mockAppState.currentDesktopTab = 'monitor'
+    mockAppState.latestDashboard = null
   })
 
   it('renders a theme select dropdown with 5 options', async () => {
@@ -366,6 +373,7 @@ describe('App.vue — Konami Code Easter Egg', () => {
     mockRouteName.value = 'dashboard'
     mockAppState.currentDesktopTab = 'monitor'
     mockAppState.currentDetailAgentId = ''
+    mockAppState.latestDashboard = null
     capturedKonamiCallback.fn = null
   })
 
@@ -439,6 +447,7 @@ describe('App.vue — Compact Mode Toggle', () => {
     mockAppState.currentDesktopTab = 'monitor'
     mockAppState.currentDetailAgentId = ''
     mockAppState.commandPaletteRequest = 0
+    mockAppState.latestDashboard = null
     mockCompact.value = false
     capturedShortcuts.length = 0
   })
@@ -565,6 +574,7 @@ describe('App.vue — Pomodoro Timer', () => {
     mockAppState.currentDesktopTab = 'monitor'
     mockAppState.currentDetailAgentId = ''
     mockAppState.commandPaletteRequest = 0
+    mockAppState.latestDashboard = null
     mockCompact.value = false
     capturedShortcuts.length = 0
     mockPomoPhase.value = 'idle'
