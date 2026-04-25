@@ -6,6 +6,9 @@ import { computeAgentMood } from '@/utils/agentMood'
 import { appState } from '@/stores/appState'
 import { showToast } from '@/composables/useToast'
 import AgentQuickDiagnose from '@/components/AgentQuickDiagnose.vue'
+import { useAgentAliases } from '@/composables/useAgentAliases'
+
+const { displayName } = useAgentAliases()
 
 const props = defineProps<{
   agent: Agent
@@ -130,7 +133,7 @@ function onCompareClick(event: MouseEvent) {
       <div class="agent-card-name">
         <div class="agent-avatar">{{ getAgentEmoji(agent.id) }}</div>
         <div>
-          <div class="agent-name">{{ agent.id }}</div>
+          <div class="agent-name" :title="agent.id">{{ displayName(agent.id) }}</div>
           <div class="agent-hostname">{{ agent.model || 'N/A' }}</div>
         </div>
       </div>
