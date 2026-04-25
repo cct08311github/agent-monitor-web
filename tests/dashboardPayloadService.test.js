@@ -418,4 +418,32 @@ describe('dashboardPayloadService', () => {
             msg: expect.stringContaining('Expected property name'),
         }));
     });
+
+    it('recovers agents list from CLI exit-error stdout (config warnings exit non-zero)', async () => {
+        // Simulate the real-world case: openclaw exits non-zero due to plugin config
+        // warnings, but stdout still contains the valid agents list. The promise
+        // rejects with an error that carries stdout/stderr — the catch handler
+        // must preserve them rather than swallow with empty stdout.
+        mockExecFilePromise.mockImplementation((bin, args) => {
+            if (bin === 'free') return Promise.resolve({ stdout: 'Mem: 16000000000 8000000000 4000000000 0 0 4000000000', stderr: '' });
+            if (bin === 'df') return Promise.resolve({ stdout: 'Filesystem Size Used Avail Use% Mounted on\n/dev/disk1 100G 50G 50G 50% /', stderr: '' });
+            if (args && args[0] === '--version') return Promise.resolve({ stdout: 'openclaw 1.2.3', stderr: '' });
+            if (args && args[0] === 'agents') {
+                const err = new Error('Command failed: openclaw agents list');
+                err.stdout = '- main (Main Agent)\n  Workspace: /tmp/home/projects/secret\n  Model: gemini-2.5-flash';
+                err.stderr = 'Config warnings: ...';
+                return Promise.reject(err);
+            }
+            if (args && args[0] === 'cron') return Promise.resolve({ stdout: '{"jobs":[]}', stderr: '' });
+            if (args && args[0] === 'status') return Promise.resolve({ stdout: '', stderr: '' });
+            throw new Error(`unexpected execFile call ${bin} ${JSON.stringify(args)}`);
+        });
+
+        await service.updateSharedData();
+        const payload = service.getSharedPayload();
+
+        expect(Array.isArray(payload.agents)).toBe(true);
+        expect(payload.agents.length).toBe(1);
+        expect(payload.agents[0].id).toBe('main');
+    });
 });
