@@ -391,6 +391,37 @@ describe('CommandPalette', () => {
     wrapper.unmount()
     expect(mockDeactivate).toHaveBeenCalled()
   })
+
+  // -------------------------------------------------------------------------
+  // 12. kbd badge rendering for Shortcut category — Issue #410
+  // -------------------------------------------------------------------------
+
+  it('renders <kbd class="key-badge"> for Shortcut category commands', async () => {
+    // SAMPLE_SHORTCUTS has entries with key '1' and key '?' (shift)
+    // After filtering to Shortcut category items, each should have key-badge elements
+    const wrapper = mount(CommandPalette, { ...MOUNT_OPTS, props: { open: true } })
+    await flushPromises()
+
+    // Filter to just shortcut commands to verify kbd badge is rendered
+    await setInputValue('切到 Monitor')
+    const badges = document.querySelectorAll('kbd.key-badge')
+    expect(badges.length).toBeGreaterThanOrEqual(1)
+    wrapper.unmount()
+  })
+
+  it('renders separate modifier <kbd> badge for shortcut with shift', async () => {
+    const wrapper = mount(CommandPalette, { ...MOUNT_OPTS, props: { open: true } })
+    await flushPromises()
+
+    // Filter to the shortcut with shift: true (key '?', description '顯示快捷鍵清單')
+    await setInputValue('顯示快捷鍵清單')
+
+    const badges = Array.from(document.querySelectorAll('kbd.key-badge'))
+    const badgeTexts = badges.map((b) => b.textContent?.trim())
+    expect(badgeTexts).toContain('⇧')
+    expect(badgeTexts).toContain('?')
+    wrapper.unmount()
+  })
 })
 
 // ---------------------------------------------------------------------------
