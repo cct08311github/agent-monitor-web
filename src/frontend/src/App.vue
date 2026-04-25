@@ -19,6 +19,8 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AlertBadge from '@/components/AlertBadge.vue'
 import HeartbeatPulse from '@/components/HeartbeatPulse.vue'
 import ConnectionStatus from '@/components/ConnectionStatus.vue'
+import KeyboardShortcutsHelp from '@/components/KeyboardShortcutsHelp.vue'
+import { installShortcutsHelpHotkey } from '@/composables/useKeyboardShortcutsHelp'
 
 const route = useRoute()
 const router = useRouter()
@@ -192,11 +194,14 @@ async function fetchBadgeCounts(): Promise<void> {
 
 let badgePollInterval: ReturnType<typeof setInterval> | null = null
 
+let _uninstallShortcutsHelp: (() => void) | null = null
+
 onMounted(() => {
   void fetchBadgeCounts()
   badgePollInterval = setInterval(() => {
     void fetchBadgeCounts()
   }, 30_000)
+  _uninstallShortcutsHelp = installShortcutsHelpHotkey()
 })
 
 onUnmounted(() => {
@@ -204,6 +209,8 @@ onUnmounted(() => {
     clearInterval(badgePollInterval)
     badgePollInterval = null
   }
+  _uninstallShortcutsHelp?.()
+  _uninstallShortcutsHelp = null
 })
 
 // ── Compact mode keyboard shortcut ─────────────────────────────────────────
@@ -420,6 +427,7 @@ registerShortcut({
     <!-- Global UI overlays -->
     <ToastContainer />
     <ConfirmDialog />
+    <KeyboardShortcutsHelp />
 
     <!-- Konami Code Easter Egg -->
     <div v-if="celebrating" class="konami-celebrate" aria-hidden="true">
