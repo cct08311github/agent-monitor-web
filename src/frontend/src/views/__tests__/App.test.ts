@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { defineComponent } from 'vue'
+import { defineComponent, ref } from 'vue'
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — shared refs between vi.mock factories
@@ -80,6 +80,42 @@ vi.mock('@/components/AlertBadge.vue', () => ({
 }))
 
 // ---------------------------------------------------------------------------
+// Mock useKeyboardShortcuts — capture registered shortcuts
+// ---------------------------------------------------------------------------
+
+const { capturedShortcuts } = vi.hoisted(() => {
+  const capturedShortcuts: Array<{ key: string; shift?: boolean; handler: () => void; description: string; category?: string }> = []
+  return { capturedShortcuts }
+})
+
+vi.mock('@/composables/useKeyboardShortcuts', () => ({
+  useKeyboardShortcuts: () => ({
+    registerShortcut: (s: { key: string; shift?: boolean; handler: () => void; description: string; category?: string }) => {
+      capturedShortcuts.push(s)
+    },
+    unregisterShortcut: vi.fn(),
+    getShortcuts: () => [...capturedShortcuts],
+  }),
+}))
+
+// ---------------------------------------------------------------------------
+// Mock useCompactMode — use a reactive ref inside the mock factory
+// ---------------------------------------------------------------------------
+
+const mockCompact = ref(false)
+const mockToggleCompact = vi.fn(() => {
+  mockCompact.value = !mockCompact.value
+})
+
+vi.mock('@/composables/useCompactMode', () => ({
+  useCompactMode: () => ({
+    compact: mockCompact,
+    toggleCompact: mockToggleCompact,
+    setCompact: vi.fn(),
+  }),
+}))
+
+// ---------------------------------------------------------------------------
 // Mock useKonamiCode — capture the callback for manual triggering in tests
 // ---------------------------------------------------------------------------
 
@@ -131,6 +167,8 @@ describe('App.vue — Command Palette opener button', () => {
     mockAppState.commandPaletteRequest = 0
     mockAppState.currentDesktopTab = 'monitor'
     mockAppState.currentDetailAgentId = ''
+    mockCompact.value = false
+    capturedShortcuts.length = 0
   })
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -386,6 +424,96 @@ describe('App.vue — Konami Code Easter Egg', () => {
 
     const overlay = wrapper.find('.konami-celebrate')
     expect(overlay.attributes('aria-hidden')).toBe('true')
+    wrapper.unmount()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Compact Mode Button
+// ---------------------------------------------------------------------------
+
+describe('App.vue — Compact Mode Toggle', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockRouteName.value = 'dashboard'
+    mockAppState.currentDesktopTab = 'monitor'
+    mockAppState.currentDetailAgentId = ''
+    mockAppState.commandPaletteRequest = 0
+    mockCompact.value = false
+    capturedShortcuts.length = 0
+  })
+
+  it('renders compact mode button in header', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    // Find button with the compact mode title pattern
+    const buttons = wrapper.findAll('.header-btn.icon-only')
+    const compactBtn = buttons.find((b) => b.attributes('title')?.includes('Compact'))
+    expect(compactBtn).toBeTruthy()
+    wrapper.unmount()
+  })
+
+  it('compact button title shows OFF when compact is false', async () => {
+    mockCompact.value = false
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const buttons = wrapper.findAll('.header-btn.icon-only')
+    const compactBtn = buttons.find((b) => b.attributes('title')?.includes('Compact'))
+    expect(compactBtn?.attributes('title')).toContain('OFF')
+    wrapper.unmount()
+  })
+
+  it('compact button title shows ON when compact is true', async () => {
+    mockCompact.value = true
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const buttons = wrapper.findAll('.header-btn.icon-only')
+    const compactBtn = buttons.find((b) => b.attributes('title')?.includes('Compact'))
+    expect(compactBtn?.attributes('title')).toContain('ON')
+    wrapper.unmount()
+  })
+
+  it('clicking compact button calls toggleCompact', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const buttons = wrapper.findAll('.header-btn.icon-only')
+    const compactBtn = buttons.find((b) => b.attributes('title')?.includes('Compact'))
+    await compactBtn!.trigger('click')
+
+    expect(mockToggleCompact).toHaveBeenCalledOnce()
+    wrapper.unmount()
+  })
+
+  it('root div does not have compact-mode class when compact is false', async () => {
+    mockCompact.value = false
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.find('#vue-app').classes()).not.toContain('compact-mode')
+    wrapper.unmount()
+  })
+
+  it('root div has compact-mode class when compact is true', async () => {
+    mockCompact.value = true
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.find('#vue-app').classes()).toContain('compact-mode')
+    wrapper.unmount()
+  })
+
+  it('compact button has aria-pressed attribute reflecting compact state', async () => {
+    mockCompact.value = true
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const buttons = wrapper.findAll('.header-btn.icon-only')
+    const compactBtn = buttons.find((b) => b.attributes('title')?.includes('Compact'))
+    expect(compactBtn?.attributes('aria-pressed')).toBe('true')
     wrapper.unmount()
   })
 })
