@@ -179,6 +179,7 @@ const filteredSessions = computed(() => {
 // ── Session bookmarks ─────────────────────────────────────────────────────────
 
 import { loadBookmarks, toggleBookmark, partition } from '@/utils/sessionBookmarks'
+import AgentNotes from '@/components/AgentNotes.vue'
 
 const bookmarks = ref<string[]>([])
 
@@ -285,6 +286,12 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
       <div class="detail-card">
         <div class="detail-card-title">目前任務</div>
         <div class="detail-task-content">{{ agent?.currentTask?.task || '無' }}</div>
+      </div>
+
+      <!-- Notes Card -->
+      <div class="detail-card">
+        <div class="detail-card-title">📝 筆記</div>
+        <AgentNotes :agentId="agentId" />
       </div>
 
       <!-- Action Buttons -->
