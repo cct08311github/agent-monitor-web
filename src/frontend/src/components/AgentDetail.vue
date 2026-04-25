@@ -6,6 +6,15 @@ import { formatTokens, formatTWD, getAgentEmoji, getStatusInfo } from '@/utils/f
 import SessionViewer from '@/components/SessionViewer.vue'
 import { showToast } from '@/composables/useToast'
 
+// ── History trend ─────────────────────────────────────────────────────────────
+
+interface HistoryPoint {
+  timestamp: string
+  cost: number
+  input_tokens: number
+  output_tokens: number
+}
+
 const props = defineProps<{
   agentId: string
 }>()
@@ -46,7 +55,10 @@ async function loadSessions() {
   }
 }
 
-onMounted(loadSessions)
+onMounted(() => {
+  loadSessions()
+  fetchAgentHistory()
+})
 
 function openSession(sessionId: string) {
   activeSessionId.value = sessionId
@@ -81,6 +93,54 @@ function getTokenField(field: string): number {
 function getLastActivity(): string {
   const a = agentExt()
   return String(a['lastActivity'] ?? '-')
+}
+
+const history = ref<HistoryPoint[]>([])
+const historyLoading = ref(true)
+const historyError = ref(false)
+
+async function fetchAgentHistory() {
+  historyLoading.value = true
+  historyError.value = false
+  try {
+    const data = (await api.get(
+      `/api/agents/${encodeURIComponent(props.agentId)}/history?hours=24`
+    )) as { success?: boolean; history?: HistoryPoint[] }
+    history.value = data?.history ?? []
+  } catch {
+    history.value = []
+    historyError.value = true
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+const totalCost24h = computed<number>(() =>
+  history.value.reduce((sum, p) => sum + (p.cost ?? 0), 0)
+)
+
+const totalTokens24h = computed<number>(() =>
+  history.value.reduce((sum, p) => sum + (p.input_tokens ?? 0) + (p.output_tokens ?? 0), 0)
+)
+
+const maxCost = computed<number>(() => {
+  const costs = history.value.map((p) => p.cost ?? 0)
+  return Math.max(...costs, 0.000001)
+})
+
+function histBarWidth(cost: number): string {
+  return ((cost / maxCost.value) * 100).toFixed(1) + '%'
+}
+
+function fmtHistTs(ts: string): string {
+  try {
+    const d = new Date(ts)
+    const hh = String(d.getHours()).padStart(2, '0')
+    const mm = String(d.getMinutes()).padStart(2, '0')
+    return `${hh}:${mm}`
+  } catch {
+    return ts.slice(-5)
+  }
 }
 
 // ── Model usage ───────────────────────────────────────────────────────────────
@@ -184,6 +244,35 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
         <button class="ctrl-btn" style="flex:1" @click="$emit('model-switch', agentId, agent?.model || '')">🔄 切換模型</button>
       </div>
 
+      <!-- History Trend Card -->
+      <div class="detail-card">
+        <div class="detail-card-title">近 24h 趨勢</div>
+        <div v-if="historyLoading" style="color:var(--text-muted);font-size:12px;padding:4px 0">載入中…</div>
+        <div v-else-if="historyError" style="color:var(--error);font-size:12px;padding:4px 0">
+          ⚠️ 載入失敗
+          <button type="button" class="btn-reset" style="text-decoration:underline;margin-left:4px;color:inherit" @click="fetchAgentHistory">重試</button>
+        </div>
+        <div v-else-if="history.length === 0" style="color:var(--text-muted);font-size:12px">尚無歷史資料</div>
+        <div v-else>
+          <div class="hist-summary">
+            <span>費用 <strong style="color:var(--green)">{{ formatTWD(totalCost24h, appState.currentExchangeRate) }}</strong></span>
+            <span>Tokens <strong>{{ formatTokens(totalTokens24h) }}</strong></span>
+          </div>
+          <div class="hist-list">
+            <div
+              v-for="point in history.slice(-24)"
+              :key="point.timestamp"
+              class="hist-item"
+            >
+              <span class="hist-ts">{{ fmtHistTs(point.timestamp) }}</span>
+              <div class="hist-bar-track">
+                <div class="hist-bar" :style="{ width: histBarWidth(point.cost) }"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Sessions Card -->
       <div class="detail-card">
         <div class="detail-card-title">Sessions</div>
@@ -220,3 +309,48 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
     />
   </div>
 </template>
+
+<style scoped>
+.hist-summary {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.hist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hist-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hist-ts {
+  font-family: monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  min-width: 36px;
+}
+
+.hist-bar-track {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-secondary, #1e1e2e);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.hist-bar {
+  height: 100%;
+  background: var(--blue, #89b4fa);
+  border-radius: 3px;
+  min-width: 2px;
+  transition: width 0.2s ease;
+}
+</style>

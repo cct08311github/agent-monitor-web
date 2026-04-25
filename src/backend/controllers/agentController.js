@@ -1,6 +1,9 @@
 const openclawService = require('../services/openclawService');
+const tsdbService = require('../services/tsdbService');
 const { sendOk, sendFail } = require('../utils/apiResponse');
 const logger = require('../utils/logger');
+
+const AGENT_ID_RE = /^[A-Za-z0-9_-]+$/;
 
 class AgentController {
     async getAgents(req, res) {
@@ -43,6 +46,27 @@ class AgentController {
 
         } catch (error) { /* istanbul ignore next */
             logger.error('agent_get_agents_error', { requestId: req.requestId, details: logger.toErrorFields(error) });
+            return sendFail(res, 500, 'internal_error');
+        }
+    }
+
+    async getHistory(req, res) {
+        try {
+            const agentId = req.params.id;
+            if (!agentId || !AGENT_ID_RE.test(agentId)) {
+                return sendFail(res, 400, 'invalid_agent_id');
+            }
+
+            const rawHours = req.query.hours !== undefined ? req.query.hours : '24';
+            const hours = parseInt(rawHours, 10);
+            if (isNaN(hours) || hours < 1 || hours > 168) {
+                return sendFail(res, 400, 'invalid_hours');
+            }
+
+            const history = tsdbService.getAgentHistory(agentId, hours);
+            return sendOk(res, { history });
+        } catch (error) { /* istanbul ignore next */
+            logger.error('agent_get_history_error', { requestId: req.requestId, details: logger.toErrorFields(error) });
             return sendFail(res, 500, 'internal_error');
         }
     }
