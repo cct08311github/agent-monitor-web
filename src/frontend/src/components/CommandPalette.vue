@@ -13,6 +13,12 @@ const RECENTS_KEY = 'oc_palette_recent'
 const RECENTS_MAX = 5
 
 // ---------------------------------------------------------------------------
+// Favorites persistence constants
+// ---------------------------------------------------------------------------
+
+const FAVORITES_KEY = 'oc_palette_favorites'
+
+// ---------------------------------------------------------------------------
 // Props & emits
 // ---------------------------------------------------------------------------
 
@@ -207,8 +213,47 @@ function pushRecent(id: string): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Favorites state & persistence
+// ---------------------------------------------------------------------------
+
+const favoriteIds = ref<string[]>([])
+
+function loadFavorites(): void {
+  try {
+    const raw = localStorage.getItem(FAVORITES_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        favoriteIds.value = parsed as string[]
+      }
+    }
+  } catch {
+    // Silent fallback — localStorage unavailable or JSON malformed
+    favoriteIds.value = []
+  }
+}
+
+function persistFavorites(): void {
+  try {
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favoriteIds.value))
+  } catch {
+    // Silent fallback — storage quota or private browsing
+  }
+}
+
+function toggleFavorite(id: string): void {
+  if (favoriteIds.value.includes(id)) {
+    favoriteIds.value = favoriteIds.value.filter((fid) => fid !== id)
+  } else {
+    favoriteIds.value = [...favoriteIds.value, id]
+  }
+  persistFavorites()
+}
+
 onMounted(() => {
   loadRecents()
+  loadFavorites()
 })
 
 // ---------------------------------------------------------------------------
@@ -222,6 +267,13 @@ const dialogRef = ref<HTMLDivElement | null>(null)
 
 /** All available commands — rebuilt on each open to capture latest shortcuts */
 const allCommands = ref<Command[]>([])
+
+/** Favorite commands: map favoriteIds → actual commands, filtering out unknown ids */
+const favoriteCommands = computed<Command[]>(() => {
+  return favoriteIds.value
+    .map((id) => allCommands.value.find((cmd) => cmd.id === id))
+    .filter((cmd): cmd is Command => cmd !== undefined)
+})
 
 /** Recent commands: map recentIds → actual commands, filtering out unknown ids */
 const recentCommands = computed<Command[]>(() => {
@@ -249,14 +301,23 @@ const filteredCommands = computed<Command[]>(() => {
 })
 
 /** Group filtered commands by category, preserving insertion order.
- *  When query is empty and recents exist, prepend a synthetic 'Recent' group. */
+ *  When query is empty: Favorites group first (if any), then Recent group (if any),
+ *  then remaining category groups.
+ *  When query is non-empty: category groups only, no Favorites/Recent groups. */
 const groupedCommands = computed<Array<{ category: string; commands: Command[] }>>(() => {
   const q = query.value.trim()
   const groups = new Map<string, Command[]>()
 
-  if (!q && recentCommands.value.length > 0) {
-    // Synthetic Recent group first
-    groups.set('Recent', [...recentCommands.value])
+  if (!q) {
+    // Synthetic Favorites group first (when favorites exist)
+    if (favoriteCommands.value.length > 0) {
+      groups.set('Favorites', [...favoriteCommands.value])
+    }
+
+    // Synthetic Recent group next (when recents exist)
+    if (recentCommands.value.length > 0) {
+      groups.set('Recent', [...recentCommands.value])
+    }
   }
 
   // Build remaining groups from filteredCommands (non-recent when query empty)
@@ -431,6 +492,18 @@ function flatIndex(cmd: Command): number {
                   v-else-if="cmd.description"
                   class="cp-item-desc"
                 >{{ cmd.description }}</span>
+                <!-- Favorite star toggle -->
+                <span
+                  class="cp-star"
+                  :class="{ 'cp-star--on': favoriteIds.includes(cmd.id) }"
+                  :title="favoriteIds.includes(cmd.id) ? '取消釘選' : '釘選'"
+                  role="button"
+                  :aria-pressed="favoriteIds.includes(cmd.id)"
+                  tabindex="0"
+                  @click.stop="toggleFavorite(cmd.id)"
+                  @keydown.enter.stop="toggleFavorite(cmd.id)"
+                  @keydown.space.stop.prevent="toggleFavorite(cmd.id)"
+                >★</span>
               </button>
             </div>
           </template>
@@ -645,5 +718,32 @@ function flatIndex(cmd: Command): number {
   line-height: 1.4;
   color: var(--color-text, #cdd6f4);
   white-space: nowrap;
+}
+
+/* Favorite star button */
+.cp-star {
+  visibility: hidden;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 0.2rem;
+  font-size: 0.95rem;
+  color: var(--color-muted, #6c7086);
+  flex-shrink: 0;
+  line-height: 1;
+  transition: color 0.1s;
+}
+
+.cp-item:hover .cp-star {
+  visibility: visible;
+}
+
+.cp-star--on {
+  color: gold;
+  visibility: visible;
+}
+
+.cp-star:hover {
+  color: gold;
 }
 </style>

@@ -598,3 +598,160 @@ describe('CommandPalette — recent commands', () => {
     wrapper.unmount()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Favorite commands — Issue #450
+// ---------------------------------------------------------------------------
+
+describe('CommandPalette — favorites', () => {
+  const FAVORITES_KEY = 'oc_palette_favorites'
+
+  beforeEach(() => {
+    mockGetShortcuts.mockReturnValue(SAMPLE_SHORTCUTS)
+    mockCycleTheme.mockReset()
+    mockActivate.mockReset()
+    mockDeactivate.mockReset()
+    appState.currentDesktopTab = 'monitor'
+    appState.preferredMonitorSubTab = null
+    localStorageMock.clear()
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+    mockGetShortcuts.mockReturnValue(SAMPLE_SHORTCUTS)
+  })
+
+  // Case 1: Loads favoriteIds from localStorage on mount
+  it('loads favoriteIds from localStorage on mount', async () => {
+    _lsStore[FAVORITES_KEY] = JSON.stringify(['action-toggle-theme'])
+
+    const wrapper = mount(CommandPalette, { ...MOUNT_OPTS, props: { open: true } })
+    await flushPromises()
+
+    // Favorites group should appear since we have a valid favorite
+    const headers = Array.from(document.querySelectorAll('.cp-group-header')).map(
+      (h) => h.textContent?.trim(),
+    )
+    expect(headers[0]).toBe('Favorites')
+    wrapper.unmount()
+  })
+
+  // Case 2: toggleFavorite adds id + persists to localStorage
+  it('toggleFavorite adds id to favoriteIds and persists', async () => {
+    const wrapper = mount(CommandPalette, { ...MOUNT_OPTS, props: { open: true } })
+    await flushPromises()
+
+    // Click star on theme command — filter to it first
+    await setInputValue('theme')
+    const star = document.querySelector('.cp-star') as HTMLElement
+    expect(star).not.toBeNull()
+    star.click()
+    await flushPromises()
+
+    expect(localStorageMock.setItem).toHaveBeenCalledWith(
+      FAVORITES_KEY,
+      expect.stringContaining('action-toggle-theme'),
+    )
+    wrapper.unmount()
+  })
+
+  // Case 3: toggleFavorite removes id when already favorited
+  it('toggleFavorite removes id when already favorited + persists', async () => {
+    _lsStore[FAVORITES_KEY] = JSON.stringify(['action-toggle-theme'])
+
+    const wrapper = mount(CommandPalette, { ...MOUNT_OPTS, props: { open: true } })
+    await flushPromises()
+
+    // Filter to theme command and click its active star to un-favorite
+    await setInputValue('theme')
+    const star = document.querySelector('.cp-star') as HTMLElement
+    expect(star).not.toBeNull()
+    star.click()
+    await flushPromises()
+
+    const calls = localStorageMock.setItem.mock.calls
+    const lastSaved = JSON.parse(calls[calls.length - 1][1] as string) as string[]
+    expect(lastSaved).not.toContain('action-toggle-theme')
+    wrapper.unmount()
+  })
+
+  // Case 4: Empty query + favorites → Favorites group shown at very top
+  it('shows Favorites group at top when query empty and favorites exist', async () => {
+    _lsStore[FAVORITES_KEY] = JSON.stringify(['nav-system'])
+
+    const wrapper = mount(CommandPalette, { ...MOUNT_OPTS, props: { open: true } })
+    await flushPromises()
+
+    const headers = Array.from(document.querySelectorAll('.cp-group-header')).map(
+      (h) => h.textContent?.trim(),
+    )
+    expect(headers[0]).toBe('Favorites')
+    expect(headers).toContain('Navigation')
+    wrapper.unmount()
+  })
+
+  // Case 5: Empty query + no favorites → no Favorites group shown
+  it('does not show Favorites group when no favorites exist', async () => {
+    const wrapper = mount(CommandPalette, { ...MOUNT_OPTS, props: { open: true } })
+    await flushPromises()
+
+    const headers = Array.from(document.querySelectorAll('.cp-group-header')).map(
+      (h) => h.textContent?.trim(),
+    )
+    expect(headers).not.toContain('Favorites')
+    wrapper.unmount()
+  })
+
+  // Case 6: Non-empty query → no Favorites group shown
+  it('does not show Favorites group when query is non-empty', async () => {
+    _lsStore[FAVORITES_KEY] = JSON.stringify(['action-toggle-theme'])
+
+    const wrapper = mount(CommandPalette, { ...MOUNT_OPTS, props: { open: true } })
+    await flushPromises()
+
+    await setInputValue('監控')
+
+    const headers = Array.from(document.querySelectorAll('.cp-group-header')).map(
+      (h) => h.textContent?.trim(),
+    )
+    expect(headers).not.toContain('Favorites')
+    wrapper.unmount()
+  })
+
+  // Case 7: Star button click updates favoriteIds (star visible + toggled)
+  it('star button click toggles favoriteIds correctly', async () => {
+    const wrapper = mount(CommandPalette, { ...MOUNT_OPTS, props: { open: true } })
+    await flushPromises()
+
+    // Filter to theme command
+    await setInputValue('theme')
+
+    // Star should initially not have cp-star--on class
+    const star = document.querySelector('.cp-star') as HTMLElement
+    expect(star).not.toBeNull()
+    expect(star.classList.contains('cp-star--on')).toBe(false)
+
+    // Click to add favorite
+    star.click()
+    await flushPromises()
+
+    // Star should now have cp-star--on class
+    const starAfter = document.querySelector('.cp-star') as HTMLElement
+    expect(starAfter.classList.contains('cp-star--on')).toBe(true)
+    wrapper.unmount()
+  })
+
+  // Case 8: Malformed JSON in favorites localStorage → silent fallback, no Favorites group
+  it('silently falls back to empty favorites when localStorage JSON is malformed', async () => {
+    _lsStore[FAVORITES_KEY] = 'not-valid-json{'
+
+    const wrapper = mount(CommandPalette, { ...MOUNT_OPTS, props: { open: true } })
+    await flushPromises()
+
+    const headers = Array.from(document.querySelectorAll('.cp-group-header')).map(
+      (h) => h.textContent?.trim(),
+    )
+    expect(headers).not.toContain('Favorites')
+    wrapper.unmount()
+  })
+})
