@@ -10,6 +10,16 @@ import { showToast } from '@/composables/useToast'
 // Types
 // ---------------------------------------------------------------------------
 
+type InsightSeverity = 'critical' | 'warning' | 'info'
+
+interface Insight {
+  type: string
+  severity: InsightSeverity
+  message: string
+  ts: number
+  meta?: Record<string, unknown>
+}
+
 interface HealthFull {
   status: 'ok' | 'degraded' | 'critical'
   uptime_ms: number
@@ -68,6 +78,11 @@ const tokenChartRef = ref<HTMLCanvasElement | null>(null)
 const health = ref<HealthFull | null>(null)
 const healthLoading = ref(true)
 const healthError = ref(false)
+
+// Smart Insights state
+const insights = ref<Insight[]>([])
+const insightsLoading = ref(true)
+const insightsError = ref(false)
 
 const sysHistoryData = ref<HistoryPoint[]>([])
 const costHistoryData = ref<CostHistoryPoint[]>([])
@@ -135,6 +150,26 @@ const healthStatusLabel = computed<string>(() => {
     default: return '—'
   }
 })
+
+// ---------------------------------------------------------------------------
+// Insights helpers
+// ---------------------------------------------------------------------------
+
+function insightIcon(severity: InsightSeverity): string {
+  switch (severity) {
+    case 'critical': return '🔴'
+    case 'warning': return '🟠'
+    default: return '🔵'
+  }
+}
+
+function insightSeverityClass(severity: InsightSeverity): string {
+  switch (severity) {
+    case 'critical': return 'insight-item--critical'
+    case 'warning': return 'insight-item--warning'
+    default: return 'insight-item--info'
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -386,6 +421,22 @@ function redrawCharts(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Fetch insights
+// ---------------------------------------------------------------------------
+
+async function fetchInsights(): Promise<void> {
+  try {
+    insightsError.value = false
+    const data = (await api.get('/api/read/insights')) as { insights: Insight[] }
+    insights.value = data.insights ?? []
+  } catch {
+    insightsError.value = true
+  } finally {
+    insightsLoading.value = false
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Fetch health/full composite status
 // ---------------------------------------------------------------------------
 
@@ -471,17 +522,21 @@ function setupThemeObserver(): void {
 // ---------------------------------------------------------------------------
 
 let _healthInterval: ReturnType<typeof setInterval> | null = null
+let _insightsInterval: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {
   fetchHealth()
   _healthInterval = setInterval(fetchHealth, 15000)
   fetchHistory()
+  fetchInsights()
+  _insightsInterval = setInterval(fetchInsights, 60000)
   setupResizeObserver()
   setupThemeObserver()
 })
 
 onUnmounted(() => {
   if (_healthInterval) { clearInterval(_healthInterval); _healthInterval = null }
+  if (_insightsInterval) { clearInterval(_insightsInterval); _insightsInterval = null }
   if (_resizeTimer) { clearTimeout(_resizeTimer); _resizeTimer = null }
   resizeObserver?.disconnect()
   themeObserver?.disconnect()
@@ -501,6 +556,52 @@ watch(tokenChartRef, (el) => {
 
 <template>
   <div class="system-tab">
+    <!-- ---------------------------------------------------------------- -->
+    <!-- Smart Insights Card                                               -->
+    <!-- ---------------------------------------------------------------- -->
+    <div class="insights-card" data-testid="insights-card">
+      <div class="insights-card-header">
+        <h2 class="insights-card-title">💡 Smart Insights</h2>
+        <button
+          class="ctrl-btn"
+          style="font-size:12px"
+          :disabled="insightsLoading"
+          @click="fetchInsights"
+        >重新整理</button>
+      </div>
+
+      <!-- Loading state -->
+      <div v-if="insightsLoading" class="insights-loading" data-testid="insights-loading">
+        <span class="insights-loading-spinner" />
+        分析中…
+      </div>
+
+      <!-- Error state -->
+      <div v-else-if="insightsError" class="insights-error" data-testid="insights-error">
+        ⚠️ Insights 載入失敗
+        <button class="ctrl-btn" style="margin-left:8px;font-size:12px" @click="fetchInsights">重試</button>
+      </div>
+
+      <!-- Empty state -->
+      <div v-else-if="insights.length === 0" class="insights-empty" data-testid="insights-empty">
+        ✅ 一切正常 — 沒有顯著變化
+      </div>
+
+      <!-- Insights list -->
+      <ul v-else class="insights-list" data-testid="insights-list">
+        <li
+          v-for="(item, idx) in insights"
+          :key="idx"
+          class="insight-item"
+          :class="insightSeverityClass(item.severity)"
+          :data-testid="`insight-item-${item.severity}`"
+        >
+          <span class="insight-icon" aria-hidden="true">{{ insightIcon(item.severity) }}</span>
+          <span class="insight-message">{{ item.message }}</span>
+        </li>
+      </ul>
+    </div>
+
     <!-- ---------------------------------------------------------------- -->
     <!-- 系統健康 Card (health/full composite status)                      -->
     <!-- ---------------------------------------------------------------- -->
@@ -681,6 +782,109 @@ watch(tokenChartRef, (el) => {
 </template>
 
 <style scoped>
+/* ------------------------------------------------------------------ */
+/* Smart Insights Card                                                  */
+/* ------------------------------------------------------------------ */
+
+.insights-card {
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  background: var(--surface-base, #fff);
+}
+
+.insights-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.insights-card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+}
+
+.insights-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted, #94a3b8);
+  padding: 8px 0;
+}
+
+.insights-loading-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border-color, #e2e8f0);
+  border-top-color: var(--accent, #3b82f6);
+  border-radius: 50%;
+  animation: health-spin 0.7s linear infinite;
+}
+
+.insights-error {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: var(--red, #ef4444);
+  padding: 6px 0;
+}
+
+.insights-empty {
+  font-size: 13px;
+  color: var(--text-muted, #64748b);
+  padding: 6px 0;
+}
+
+.insights-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.insight-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.insight-item--critical {
+  background: color-mix(in srgb, var(--red, #ef4444) 8%, transparent);
+  border-left: 3px solid var(--red, #ef4444);
+}
+
+.insight-item--warning {
+  background: color-mix(in srgb, var(--amber, #f59e0b) 8%, transparent);
+  border-left: 3px solid var(--amber, #f59e0b);
+}
+
+.insight-item--info {
+  background: color-mix(in srgb, var(--accent, #3b82f6) 8%, transparent);
+  border-left: 3px solid var(--accent, #3b82f6);
+}
+
+.insight-icon {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.insight-message {
+  color: var(--text-primary, #1e293b);
+}
+
 /* ------------------------------------------------------------------ */
 /* Health Card                                                          */
 /* ------------------------------------------------------------------ */
