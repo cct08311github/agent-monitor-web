@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import Skeleton from './Skeleton.vue'
+import SnoozeMenu from './SnoozeMenu.vue'
 import { api } from '@/composables/useApi'
 import { showToast } from '@/composables/useToast'
+import { useToast } from '@/composables/useToast'
+import { useAlertSnooze } from '@/composables/useAlertSnooze'
+import { partitionAlerts, snoozeRemainingLabel, durationLabel } from '@/utils/alertSnooze'
 import { formatTs, formatExportTimestamp } from '@/lib/time'
 
 // ---------------------------------------------------------------------------
@@ -152,6 +156,11 @@ const alerts = ref<AlertRecord[]>([])
 const alertsLoading = ref(false)
 const alertsError = ref<string | null>(null)
 
+// Snooze
+const { snoozes, now: snoozeNow, snooze, unsnooze } = useAlertSnooze()
+const toast = useToast()
+const snoozedExpanded = ref(false)
+
 // Alert config / thresholds state
 const alertConfig = ref<AlertConfig | null>(null)
 const configLoading = ref(false)
@@ -249,6 +258,16 @@ const lastUpdatedLabel = computed(() => {
     hour12: false,
   })
 })
+
+// Alerts with derived id field (rule+ts) for snooze partitioning
+type AlertWithId = AlertRecord & { id: string }
+const alertsWithId = computed<AlertWithId[]>(() =>
+  alerts.value.map((a) => ({ ...a, id: `${a.rule}:${a.ts}` })),
+)
+
+const partitionedAlerts = computed(() =>
+  partitionAlerts(alertsWithId.value, snoozes.value, snoozeNow.value),
+)
 
 // ---------------------------------------------------------------------------
 // Data fetching
@@ -418,6 +437,26 @@ async function saveConfig(): Promise<void> {
 function resetConfig(): void {
   if (!alertConfig.value) return
   editedConfig.value = JSON.parse(JSON.stringify(alertConfig.value)) as AlertConfig
+}
+
+// ---------------------------------------------------------------------------
+// Snooze handlers
+// ---------------------------------------------------------------------------
+
+function onSnooze(alertId: string, durationMs: number): void {
+  const entry = snooze(alertId, durationMs)
+  const label = durationLabel(durationMs)
+  const restoreTime = new Date(entry.snoozedUntil).toLocaleTimeString('zh-TW', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  toast.success(`已 snooze ${label} (${restoreTime} 自動恢復)`)
+}
+
+function onUnsnooze(alert: AlertWithId): void {
+  unsnooze(alert.id)
+  toast.info(`已恢復: ${alert.rule}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -857,14 +896,24 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <!-- Empty state -->
-      <div v-else-if="!alertsLoading && alerts.length === 0" class="obs-empty-state">
+      <!-- Empty state (no alerts at all, or all snoozed) -->
+      <div v-else-if="!alertsLoading && partitionedAlerts.active.length === 0 && alerts.length === 0" class="obs-empty-state">
         <div class="obs-empty-icon" aria-hidden="true">🟢</div>
         <div class="obs-empty-title">目前無 alert</div>
         <div class="obs-empty-desc">所有系統指標正常，無警報觸發。</div>
       </div>
 
-      <!-- Table -->
+      <!-- All snoozed (but there are alerts) -->
+      <div
+        v-else-if="!alertsLoading && partitionedAlerts.active.length === 0 && alerts.length > 0"
+        class="obs-empty-state"
+      >
+        <div class="obs-empty-icon" aria-hidden="true">☕</div>
+        <div class="obs-empty-title">所有 alert 已 snooze</div>
+        <div class="obs-empty-desc">{{ partitionedAlerts.snoozed.length }} 個 alert 暫時隱藏中，到期後自動恢復。</div>
+      </div>
+
+      <!-- Active alerts table -->
       <div v-else class="obs-table-wrap">
         <table class="obs-table">
           <thead>
@@ -873,10 +922,11 @@ onUnmounted(() => {
               <th class="obs-th">Rule</th>
               <th class="obs-th">Severity</th>
               <th class="obs-th">Message</th>
+              <th class="obs-th obs-th--actions">Snooze</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(a, i) in alerts" :key="a.rule + a.ts + i" class="obs-tr">
+            <tr v-for="a in partitionedAlerts.active" :key="a.id" class="obs-tr">
               <td class="obs-td obs-td--mono">{{ fmtTime(a.ts) }}</td>
               <td class="obs-td obs-td--mono obs-td--rule">{{ a.rule }}</td>
               <td class="obs-td">
@@ -885,10 +935,58 @@ onUnmounted(() => {
                 </span>
               </td>
               <td class="obs-td obs-td--alertmsg">{{ a.message }}</td>
+              <td class="obs-td obs-td--actions">
+                <SnoozeMenu @select="onSnooze(a.id, $event)" />
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
+
+      <!-- Snoozed section -->
+      <details
+        v-if="partitionedAlerts.snoozed.length > 0"
+        class="snoozed-section"
+        :open="snoozedExpanded"
+        @toggle="snoozedExpanded = ($event.target as HTMLDetailsElement).open"
+      >
+        <summary class="snoozed-summary">
+          ☕ Snoozed ({{ partitionedAlerts.snoozed.length }})
+        </summary>
+        <table class="obs-table snoozed-table">
+          <thead>
+            <tr>
+              <th class="obs-th">Rule</th>
+              <th class="obs-th">Severity</th>
+              <th class="obs-th">Message</th>
+              <th class="obs-th">恢復時間</th>
+              <th class="obs-th obs-th--actions">動作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="a in partitionedAlerts.snoozed" :key="'snoozed-' + a.id" class="obs-tr obs-tr--snoozed">
+              <td class="obs-td obs-td--mono obs-td--rule">{{ a.rule }}</td>
+              <td class="obs-td">
+                <span :class="['severity-badge', `severity-badge--${a.severity}`]">
+                  {{ a.severity }}
+                </span>
+              </td>
+              <td class="obs-td obs-td--alertmsg">{{ a.message }}</td>
+              <td class="obs-td obs-td--mono obs-td--snooze-remaining">
+                {{ snoozes.get(a.id) ? snoozeRemainingLabel(snoozes.get(a.id)!, snoozeNow) : '' }}
+              </td>
+              <td class="obs-td obs-td--actions">
+                <button
+                  class="obs-btn obs-btn--secondary obs-btn--sm"
+                  @click="onUnsnooze(a)"
+                >
+                  立即恢復
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </details>
 
       <!-- History toggle -->
       <div class="obs-history-toggle-wrap">
@@ -1737,5 +1835,51 @@ onUnmounted(() => {
 
 .alert-timeline-legend-item--warning::before {
   background: #f59e0b;
+}
+
+/* ── Snoozed section ─────────────────────────────────────────────────────── */
+
+.snoozed-section {
+  margin-top: 8px;
+  border: 1px solid var(--color-border, #333);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.snoozed-summary {
+  cursor: pointer;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted, #888);
+  background: var(--color-surface-1, #1e1e1e);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+  transition: background 0.12s;
+}
+
+.snoozed-summary:hover {
+  background: var(--color-bg-hover, rgba(255, 255, 255, 0.04));
+}
+
+.snoozed-summary::-webkit-details-marker {
+  display: none;
+}
+
+.snoozed-table {
+  border-top: 1px solid var(--color-border, #333);
+}
+
+.obs-tr--snoozed {
+  opacity: 0.65;
+}
+
+.obs-td--snooze-remaining {
+  font-size: 12px;
+  color: var(--color-text-muted, #888);
+  white-space: nowrap;
 }
 </style>
