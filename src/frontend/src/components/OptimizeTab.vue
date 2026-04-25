@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { getBasePath, api } from '@/composables/useApi'
 import { showToast } from '@/composables/useToast'
+import EmptyState from '@/components/EmptyState.vue'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -308,7 +309,7 @@ onUnmounted(() => {
       <h3>📋 過往報告</h3>
       <div v-if="historyLoading" class="optimize-history-loading">載入中...</div>
       <div v-else-if="historyError" class="optimize-history-error">{{ historyError }}</div>
-      <div v-else-if="history.length === 0" class="optimize-history-empty">尚無過往報告</div>
+      <EmptyState v-else-if="history.length === 0" variant="generic" title="尚無過往報告" />
       <ul v-else class="optimize-history-list">
         <li
           v-for="entry in history"
