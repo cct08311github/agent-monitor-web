@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { api } from '@/composables/useApi'
 import { showToast } from '@/composables/useToast'
 import { confirm } from '@/composables/useConfirm'
@@ -7,6 +7,7 @@ import { fmtTime } from '@/utils/format'
 import type { CronJob } from '@/types/api'
 import { formatCronError } from '@/lib/cronError'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { formatCountdown } from '@/lib/time'
 
 // ---------------------------------------------------------------------------
 // State
@@ -14,6 +15,9 @@ import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 
 const jobs = ref<CronJob[]>([])
 const loading = ref(false)
+const now = ref<number>(Date.now())
+
+let _nowTimer: ReturnType<typeof setInterval> | null = null
 
 const searchInputRef = ref<HTMLInputElement | null>(null)
 const searchQuery = ref('')
@@ -82,6 +86,9 @@ const { registerShortcut } = useKeyboardShortcuts()
 
 onMounted(() => {
   fetchJobs()
+  _nowTimer = setInterval(() => {
+    now.value = Date.now()
+  }, 1000)
   registerShortcut({
     key: '/',
     handler: () => {
@@ -91,6 +98,13 @@ onMounted(() => {
     description: '聚焦搜尋',
     category: 'Actions',
   })
+})
+
+onUnmounted(() => {
+  if (_nowTimer !== null) {
+    clearInterval(_nowTimer)
+    _nowTimer = null
+  }
 })
 
 // ---------------------------------------------------------------------------
@@ -194,6 +208,11 @@ function formatLastRun(ms: number | undefined): string {
 
 function formatNextRun(ms: number | undefined): string {
   return ms ? fmtTime(new Date(ms)) : '未排程'
+}
+
+function getNextRunCountdown(job: CronJob): string {
+  if (!job.enabled) return '已停用'
+  return formatCountdown(job.state?.nextRunAtMs ?? 0, now.value)
 }
 </script>
 
@@ -368,6 +387,7 @@ function formatNextRun(ms: number | undefined): string {
               <span class="agent-info-label">下次執行</span>
               <span class="agent-info-value" style="font-size: 11px">
                 {{ formatNextRun(job.state?.nextRunAtMs) }}
+                <span class="cron-countdown">{{ getNextRunCountdown(job) }}</span>
               </span>
             </div>
 
@@ -462,5 +482,13 @@ function formatNextRun(ms: number | undefined): string {
 
 .cron-sort-select:focus {
   border-color: var(--accent, #6366f1);
+}
+
+.cron-countdown {
+  display: block;
+  font-size: 10px;
+  color: var(--text-muted, #94a3b8);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
 }
 </style>
