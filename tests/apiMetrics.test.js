@@ -105,10 +105,10 @@ describe('apiMetrics.recordError + errorCount in getStats', () => {
         expect(stats['GET /api/x'].errorCount['4xx']).toBe(0);
     });
 
-    test('errorCount defaults to 0/0 when no errors recorded', () => {
+    test('errorCount defaults to 0/0/0 when no errors recorded', () => {
         apiMetrics.record('GET /api/clean', 5);
         const stats = apiMetrics.getStats();
-        expect(stats['GET /api/clean'].errorCount).toEqual({ '4xx': 0, '5xx': 0 });
+        expect(stats['GET /api/clean'].errorCount).toEqual({ '4xx': 0, '5xx': 0, '429': 0 });
     });
 
     test('recordError mixed 4xx and 5xx on same key', () => {
@@ -127,7 +127,7 @@ describe('apiMetrics.recordError + errorCount in getStats', () => {
         apiMetrics.recordError('GET /api/y', 301);
         apiMetrics.recordError('GET /api/y', 600);
         const stats = apiMetrics.getStats();
-        expect(stats['GET /api/y'].errorCount).toEqual({ '4xx': 0, '5xx': 0 });
+        expect(stats['GET /api/y'].errorCount).toEqual({ '4xx': 0, '5xx': 0, '429': 0 });
     });
 
     test('recordError ignores empty key', () => {
@@ -136,7 +136,7 @@ describe('apiMetrics.recordError + errorCount in getStats', () => {
         apiMetrics.recordError(null, 500);
         const stats = apiMetrics.getStats();
         // 'GET /api/z' should still have zero errors
-        expect(stats['GET /api/z'].errorCount).toEqual({ '4xx': 0, '5xx': 0 });
+        expect(stats['GET /api/z'].errorCount).toEqual({ '4xx': 0, '5xx': 0, '429': 0 });
     });
 
     test('recordError ignores non-integer statusCode', () => {
@@ -145,7 +145,7 @@ describe('apiMetrics.recordError + errorCount in getStats', () => {
         apiMetrics.recordError('GET /api/z', '500');
         apiMetrics.recordError('GET /api/z', NaN);
         const stats = apiMetrics.getStats();
-        expect(stats['GET /api/z'].errorCount).toEqual({ '4xx': 0, '5xx': 0 });
+        expect(stats['GET /api/z'].errorCount).toEqual({ '4xx': 0, '5xx': 0, '429': 0 });
     });
 
     test('reset() clears errorCounts', () => {
@@ -163,5 +163,70 @@ describe('apiMetrics.recordError + errorCount in getStats', () => {
         const stats = apiMetrics.getStats();
         // No latency recorded → key should not appear in stats
         expect(stats['GET /api/nosamples']).toBeUndefined();
+    });
+});
+
+describe('apiMetrics — 429 rate-limit counter', () => {
+    test('statusCode=429 increments 429 only — not 4xx', () => {
+        apiMetrics.record('GET /api/rl', 10);
+        apiMetrics.recordError('GET /api/rl', 429);
+        const stats = apiMetrics.getStats();
+        expect(stats['GET /api/rl'].errorCount['429']).toBe(1);
+        expect(stats['GET /api/rl'].errorCount['4xx']).toBe(0);
+        expect(stats['GET /api/rl'].errorCount['5xx']).toBe(0);
+    });
+
+    test('statusCode=400 increments 4xx not 429', () => {
+        apiMetrics.record('GET /api/rl', 10);
+        apiMetrics.recordError('GET /api/rl', 400);
+        const stats = apiMetrics.getStats();
+        expect(stats['GET /api/rl'].errorCount['4xx']).toBe(1);
+        expect(stats['GET /api/rl'].errorCount['429']).toBe(0);
+        expect(stats['GET /api/rl'].errorCount['5xx']).toBe(0);
+    });
+
+    test('statusCode=503 increments 5xx only', () => {
+        apiMetrics.record('GET /api/rl', 10);
+        apiMetrics.recordError('GET /api/rl', 503);
+        const stats = apiMetrics.getStats();
+        expect(stats['GET /api/rl'].errorCount['5xx']).toBe(1);
+        expect(stats['GET /api/rl'].errorCount['4xx']).toBe(0);
+        expect(stats['GET /api/rl'].errorCount['429']).toBe(0);
+    });
+
+    test('getStats returns errorCount with 429 field', () => {
+        apiMetrics.record('GET /api/rl', 10);
+        const stats = apiMetrics.getStats();
+        expect(stats['GET /api/rl'].errorCount).toHaveProperty('429');
+    });
+
+    test('multiple 429 errors accumulate correctly', () => {
+        apiMetrics.record('GET /api/rl', 10);
+        apiMetrics.recordError('GET /api/rl', 429);
+        apiMetrics.recordError('GET /api/rl', 429);
+        apiMetrics.recordError('GET /api/rl', 429);
+        const stats = apiMetrics.getStats();
+        expect(stats['GET /api/rl'].errorCount['429']).toBe(3);
+        expect(stats['GET /api/rl'].errorCount['4xx']).toBe(0);
+    });
+
+    test('statusCode=399 does not trigger any increment', () => {
+        apiMetrics.record('GET /api/rl', 10);
+        apiMetrics.recordError('GET /api/rl', 399);
+        const stats = apiMetrics.getStats();
+        expect(stats['GET /api/rl'].errorCount).toEqual({ '4xx': 0, '5xx': 0, '429': 0 });
+    });
+
+    test('429 and 4xx and 5xx are all mutually exclusive and accumulate independently', () => {
+        apiMetrics.record('POST /api/mixed2', 20);
+        apiMetrics.recordError('POST /api/mixed2', 429);
+        apiMetrics.recordError('POST /api/mixed2', 429);
+        apiMetrics.recordError('POST /api/mixed2', 404);
+        apiMetrics.recordError('POST /api/mixed2', 422);
+        apiMetrics.recordError('POST /api/mixed2', 500);
+        const stats = apiMetrics.getStats();
+        expect(stats['POST /api/mixed2'].errorCount['429']).toBe(2);
+        expect(stats['POST /api/mixed2'].errorCount['4xx']).toBe(2);
+        expect(stats['POST /api/mixed2'].errorCount['5xx']).toBe(1);
     });
 });
