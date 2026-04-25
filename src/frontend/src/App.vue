@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { useAuth } from '@/composables/useAuth'
@@ -14,6 +14,11 @@ import { parseVoice } from '@/utils/voiceParser'
 import { appState } from '@/stores/appState'
 import { api } from '@/composables/useApi'
 import { formatBadge, shouldShowBadge } from '@/utils/badgeFormat'
+import {
+  useNotificationBadge,
+  installNotificationBadge,
+  teardownNotificationBadge,
+} from '@/composables/useNotificationBadge'
 import ToastContainer from '@/components/ToastContainer.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AlertBadge from '@/components/AlertBadge.vue'
@@ -196,7 +201,39 @@ let badgePollInterval: ReturnType<typeof setInterval> | null = null
 
 let _uninstallShortcutsHelp: (() => void) | null = null
 
+// ── Background tab notification badge ───────────────────────────────────────
+
+const { increment: incrementBadge } = useNotificationBadge()
+
+/**
+ * Track which alert IDs we have already counted so repeated SSE frames or
+ * poll cycles don't double-count the same alert.
+ */
+const _seenAlertIds = new Set<string>()
+
+/** Watch for new active (unresolved) alerts while the tab is hidden. */
+watch(
+  () => appState.latestDashboard,
+  (dashboard) => {
+    if (!dashboard) return
+    // alerts may live on the dashboard payload or a sibling field
+    const alerts: Array<{ id?: string; resolved?: boolean }> =
+      (dashboard as unknown as { alerts?: Array<{ id?: string; resolved?: boolean }> }).alerts ?? []
+
+    for (const alert of alerts) {
+      const id = alert.id ?? JSON.stringify(alert)
+      if (!_seenAlertIds.has(id) && alert.resolved !== true) {
+        _seenAlertIds.add(id)
+        // increment only counts when document.hidden (handled inside composable)
+        incrementBadge()
+      }
+    }
+  },
+  { deep: true },
+)
+
 onMounted(() => {
+  installNotificationBadge()
   void fetchBadgeCounts()
   badgePollInterval = setInterval(() => {
     void fetchBadgeCounts()
@@ -205,6 +242,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  teardownNotificationBadge()
   if (badgePollInterval !== null) {
     clearInterval(badgePollInterval)
     badgePollInterval = null
