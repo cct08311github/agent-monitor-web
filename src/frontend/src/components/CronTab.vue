@@ -8,6 +8,8 @@ import type { CronJob } from '@/types/api'
 import { formatCronError } from '@/lib/cronError'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { formatCountdown } from '@/lib/time'
+import { buildMarkers, formatRelative } from '@/utils/cronTimeline'
+import type { TimelineMarker } from '@/utils/cronTimeline'
 
 // ---------------------------------------------------------------------------
 // State
@@ -77,6 +79,17 @@ const hasResults = computed(() => filteredJobs.value.length > 0)
 const isFiltered = computed(
   () => searchQuery.value.trim() !== '' || filterMode.value !== 'all',
 )
+
+// Up Next timeline: map CronJob state.nextRunAtMs → TimelineJob.nextRun
+const markers = computed<TimelineMarker[]>(() => {
+  const timelineJobs = jobs.value.map((j) => ({
+    id: j.id,
+    name: j.name,
+    enabled: j.enabled,
+    nextRun: j.state?.nextRunAtMs,
+  }))
+  return buildMarkers(timelineJobs, now.value)
+})
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -237,6 +250,62 @@ function getNextRunCountdown(job: CronJob): string {
 
     <!-- Jobs exist: show filter bar + grid -->
     <template v-else>
+      <!-- Up Next timeline card -->
+      <div class="cron-timeline-card">
+        <div class="cron-timeline-header">
+          <span class="cron-timeline-title">⏰ Up Next (24h)</span>
+          <span class="cron-timeline-badge">{{ markers.length }}</span>
+        </div>
+
+        <!-- Empty state: no jobs fire within 24h -->
+        <div v-if="markers.length === 0" class="cron-timeline-empty">
+          未來 24 小時無 cron 觸發
+        </div>
+
+        <!-- SVG axis -->
+        <svg
+          v-else
+          class="cron-timeline-svg"
+          viewBox="0 0 720 80"
+          aria-label="Cron Up Next 24h 時間軸"
+          role="img"
+        >
+          <!-- axis line -->
+          <line x1="20" y1="50" x2="700" y2="50" stroke="var(--border, rgba(255,255,255,0.18))" stroke-width="1.5" />
+
+          <!-- hour tick labels: 0 / 6 / 12 / 18 / 24 -->
+          <text v-for="tick in [0, 6, 12, 18, 24]" :key="tick"
+            :x="20 + (680 * tick / 24)"
+            y="68"
+            font-size="10"
+            fill="var(--text-muted, #94a3b8)"
+            text-anchor="middle"
+          >{{ tick }}h</text>
+
+          <!-- tick marks -->
+          <line v-for="tick in [0, 6, 12, 18, 24]" :key="'t' + tick"
+            :x1="20 + (680 * tick / 24)"
+            :x2="20 + (680 * tick / 24)"
+            y1="46"
+            y2="54"
+            stroke="var(--border, rgba(255,255,255,0.18))"
+            stroke-width="1"
+          />
+
+          <!-- job markers -->
+          <g v-for="m in markers" :key="m.id">
+            <title>{{ m.name }} — {{ formatRelative(m.ts - now) }}</title>
+            <circle
+              :cx="20 + (680 * m.hourOffset / 24)"
+              cy="50"
+              r="6"
+              :fill="m.isOverdue ? 'var(--red, #ef4444)' : 'var(--accent, #6366f1)'"
+              opacity="0.92"
+            />
+          </g>
+        </svg>
+      </div>
+
       <!-- Filter bar -->
       <div class="cron-filter-bar">
         <input
@@ -490,5 +559,57 @@ function getNextRunCountdown(job: CronJob): string {
   color: var(--text-muted, #94a3b8);
   margin-top: 2px;
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Up Next timeline card ──────────────────────────────────────── */
+
+.cron-timeline-card {
+  background: var(--surface2, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+}
+
+.cron-timeline-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.cron-timeline-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text, #e2e8f0);
+}
+
+.cron-timeline-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background: var(--accent, #6366f1);
+  color: #fff;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.cron-timeline-empty {
+  font-size: 12px;
+  color: var(--text-muted, #94a3b8);
+  padding: 8px 0 4px;
+  text-align: center;
+}
+
+.cron-timeline-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
 }
 </style>
