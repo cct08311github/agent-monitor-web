@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { api } from '@/composables/useApi'
 import { showToast } from '@/composables/useToast'
+import { confirm } from '@/composables/useConfirm'
 import TaskDetailModal from '@/components/TaskDetailModal.vue'
 import AddTaskModal from '@/components/AddTaskModal.vue'
 
@@ -40,6 +41,7 @@ const domains = [
 ]
 
 const columns = [
+  { label: '', sortKey: null },          // checkbox column
   { label: '優先', sortKey: 'priority' },
   { label: '標題', sortKey: null },
   { label: '狀態', sortKey: 'status' },
@@ -114,6 +116,13 @@ const stats          = ref<TaskHubStats | null>(null)
 const editingTask    = ref<TaskHubTask | null>(null)
 const showAddModal   = ref(false)
 
+// ── Batch selection state ─────────────────────────────────────────────────────
+
+// Composite key: `${domain}:${id}` — both domain + id are required for uniqueness
+const selectedIds       = ref<Set<string>>(new Set())
+const batchProcessing   = ref(false)
+const batchProgress     = ref({ done: 0, total: 0 })
+
 // ── Computed ──────────────────────────────────────────────────────────────────
 
 const sortedTasks = computed(() => {
@@ -131,6 +140,25 @@ const sortedTasks = computed(() => {
     return sortDir.value === 'asc' ? cmp : -cmp
   })
 })
+
+// ── Batch computed ─────────────────────────────────────────────────────────────
+
+function taskKey(domain: string, id: string | number): string {
+  return `${domain}:${id}`
+}
+
+const allSelected = computed(() =>
+  sortedTasks.value.length > 0 &&
+  sortedTasks.value.every((t) => selectedIds.value.has(taskKey(t.domain, t.id))),
+)
+
+const someSelected = computed(() =>
+  sortedTasks.value.some((t) => selectedIds.value.has(taskKey(t.domain, t.id))),
+)
+
+const selectedTasks = computed(() =>
+  sortedTasks.value.filter((t) => selectedIds.value.has(taskKey(t.domain, t.id))),
+)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -151,12 +179,122 @@ function toggleSort(key: string) {
 
 function setDomain(d: string) {
   domain.value = d
+  clearSelection()
   fetchTasks()
 }
 
 function debounceSearch() {
   clearTimeout(searchTimer.value)
   searchTimer.value = setTimeout(fetchTasks, 400)
+}
+
+// ── Batch selection helpers ────────────────────────────────────────────────────
+
+function clearSelection() {
+  selectedIds.value = new Set()
+}
+
+function toggleAll() {
+  if (allSelected.value) {
+    clearSelection()
+  } else {
+    selectedIds.value = new Set(sortedTasks.value.map((t) => taskKey(t.domain, t.id)))
+  }
+}
+
+function toggleOne(taskDomain: string, id: string | number) {
+  const key = taskKey(taskDomain, id)
+  const next = new Set(selectedIds.value)
+  if (next.has(key)) {
+    next.delete(key)
+  } else {
+    next.add(key)
+  }
+  selectedIds.value = next
+}
+
+// ── Batch API operations ───────────────────────────────────────────────────────
+
+async function batchDelete() {
+  const targets = selectedTasks.value
+  if (targets.length === 0) return
+
+  const confirmed = await confirm({
+    type: 'danger',
+    title: '批次刪除任務',
+    message: `將刪除 ${targets.length} 筆任務，此操作無法復原，確定繼續？`,
+    confirmLabel: `刪除 ${targets.length} 筆`,
+    cancelLabel: '取消',
+  })
+  if (!confirmed) return
+
+  batchProcessing.value = true
+  batchProgress.value = { done: 0, total: targets.length }
+  const errors: string[] = []
+
+  for (const task of targets) {
+    try {
+      const data = await api.del(`/api/taskhub/tasks/${task.domain}/${task.id}`) as TaskHubMutationResponse
+      if (!data.success) throw new Error(data.error ?? '未知錯誤')
+    } catch (e) {
+      errors.push(`${task.title}: ${e instanceof Error ? e.message : String(e)}`)
+    }
+    batchProgress.value = { done: batchProgress.value.done + 1, total: targets.length }
+  }
+
+  batchProcessing.value = false
+
+  if (errors.length > 0) {
+    showToast(`⚠️ ${targets.length - errors.length} 筆已刪除，${errors.length} 筆失敗：${errors.join('；')}`, 'warning')
+  } else {
+    showToast(`✅ 已刪除 ${targets.length} 筆任務`, 'success')
+  }
+
+  clearSelection()
+  await fetchTasks()
+  fetchStats()
+}
+
+async function batchSetStatus(newStatus: string) {
+  const targets = selectedTasks.value
+  if (targets.length === 0) return
+
+  const statusLabel = STATUS_MAP[newStatus]?.label ?? newStatus
+
+  const confirmed = await confirm({
+    type: 'warning',
+    title: '批次更改狀態',
+    message: `將 ${targets.length} 筆任務改為「${statusLabel}」，確定繼續？`,
+    confirmLabel: `改為 ${statusLabel}`,
+    cancelLabel: '取消',
+  })
+  if (!confirmed) return
+
+  batchProcessing.value = true
+  batchProgress.value = { done: 0, total: targets.length }
+  const errors: string[] = []
+
+  for (const task of targets) {
+    try {
+      const data = await api.patch(`/api/taskhub/tasks/${task.domain}/${task.id}`, { status: newStatus }) as TaskHubMutationResponse
+      if (!data.success) throw new Error(data.error ?? '未知錯誤')
+    } catch (e) {
+      errors.push(`${task.title}: ${e instanceof Error ? e.message : String(e)}`)
+    }
+    batchProgress.value = { done: batchProgress.value.done + 1, total: targets.length }
+  }
+
+  batchProcessing.value = false
+
+  if (errors.length > 0) {
+    showToast(`⚠️ ${targets.length - errors.length} 筆已更新，${errors.length} 筆失敗：${errors.join('；')}`, 'warning')
+  } else {
+    showToast(`✅ 已將 ${targets.length} 筆任務改為「${statusLabel}」`, 'success')
+  }
+
+  clearSelection()
+  await fetchTasks()
+  fetchStats()
 }
 
 // ── API calls ─────────────────────────────────────────────────────────────────
@@ -265,6 +403,19 @@ function toggleDropdown(id: string | number, e: Event) {
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
+// Clear selection whenever sortedTasks reference changes (fetch result replaced)
+watch(
+  () => tasks.value,
+  () => {
+    // Only clear stale keys no longer present in the new task list
+    const validKeys = new Set(tasks.value.map((t) => taskKey(t.domain, t.id)))
+    const next = new Set([...selectedIds.value].filter((k) => validKeys.has(k)))
+    if (next.size !== selectedIds.value.size) {
+      selectedIds.value = next
+    }
+  },
+)
+
 onMounted(() => {
   fetchStats()
   fetchTasks()
@@ -333,6 +484,31 @@ onUnmounted(() => {
       <button class="ctrl-btn accent" @click="showAddModal = true">＋ 新增任務</button>
     </div>
 
+    <!-- Batch Action Bar (sticky, shown when any selection exists) -->
+    <div v-if="selectedIds.size > 0" class="th-batch-bar">
+      <span class="th-batch-count">已選 {{ selectedIds.size }} 筆</span>
+      <select
+        class="th-batch-status-select"
+        :disabled="batchProcessing"
+        @change="batchSetStatus(($event.target as HTMLSelectElement).value); ($event.target as HTMLSelectElement).value = ''"
+      >
+        <option value="" disabled selected>批次改狀態...</option>
+        <option v-for="(s, v) in STATUS_MAP" :key="v" :value="v">{{ s.label }}</option>
+      </select>
+      <button
+        class="th-batch-btn th-batch-delete"
+        :disabled="batchProcessing"
+        @click="batchDelete"
+      >
+        {{ batchProcessing ? `刪除中 ${batchProgress.done}/${batchProgress.total}` : '🗑 批次刪除' }}
+      </button>
+      <button
+        class="th-batch-btn th-batch-cancel"
+        :disabled="batchProcessing"
+        @click="clearSelection"
+      >取消選取</button>
+    </div>
+
     <!-- Task Table -->
     <div class="taskhub-grid" :class="{ 'th-hide-domain': domain !== 'all' }">
       <div v-if="loading" class="th-loading">載入中...</div>
@@ -344,8 +520,19 @@ onUnmounted(() => {
       <table v-else class="th-task-table">
         <thead>
           <tr>
+            <!-- Checkbox column header -->
+            <th class="th-col-check">
+              <input
+                type="checkbox"
+                class="th-check-all"
+                :checked="allSelected"
+                :indeterminate="someSelected && !allSelected"
+                :disabled="batchProcessing"
+                @click="toggleAll"
+              />
+            </th>
             <th
-              v-for="col in columns"
+              v-for="col in columns.slice(1)"
               :key="col.label"
               :class="{ 'th-sortable': col.sortKey }"
               @click="col.sortKey && toggleSort(col.sortKey)"
@@ -359,8 +546,20 @@ onUnmounted(() => {
             v-for="task in sortedTasks"
             :key="task.id"
             class="th-task-row"
+            :class="{ 'th-row-selected': selectedIds.has(taskKey(task.domain, task.id)) }"
             @click="editingTask = task"
           >
+            <!-- Checkbox -->
+            <td class="th-col-check" @click.stop>
+              <input
+                type="checkbox"
+                class="th-row-check"
+                :checked="selectedIds.has(taskKey(task.domain, task.id))"
+                :disabled="batchProcessing"
+                @click.stop="toggleOne(task.domain, task.id)"
+              />
+            </td>
+
             <!-- Priority -->
             <td class="th-col-priority">
               <span :class="['th-priority-badge', PRIORITY_MAP[task.priority]?.cls || '']">
@@ -475,3 +674,80 @@ onUnmounted(() => {
     />
   </div>
 </template>
+
+<style scoped>
+/* ── Batch action bar ─────────────────────────────────────────────────────── */
+.th-batch-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--color-surface-2, #1e2030);
+  border: 1px solid var(--color-accent, #7aa2f7);
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.th-batch-count {
+  font-weight: 600;
+  color: var(--color-accent, #7aa2f7);
+  min-width: 5rem;
+}
+
+.th-batch-status-select {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--color-border, #444);
+  background: var(--color-surface-1, #13141d);
+  color: var(--color-text, #cdd6f4);
+  font-size: 0.85rem;
+}
+
+.th-batch-btn {
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: opacity 0.15s;
+}
+
+.th-batch-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.th-batch-delete {
+  background: var(--color-danger, #f38ba8);
+  color: #fff;
+}
+
+.th-batch-delete:not(:disabled):hover {
+  opacity: 0.85;
+}
+
+.th-batch-cancel {
+  background: var(--color-surface-3, #313244);
+  color: var(--color-text, #cdd6f4);
+}
+
+.th-batch-cancel:not(:disabled):hover {
+  opacity: 0.85;
+}
+
+/* ── Checkbox column ─────────────────────────────────────────────────────── */
+.th-col-check {
+  width: 2.5rem;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.th-row-selected {
+  background: var(--color-surface-selected, rgba(122, 162, 247, 0.08));
+}
+</style>
