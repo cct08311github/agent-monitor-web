@@ -34,12 +34,17 @@ vi.mock('vue-router', () => ({
 // Mock composables
 // ---------------------------------------------------------------------------
 
+const { mockSetTheme } = vi.hoisted(() => {
+  const mockSetTheme = vi.fn()
+  return { mockSetTheme }
+})
+
 vi.mock('@/composables/useTheme', () => ({
   useTheme: () => ({
     cycleTheme: vi.fn(),
     currentTheme: { value: 'auto' },
     effectiveTheme: { value: 'dark' },
-    setTheme: vi.fn(),
+    setTheme: mockSetTheme,
   }),
 }))
 
@@ -208,6 +213,72 @@ describe('App.vue — Command Palette opener button', () => {
     await flushPromises()
 
     expect(wrapper.find('.app-header').exists()).toBe(false)
+    wrapper.unmount()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Theme select dropdown — 5-option palette
+// ---------------------------------------------------------------------------
+
+describe('App.vue — Theme select dropdown', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockRouteName.value = 'dashboard'
+    mockAppState.currentDesktopTab = 'monitor'
+  })
+
+  it('renders a theme select dropdown with 5 options', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const select = wrapper.find('.header-theme-select')
+    expect(select.exists()).toBe(true)
+
+    const options = wrapper.findAll('.header-theme-select option')
+    expect(options).toHaveLength(5)
+    wrapper.unmount()
+  })
+
+  it('theme select options include light, dark, auto, neon, retro', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const options = wrapper.findAll('.header-theme-select option')
+    const values = options.map((o) => o.attributes('value'))
+    expect(values).toContain('light')
+    expect(values).toContain('dark')
+    expect(values).toContain('auto')
+    expect(values).toContain('neon')
+    expect(values).toContain('retro')
+    wrapper.unmount()
+  })
+
+  it('theme select has accessible aria-label', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const select = wrapper.find('.header-theme-select')
+    expect(select.attributes('aria-label')).toBe('主題')
+    wrapper.unmount()
+  })
+
+  it('theme select has a title attribute showing current theme', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const select = wrapper.find('.header-theme-select')
+    const title = select.attributes('title') ?? ''
+    expect(title).toMatch(/auto/)
+    wrapper.unmount()
+  })
+
+  it('theme select does not render on login page', async () => {
+    mockRouteName.value = 'login'
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.find('.header-theme-select').exists()).toBe(false)
     wrapper.unmount()
   })
 })

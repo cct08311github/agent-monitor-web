@@ -1,12 +1,14 @@
 // ---------------------------------------------------------------------------
 // useTheme — Theme switcher composable ported from theme-manager.js
 //
-// Supports 3 modes:
-//   'light'  — always light
-//   'dark'   — always dark
+// Supports 5 modes:
+//   'light'  — always light (Warm Stone)
+//   'dark'   — always dark (Neutral Dark)
 //   'auto'   — follows OS/browser preference (prefers-color-scheme)
+//   'neon'   — Cyber-punk: black base + neon green/purple accent
+//   'retro'  — 80s terminal: warm paper base + dark red accent + monospace
 //
-// Cycle order: light → dark → auto  (matches original theme-manager.js)
+// Cycle order: light → dark → auto → neon → retro
 // Persists to localStorage under key 'oc_theme'.
 // Applies theme via data-theme attribute on <html>.
 // Updates <meta name="theme-color"> for mobile browsers.
@@ -14,15 +16,18 @@
 
 import { shallowRef, computed, watchEffect, triggerRef, onMounted, onUnmounted } from 'vue'
 
-export type ThemeMode = 'light' | 'dark' | 'auto'
+export type ThemeMode = 'light' | 'dark' | 'auto' | 'neon' | 'retro'
 
 const STORAGE_KEY = 'oc_theme'
-// Cycle: light → dark → auto  (matches original theme-manager.js cycleTheme order)
-const CYCLE_ORDER: ThemeMode[] = ['light', 'dark', 'auto']
+// Cycle: light → dark → auto → neon → retro
+const CYCLE_ORDER: ThemeMode[] = ['light', 'dark', 'auto', 'neon', 'retro']
 
-const THEME_COLORS: Record<'light' | 'dark', string> = {
+/** meta theme-color per resolved theme (used by mobile browser chrome) */
+const THEME_COLORS: Record<'light' | 'dark' | 'neon' | 'retro', string> = {
   light: '#f4f7fb',
   dark: '#0f172a',
+  neon: '#0a0014',
+  retro: '#f4ecd8',
 }
 
 // ---------------------------------------------------------------------------
@@ -32,7 +37,8 @@ const THEME_COLORS: Record<'light' | 'dark', string> = {
 function loadStoredTheme(): ThemeMode {
   if (typeof localStorage === 'undefined') return 'auto'
   const stored = localStorage.getItem(STORAGE_KEY)
-  if (stored === 'light' || stored === 'dark' || stored === 'auto') return stored
+  if (stored === 'light' || stored === 'dark' || stored === 'auto' || stored === 'neon' || stored === 'retro')
+    return stored
   return 'auto'
 }
 
@@ -46,13 +52,15 @@ function systemPrefersDark(): boolean {
 // shallowRef for primitive string — enables triggerRef() for OS preference changes
 const currentTheme = shallowRef<ThemeMode>(loadStoredTheme())
 
-const effectiveTheme = computed<'light' | 'dark'>(() =>
-  currentTheme.value === 'auto'
-    ? systemPrefersDark()
-      ? 'dark'
-      : 'light'
-    : currentTheme.value,
-)
+// effectiveTheme: resolves what data-theme value to actually apply to the DOM.
+// 'auto'  → derived from OS preference (light/dark)
+// 'neon' / 'retro' → pass through directly (not mapped to light/dark)
+const effectiveTheme = computed<'light' | 'dark' | 'neon' | 'retro'>(() => {
+  if (currentTheme.value === 'auto') {
+    return systemPrefersDark() ? 'dark' : 'light'
+  }
+  return currentTheme.value
+})
 
 // Apply theme to the DOM and persist whenever it changes
 watchEffect(() => {
@@ -67,7 +75,7 @@ watchEffect(() => {
   }
 })
 
-function updateThemeColor(theme: 'light' | 'dark'): void {
+function updateThemeColor(theme: 'light' | 'dark' | 'neon' | 'retro'): void {
   let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
   if (!meta) {
     meta = document.createElement('meta')
