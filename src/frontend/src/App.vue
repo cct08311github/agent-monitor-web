@@ -26,6 +26,11 @@ import HeartbeatPulse from '@/components/HeartbeatPulse.vue'
 import ConnectionStatus from '@/components/ConnectionStatus.vue'
 import KeyboardShortcutsHelp from '@/components/KeyboardShortcutsHelp.vue'
 import { installShortcutsHelpHotkey } from '@/composables/useKeyboardShortcutsHelp'
+import OnboardingTour from '@/components/OnboardingTour.vue'
+import {
+  installOnboardingAutoStart,
+  teardownOnboardingAutoStart,
+} from '@/composables/useOnboardingTour'
 
 const route = useRoute()
 const router = useRouter()
@@ -239,6 +244,7 @@ onMounted(() => {
     void fetchBadgeCounts()
   }, 30_000)
   _uninstallShortcutsHelp = installShortcutsHelpHotkey()
+  installOnboardingAutoStart()
 })
 
 onUnmounted(() => {
@@ -249,6 +255,7 @@ onUnmounted(() => {
   }
   _uninstallShortcutsHelp?.()
   _uninstallShortcutsHelp = null
+  teardownOnboardingAutoStart()
 })
 
 // ── Compact mode keyboard shortcut ─────────────────────────────────────────
@@ -466,6 +473,7 @@ registerShortcut({
     <ToastContainer />
     <ConfirmDialog />
     <KeyboardShortcutsHelp />
+    <OnboardingTour />
 
     <!-- Konami Code Easter Egg -->
     <div v-if="celebrating" class="konami-celebrate" aria-hidden="true">
