@@ -1,6 +1,7 @@
 const alertEngine = require('../src/backend/services/alertEngine');
 const apiMetrics = require('../src/backend/services/apiMetrics');
 const errorBuffer = require('../src/backend/services/errorBuffer');
+const tsdbService = require('../src/backend/services/tsdbService');
 
 describe('AlertEngine', () => {
     beforeEach(() => alertEngine.resetForTesting());
@@ -168,6 +169,26 @@ describe('AlertEngine', () => {
             expect(below.some(a => a.rule === 'cost_today_high')).toBe(false);
             const above = alertEngine.evaluate({ sys, agents: [{ costs: { today: 25 } }] });
             expect(above.some(a => a.rule === 'cost_today_high')).toBe(true);
+        });
+    });
+
+    describe('fire() DB persistence', () => {
+        afterEach(() => jest.restoreAllMocks());
+
+        it('calls tsdbService.recordAlert when an alert fires', () => {
+            const spy = jest.spyOn(tsdbService, 'recordAlert').mockReturnValue(true);
+            alertEngine.evaluate({ sys: { cpu: 96, memory: 50, disk: 40 }, agents: [] });
+            expect(spy).toHaveBeenCalledWith(expect.objectContaining({
+                rule: 'cpu_critical',
+                severity: 'critical',
+            }));
+        });
+
+        it('does not propagate DB error when recordAlert throws', () => {
+            jest.spyOn(tsdbService, 'recordAlert').mockImplementation(() => { throw new Error('db down'); });
+            expect(() => {
+                alertEngine.evaluate({ sys: { cpu: 96, memory: 50, disk: 40 }, agents: [] });
+            }).not.toThrow();
         });
     });
 

@@ -36,17 +36,30 @@ db.exec(`
         output_tokens INTEGER
     );
 
+    CREATE TABLE IF NOT EXISTS alerts (
+        ts INTEGER NOT NULL,
+        rule TEXT NOT NULL,
+        severity TEXT NOT NULL,
+        message TEXT NOT NULL,
+        meta TEXT
+    );
+
     CREATE INDEX IF NOT EXISTS idx_sys_time ON system_metrics(timestamp);
     CREATE INDEX IF NOT EXISTS idx_agent_time ON agent_metrics(timestamp);
     CREATE INDEX IF NOT EXISTS idx_agent_id ON agent_metrics(agent_id);
-`); // Store historical limits up to 7 days for efficiency
+    CREATE INDEX IF NOT EXISTS idx_alerts_ts ON alerts(ts);
+`);
+// Store historical limits up to 7 days for efficiency
 
 const insertSystemStmt = db.prepare('INSERT INTO system_metrics (cpu, memory, disk, total_agents, active_agents) VALUES (?, ?, ?, ?, ?)');
 const insertAgentStmt = db.prepare('INSERT INTO agent_metrics (agent_id, status, cost, input_tokens, output_tokens) VALUES (?, ?, ?, ?, ?)');
+const insertAlertStmt = db.prepare('INSERT INTO alerts (ts, rule, severity, message, meta) VALUES (?, ?, ?, ?, ?)');
+const selectAlertHistoryStmt = db.prepare('SELECT ts, rule, severity, message, meta FROM alerts WHERE ts >= ? AND ts <= ? ORDER BY ts DESC LIMIT ?');
 
 // Maintenance: Delete older than 7 days
 const cleanupStmt = db.prepare(`DELETE FROM system_metrics WHERE timestamp < datetime('now', '-7 days')`);
 const cleanupAgentsStmt = db.prepare(`DELETE FROM agent_metrics WHERE timestamp < datetime('now', '-7 days')`);
+const cleanupAlertsStmt = db.prepare('DELETE FROM alerts WHERE ts < ?');
 
 const selectSystemHistoryStmt = db.prepare('SELECT timestamp, cpu, memory, disk, total_agents, active_agents FROM system_metrics ORDER BY timestamp DESC LIMIT ?');
 const selectAgentTopTokensStmt = db.prepare(`
@@ -103,8 +116,67 @@ function runCleanup() {
     try {
         cleanupStmt.run();
         cleanupAgentsStmt.run();
+        cleanupAlertsStmt.run(Date.now() - 30 * 24 * 60 * 60 * 1000);
     } catch (e) {
         logger.error('tsdb_cleanup_error', { msg: e.message });
+    }
+}
+
+/**
+ * Persist a fired alert to SQLite.
+ * Returns true on success, false on validation failure or DB error (silent).
+ */
+function recordAlert({ ts, rule, severity, message, meta } = {}) {
+    if (typeof ts !== 'number' || !isFinite(ts)) {
+        logger.warn('tsdb_record_alert_invalid', { field: 'ts', val: ts });
+        return false;
+    }
+    if (typeof rule !== 'string' || rule.length === 0) {
+        logger.warn('tsdb_record_alert_invalid', { field: 'rule', val: rule });
+        return false;
+    }
+    if (typeof severity !== 'string' || severity.length === 0) {
+        logger.warn('tsdb_record_alert_invalid', { field: 'severity', val: severity });
+        return false;
+    }
+    if (typeof message !== 'string' || message.length === 0) {
+        logger.warn('tsdb_record_alert_invalid', { field: 'message', val: message });
+        return false;
+    }
+    try {
+        const metaStr = meta !== undefined && meta !== null ? JSON.stringify(meta) : null;
+        insertAlertStmt.run(ts, rule, severity, message, metaStr);
+        return true;
+    } catch (e) {
+        logger.error('tsdb_record_alert_error', { msg: e.message });
+        return false;
+    }
+}
+
+/**
+ * Retrieve alert history from SQLite.
+ * @param {object} opts
+ * @param {number} [opts.from]  - epoch ms lower bound (inclusive)
+ * @param {number} [opts.to]    - epoch ms upper bound (inclusive)
+ * @param {number} [opts.limit] - max rows, default 100, max 500
+ * @returns {Array<{ts, rule, severity, message, meta}>}
+ */
+function getAlertHistory({ from, to, limit } = {}) {
+    const resolvedLimit = Math.min(typeof limit === 'number' && limit > 0 ? limit : 100, 500);
+    const resolvedFrom = typeof from === 'number' && from >= 0 ? from : 0;
+    const resolvedTo = typeof to === 'number' && to >= 0 ? to : Date.now() + 1000;
+    try {
+        const rows = selectAlertHistoryStmt.all(resolvedFrom, resolvedTo, resolvedLimit);
+        return rows.map(r => {
+            let parsedMeta = null;
+            if (r.meta !== null && r.meta !== undefined) {
+                try { parsedMeta = JSON.parse(r.meta); } catch (_) { parsedMeta = r.meta; }
+            }
+            return { ts: r.ts, rule: r.rule, severity: r.severity, message: r.message, meta: parsedMeta };
+        });
+    } catch (e) {
+        logger.error('tsdb_get_alert_history_error', { msg: e.message });
+        return [];
     }
 }
 
@@ -159,5 +231,7 @@ module.exports = {
     getAgentTopTokens,
     getCostHistory,
     getAgentActivitySummary,
+    recordAlert,
+    getAlertHistory,
     close,
 };

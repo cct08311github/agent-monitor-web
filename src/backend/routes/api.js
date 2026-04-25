@@ -62,6 +62,7 @@ router.get('/read/dependencies', systemController.getDependencies);
 router.get('/alerts/config', alertController.getConfig);
 router.patch('/alerts/config', auth.localhostOnlyControl, auth.rateLimit, csrfVerifier, alertController.updateConfig);
 router.get('/alerts/recent', alertController.getRecent);
+router.get('/alerts/history', alertController.getHistory);
 router.get('/read/dashboard', dashboardReadController.getDashboard);
 router.get('/read/stream', dashboardReadController.streamDashboard);
 router.get('/read/history', dashboardReadController.getHistory);

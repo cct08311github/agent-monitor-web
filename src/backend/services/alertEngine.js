@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const apiMetrics = require('./apiMetrics');
 const errorBuffer = require('./errorBuffer');
+const tsdbService = require('./tsdbService');
 
 const CONFIG_PATH = path.join(__dirname, '../../../data/alert-config.json');
 
@@ -69,6 +70,8 @@ function fire(rule, message, severity, /* istanbul ignore next */ meta = {}) {
     alertsBuffer.unshift(alert);
     /* istanbul ignore next */
     if (alertsBuffer.length > MAX_BUFFER) alertsBuffer.pop();
+    // Persist to SQLite — silent fail so DB issues never block alert flow
+    try { tsdbService.recordAlert(alert); } catch (_) { /* intentional no-op */ }
     return alert;
 }
 
