@@ -11,6 +11,7 @@ import { formatTs, formatExportTimestamp } from '@/lib/time'
 export interface ApiMetricErrorCount {
   '4xx': number
   '5xx': number
+  '429': number
 }
 
 export interface ApiMetric {
@@ -599,6 +600,7 @@ onUnmounted(() => {
                 Max{{ sortIndicator('max') }}
               </th>
               <th class="obs-th obs-th--num">4xx</th>
+              <th class="obs-th obs-th--num">429</th>
               <th class="obs-th obs-th--num">5xx</th>
             </tr>
           </thead>
@@ -613,6 +615,9 @@ onUnmounted(() => {
               <td class="obs-td obs-td--num">{{ fmtMs(m.max) }}</td>
               <td class="obs-td obs-td--num" :class="{ 'obs-td--warn': m.errorCount['4xx'] > 0 }">
                 {{ m.errorCount['4xx'] }}
+              </td>
+              <td class="obs-td obs-td--num" :class="{ 'obs-td--rate-limit': m.errorCount['429'] > 0 }">
+                {{ m.errorCount['429'] }}
               </td>
               <td class="obs-td obs-td--num" :class="{ 'obs-td--error': m.errorCount['5xx'] > 0 }">
                 {{ m.errorCount['5xx'] }}
@@ -1184,6 +1189,11 @@ onUnmounted(() => {
 
 .obs-td--warn {
   color: var(--color-warn, #fbbf24);
+}
+
+.obs-td--rate-limit {
+  color: var(--color-rate-limit, #f97316);
+  font-weight: 600;
 }
 
 .obs-td--error {

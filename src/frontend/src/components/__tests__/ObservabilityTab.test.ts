@@ -54,7 +54,7 @@ const metricsFixture: ApiMetricsResponse = {
         min: 5,
         max: 300,
         mean: 25,
-        errorCount: { '4xx': 1, '5xx': 0 },
+        errorCount: { '4xx': 1, '5xx': 0, '429': 3 },
       },
       'POST /api/control/restart': {
         count: 5,
@@ -64,7 +64,7 @@ const metricsFixture: ApiMetricsResponse = {
         min: 40,
         max: 400,
         mean: 70,
-        errorCount: { '4xx': 0, '5xx': 2 },
+        errorCount: { '4xx': 0, '5xx': 2, '429': 0 },
       },
     },
   },
@@ -275,6 +275,31 @@ describe('ObservabilityTab', () => {
       await flushPromises()
 
       expect(wrapper.text()).toContain('API Latency Metrics')
+      wrapper.unmount()
+    })
+
+    it('renders 429 column header in metrics table', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      // Table header row should include a "429" column
+      const headers = wrapper.findAll('.obs-th')
+      expect(headers.some((h) => h.text() === '429')).toBe(true)
+      wrapper.unmount()
+    })
+
+    it('renders 429 count from fixture (3) in table cell', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      // GET /api/read/stream has 429: 3 in fixture
+      const text = wrapper.text()
+      expect(text).toContain('3')
+      // Verify the rate-limit styled cell exists when count > 0
+      const rateLimitCells = wrapper.findAll('.obs-td--rate-limit')
+      expect(rateLimitCells.length).toBeGreaterThan(0)
       wrapper.unmount()
     })
   })
