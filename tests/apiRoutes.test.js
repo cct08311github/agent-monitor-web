@@ -11,6 +11,29 @@ describe('API Routes', () => {
             expect(res.body.ts).toBeDefined();
         });
 
+        it('GET /api/read/health/full returns composite health without auth', async () => {
+            const res = await request(app).get('/api/read/health/full');
+            expect(res.statusCode).toBe(200);
+            expect(res.body.success).toBe(true);
+            expect(['ok', 'degraded', 'critical']).toContain(res.body.status);
+            expect(typeof res.body.uptime_ms).toBe('number');
+            expect(typeof res.body.alerts_recent_count).toBe('number');
+            expect(typeof res.body.alerts_critical_count).toBe('number');
+            expect(typeof res.body.alerts_warning_count).toBe('number');
+            expect(typeof res.body.errors_recent_count).toBe('number');
+            expect(typeof res.body.p99_max_ms).toBe('number');
+            expect(typeof res.body.ts).toBe('number');
+        });
+
+        it('GET /api/read/health/full does not require session auth', async () => {
+            // Hit the endpoint without any cookies/tokens; must not get 401 or 403
+            const res = await request(app)
+                .get('/api/read/health/full')
+                .set('Cookie', '');
+            expect(res.statusCode).toBe(200);
+            expect(res.body.success).toBe(true);
+        });
+
         it('GET /api/read/liveness returns alive status', async () => {
             const res = await request(app).get('/api/read/liveness');
             expect(res.statusCode).toBe(200);

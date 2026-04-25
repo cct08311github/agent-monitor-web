@@ -23,6 +23,7 @@ const { validateAgentId, validateSessionId, validateDomain, validateTaskId } = r
 
 // ── Public Endpoints (no auth required) ───────────────────────────────────────
 router.get('/read/health', (req, res) => sendOk(res, { ts: new Date().toISOString() }));
+router.get('/read/health/full', dashboardReadController.getHealthFull.bind(dashboardReadController));
 
 // Auth endpoints — must be public (before requireAuth)
 router.post('/auth/login', authLimiter, auth.loginRateLimit, authController.login);

@@ -4,6 +4,7 @@ const sessionReadService = require('../services/sessionReadService');
 const dashboardPayloadService = require('../services/dashboardPayloadService');
 const apiMetrics = require('../services/apiMetrics');
 const errorBuffer = require('../services/errorBuffer');
+const healthCompositeService = require('../services/healthCompositeService');
 const logger = require('../utils/logger');
 
 class DashboardReadController {
@@ -122,6 +123,16 @@ class DashboardReadController {
             return sendOk(res, { errors, total: errors.length });
         } catch (error) { /* istanbul ignore next */
             logger.error('dashboard_read_error', { requestId: req.requestId, handler: 'getRecentErrors', msg: error.message });
+            return sendFail(res, 500, 'internal_error');
+        }
+    }
+
+    async getHealthFull(req, res) {
+        try {
+            const summary = healthCompositeService.buildHealthSummary();
+            return sendOk(res, summary);
+        } catch (error) { /* istanbul ignore next */
+            logger.error('dashboard_read_error', { requestId: req.requestId, handler: 'getHealthFull', msg: error.message });
             return sendFail(res, 500, 'internal_error');
         }
     }
