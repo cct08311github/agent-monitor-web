@@ -129,6 +129,7 @@ export function useDashboard() {
   // Notify the user when SSE has exhausted all reconnect attempts
   watch(isFailed, (failed) => {
     if (failed) {
+      appState.sseStatus = 'disconnected'
       showToast('連線中斷，無法自動重連。請點擊以手動重試。', 'error', {
         duration: 0,
         retryFn: () => {
@@ -138,10 +139,22 @@ export function useDashboard() {
     }
   })
 
+  // Allow external reconnect requests (e.g. ConnectionStatus dot click)
+  watch(
+    () => appState.sseReconnectRequest,
+    (newVal, oldVal) => {
+      if (newVal !== oldVal && newVal > 0) {
+        manualReconnect()
+      }
+    },
+  )
+
   function startSSE(): void {
     connect('/api/read/stream', {
       onOpen() {
         connectionStatus.value = 'connected'
+        appState.sseStatus = 'connected'
+        appState.sseReconnectAttempt = 0
       },
       onMessage(event) {
         try {
@@ -154,6 +167,10 @@ export function useDashboard() {
             }
             lastUpdateTs.value = Date.now()
             connectionStatus.value = 'connected'
+            // Update SSE heartbeat fields for the header indicator
+            appState.sseLastHeartbeatAt = Date.now()
+            appState.sseStatus = 'connected'
+            appState.sseReconnectAttempt = 0
           }
         } catch {
           // Ignore parse errors
@@ -161,9 +178,12 @@ export function useDashboard() {
       },
       onError() {
         connectionStatus.value = 'disconnected'
+        appState.sseStatus = 'disconnected'
       },
-      onReconnecting() {
+      onReconnecting(attempt) {
         connectionStatus.value = 'reconnecting'
+        appState.sseStatus = 'reconnecting'
+        appState.sseReconnectAttempt = attempt
       },
       onResumed() {
         fetchDashboard(true)

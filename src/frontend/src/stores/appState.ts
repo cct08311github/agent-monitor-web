@@ -1,5 +1,6 @@
 import { reactive } from 'vue'
 import type { DashboardPayload, Agent } from '@/types/api'
+import type { SSEStatus } from '@/composables/useSSEStatus'
 
 // ---------------------------------------------------------------------------
 // localStorage helpers — keep error key persistence consistent with vanilla JS
@@ -51,6 +52,20 @@ export const appState = reactive({
    * Any component increments this; DashboardView watches and opens the palette.
    */
   commandPaletteRequest: 0,
+  /**
+   * SSE connection status — written by useDashboard, read by ConnectionStatus in header.
+   * Shared via appState to avoid prop-drilling across the MonitorTab → App.vue boundary.
+   */
+  sseStatus: 'idle' as SSEStatus,
+  /** Epoch ms of the last SSE heartbeat message (0 = never) */
+  sseLastHeartbeatAt: 0,
+  /** Current reconnect attempt counter (0 when connected) */
+  sseReconnectAttempt: 0,
+  /**
+   * Increment to request a manual SSE reconnect from anywhere in the app.
+   * useDashboard watches this and calls manualReconnect() when it changes.
+   */
+  sseReconnectRequest: 0,
   /**
    * Multi-agent comparison selection state.
    * firstAgentId holds the first selected agent; set to null to clear.
