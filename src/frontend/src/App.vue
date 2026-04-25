@@ -9,6 +9,8 @@ import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useCompactMode } from '@/composables/useCompactMode'
 import { usePomodoro } from '@/composables/usePomodoro'
 import { useAmbientMode } from '@/composables/useAmbientMode'
+import { useVoiceCommand } from '@/composables/useVoiceCommand'
+import { parseVoice } from '@/utils/voiceParser'
 import { appState } from '@/stores/appState'
 import ToastContainer from '@/components/ToastContainer.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -125,6 +127,33 @@ registerShortcut({
   category: 'Actions',
 })
 
+// ── Voice Command ────────────────────────────────────────────────────────────
+
+function handleTranscript(t: string) {
+  const action = parseVoice(t)
+  switch (action.type) {
+    case 'navigate':
+      appState.currentDesktopTab = action.target as string
+      showToast(`🎙️ 切換到: ${action.target}`, 'success')
+      break
+    case 'open':
+      if (action.target === 'palette') {
+        appState.commandPaletteRequest++
+        showToast('🎙️ 開啟 Command Palette', 'success')
+      }
+      break
+    case 'search':
+      appState.currentDesktopTab = 'monitor'
+      appState.agentSearchQuery = action.query ?? ''
+      showToast(`🎙️ 搜尋: ${action.query}`, 'success')
+      break
+    default:
+      showToast(`🎙️ 未識別: ${t}`, 'info')
+  }
+}
+
+const voice = useVoiceCommand(handleTranscript)
+
 // ── Ambient Mode ────────────────────────────────────────────────────────────
 
 const ambient = useAmbientMode({
@@ -229,6 +258,15 @@ registerShortcut({
           :aria-pressed="ambient.enabled.value"
           @click="ambient.toggle()"
         >📺</button>
+        <button
+          v-if="!isLoginPage"
+          class="header-btn icon-only voice-btn"
+          :class="{ 'voice-btn--listening': voice.listening.value, 'voice-btn--unsupported': !voice.supported.value }"
+          :disabled="!voice.supported.value"
+          :title="voice.supported.value ? (voice.listening.value ? '錄音中…點擊停止' : '語音指令') : '瀏覽器不支援'"
+          aria-label="voice command"
+          @click="voice.toggle()"
+        >🎙️</button>
         <select
           :value="currentTheme"
           class="header-theme-select"
@@ -372,6 +410,30 @@ registerShortcut({
   border-color: var(--accent);
   color: var(--accent);
   outline: none;
+}
+
+/* ── Voice Command Button ─────────────────────────────────────────────────── */
+
+.voice-btn--unsupported {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.voice-btn--listening {
+  color: #e55;
+  border-color: #e55;
+  animation: voice-pulse 1s ease-in-out infinite;
+}
+
+@keyframes voice-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.12);
+  }
 }
 
 /* ── Konami Code Easter Egg ───────────────────────────────────────────────── */
