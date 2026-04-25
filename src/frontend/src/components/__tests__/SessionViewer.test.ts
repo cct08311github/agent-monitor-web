@@ -90,9 +90,9 @@ describe('SessionViewer — loading state', () => {
     mockGet.mockReturnValue(new Promise(() => {}))
   })
 
-  it('shows loading indicator while fetching', () => {
+  it('shows skeleton loading component while fetching', () => {
     const wrapper = mountViewer()
-    expect(wrapper.text()).toContain('載入中')
+    expect(wrapper.find('[role="status"][aria-label="loading"]').exists()).toBe(true)
     wrapper.unmount()
   })
 })

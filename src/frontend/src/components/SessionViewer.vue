@@ -4,6 +4,7 @@ import { api } from '@/composables/useApi'
 import { showToast } from '@/composables/useToast'
 import { createFocusTrap } from '@/lib/focusTrap'
 import SessionReplay from './SessionReplay.vue'
+import Skeleton from './Skeleton.vue'
 import {
   loadAnnotations,
   saveAnnotation,
@@ -193,7 +194,9 @@ function closeReplay(): void {
       <!-- Body -->
       <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px">
         <!-- Loading -->
-        <div v-if="loading" style="color:var(--text-muted);text-align:center;padding:24px">載入中…</div>
+        <div v-if="loading" style="padding:24px">
+          <Skeleton :rows="5" height="32px" />
+        </div>
 
         <!-- Error -->
         <div v-else-if="error" style="color:var(--text-muted);text-align:center;padding:24px">
