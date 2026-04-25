@@ -5,15 +5,9 @@ import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useTheme } from '@/composables/useTheme'
 import { createFocusTrap } from '@/lib/focusTrap'
 import { useToast } from '@/composables/useToast'
+import { loadHistory, recordCommand, pickRecents } from '@/utils/commandHistory'
 
 const toast = useToast()
-
-// ---------------------------------------------------------------------------
-// Recents persistence constants
-// ---------------------------------------------------------------------------
-
-const RECENTS_KEY = 'oc_palette_recent'
-const RECENTS_MAX = 5
 
 // ---------------------------------------------------------------------------
 // Favorites persistence constants
@@ -185,35 +179,17 @@ function buildShortcutCommands(): Command[] {
 }
 
 // ---------------------------------------------------------------------------
-// Recents state & persistence
+// Recents state & persistence (backed by commandHistory.ts utility)
 // ---------------------------------------------------------------------------
 
 const recentIds = ref<string[]>([])
 
 function loadRecents(): void {
-  try {
-    const raw = localStorage.getItem(RECENTS_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed)) {
-        recentIds.value = parsed as string[]
-      }
-    }
-  } catch {
-    // Silent fallback — localStorage unavailable or JSON malformed
-    recentIds.value = []
-  }
+  recentIds.value = loadHistory()
 }
 
 function pushRecent(id: string): void {
-  // Dedupe: remove any existing occurrence then prepend
-  const updated = [id, ...recentIds.value.filter((r) => r !== id)].slice(0, RECENTS_MAX)
-  recentIds.value = updated
-  try {
-    localStorage.setItem(RECENTS_KEY, JSON.stringify(updated))
-  } catch {
-    // Silent fallback — storage quota or private browsing
-  }
+  recentIds.value = recordCommand(id)
 }
 
 // ---------------------------------------------------------------------------
@@ -279,11 +255,7 @@ const favoriteCommands = computed<Command[]>(() => {
 })
 
 /** Recent commands: map recentIds → actual commands, filtering out unknown ids */
-const recentCommands = computed<Command[]>(() => {
-  return recentIds.value
-    .map((id) => allCommands.value.find((cmd) => cmd.id === id))
-    .filter((cmd): cmd is Command => cmd !== undefined)
-})
+const recentCommands = computed<Command[]>(() => pickRecents(allCommands.value, recentIds.value))
 
 const filteredCommands = computed<Command[]>(() => {
   const q = query.value.trim()
