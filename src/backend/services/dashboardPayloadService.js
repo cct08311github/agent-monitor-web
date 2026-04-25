@@ -95,7 +95,7 @@ async function buildDashboardPayload() {
 
     if (!isFresh(cache.agents)) {
         fetches.push(
-            execFilePromise(ocBin, ['agents', 'list'], { timeout: 15_000 })
+            execFilePromise(ocBin, ['agents', 'list'], { timeout: 60_000, maxBuffer: 10 * 1024 * 1024 })
                 .catch((err) => ({ stdout: (err && err.stdout) || '', stderr: (err && err.stderr) || '' }))
                 .then(async (agentsResult) => {
                     const agentList = parseAgentsList(agentsResult.stdout || '');
