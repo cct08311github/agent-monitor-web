@@ -76,6 +76,8 @@ router.get('/dashboard', dashboardReadController.getDashboard); // very legacy
 
 // Optimize
 router.get('/optimize/run', auth.localhostOnlyControl, auth.rateLimit, optimizeController.run);
+router.get('/optimize/history', optimizeController.getHistory.bind(optimizeController));
+router.get('/optimize/result/:filename', optimizeController.getResult.bind(optimizeController));
 
 // TaskHub
 router.get('/taskhub/stats', taskHubController.getStats);

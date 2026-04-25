@@ -1,6 +1,8 @@
 // src/backend/controllers/optimizeController.js
 'use strict';
 const optimizeService = require('../services/optimizeService');
+const optimizeHistoryService = require('../services/optimizeHistoryService');
+const { sendOk, sendFail } = require('../utils/apiResponse');
 
 let isRunning = false;
 let lastCompletedAt = 0;
@@ -103,4 +105,41 @@ async function run(req, res) {
 
 function _resetCooldown() { lastCompletedAt = 0; }
 
-module.exports = { run, _setRunning, _resetCooldown };
+/**
+ * GET /api/optimize/history
+ * Returns a list of past auto-optimize plan files, sorted newest-first.
+ */
+async function getHistory(req, res) {
+    try {
+        const history = await optimizeHistoryService.listHistory();
+        return sendOk(res, { history });
+    } catch (e) {
+        const logger = require('../utils/logger');
+        logger.error('optimize_history_error', { requestId: req.requestId, err: e.message, stack: e.stack });
+        return sendFail(res, 500, 'internal_error');
+    }
+}
+
+/**
+ * GET /api/optimize/result/:filename
+ * Returns the markdown content of a specific plan file.
+ */
+async function getResult(req, res) {
+    const { filename } = req.params;
+    try {
+        const content = await optimizeHistoryService.readPlan(filename);
+        if (content === null) {
+            return sendFail(res, 404, 'not_found');
+        }
+        return sendOk(res, { filename, content });
+    } catch (e) {
+        if (e.code === 'invalid_filename') {
+            return sendFail(res, 400, 'invalid_filename');
+        }
+        const logger = require('../utils/logger');
+        logger.error('optimize_result_error', { requestId: req.requestId, filename, err: e.message, stack: e.stack });
+        return sendFail(res, 500, 'internal_error');
+    }
+}
+
+module.exports = { run, _setRunning, _resetCooldown, getHistory, getResult };
