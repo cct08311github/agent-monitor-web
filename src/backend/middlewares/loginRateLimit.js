@@ -20,9 +20,24 @@ function loginRateLimit(req, res, next) {
     const record = loginFailures.get(ip);
 
     if (record && now < record.resetAt && record.count >= LOGIN_MAX_ATTEMPTS) {
+        const retryAfter = Math.ceil((record.resetAt - now) / 1000);
+        res.set('RateLimit-Limit', String(LOGIN_MAX_ATTEMPTS));
+        res.set('RateLimit-Remaining', '0');
+        res.set('RateLimit-Reset', String(retryAfter));
+        res.set('Retry-After', String(retryAfter));
         return res.status(429).json({ success: false, error: 'too_many_attempts',
-            retryAfter: Math.ceil((record.resetAt - now) / 1000) });
+            retryAfter });
     }
+
+    const remaining = record && now < record.resetAt
+        ? Math.max(0, LOGIN_MAX_ATTEMPTS - record.count)
+        : LOGIN_MAX_ATTEMPTS;
+    const resetSec = record && now < record.resetAt
+        ? Math.ceil((record.resetAt - now) / 1000)
+        : Math.ceil(LOGIN_WINDOW_MS / 1000);
+    res.set('RateLimit-Limit', String(LOGIN_MAX_ATTEMPTS));
+    res.set('RateLimit-Remaining', String(remaining));
+    res.set('RateLimit-Reset', String(resetSec));
 
     const origJson = res.json.bind(res);
     res.json = function (body) {
