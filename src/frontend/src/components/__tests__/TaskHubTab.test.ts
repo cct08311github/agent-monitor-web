@@ -5,13 +5,14 @@ import { mount, flushPromises } from '@vue/test-utils'
 // Hoisted mock factories (must run before any imports)
 // ---------------------------------------------------------------------------
 
-const { mockGet, mockDel, mockPatch, mockConfirm, mockShowToast } = vi.hoisted(() => {
+const { mockGet, mockDel, mockPatch, mockConfirm, mockShowToast, mockRegisterShortcut } = vi.hoisted(() => {
   const mockGet     = vi.fn()
   const mockDel     = vi.fn()
   const mockPatch   = vi.fn()
   const mockConfirm = vi.fn()
   const mockShowToast = vi.fn()
-  return { mockGet, mockDel, mockPatch, mockConfirm, mockShowToast }
+  const mockRegisterShortcut = vi.fn()
+  return { mockGet, mockDel, mockPatch, mockConfirm, mockShowToast, mockRegisterShortcut }
 })
 
 // ---------------------------------------------------------------------------
@@ -41,6 +42,14 @@ vi.mock('@/components/TaskDetailModal.vue', () => ({
 
 vi.mock('@/components/AddTaskModal.vue', () => ({
   default: { name: 'AddTaskModal', template: '<div />' },
+}))
+
+vi.mock('@/composables/useKeyboardShortcuts', () => ({
+  useKeyboardShortcuts: () => ({
+    registerShortcut: mockRegisterShortcut,
+    unregisterShortcut: vi.fn(),
+    getShortcuts: vi.fn(() => []),
+  }),
 }))
 
 // ---------------------------------------------------------------------------
@@ -492,6 +501,63 @@ describe('TaskHubTab — batch selection', () => {
     const headerCb = wrapper.find<HTMLInputElement>('.th-check-all')
     expect(headerCb.element.indeterminate).toBe(true)
 
+    wrapper.unmount()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Tests — / shortcut focuses search input
+// ---------------------------------------------------------------------------
+
+describe('TaskHubTab — / shortcut focuses search input', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGet.mockImplementation((url: string) => {
+      if (url.startsWith('/api/taskhub/stats')) return Promise.resolve(statsResponse())
+      return Promise.resolve(tasksResponse([]))
+    })
+    mockConfirm.mockResolvedValue(false)
+  })
+
+  it('registers a "/" shortcut on mount', async () => {
+    const wrapper = mount(TaskHubTab)
+    await flushPromises()
+
+    expect(mockRegisterShortcut).toHaveBeenCalledWith(
+      expect.objectContaining({ key: '/' }),
+    )
+    wrapper.unmount()
+  })
+
+  it('registers the shortcut with category "Actions"', async () => {
+    const wrapper = mount(TaskHubTab)
+    await flushPromises()
+
+    expect(mockRegisterShortcut).toHaveBeenCalledWith(
+      expect.objectContaining({ key: '/', category: 'Actions' }),
+    )
+    wrapper.unmount()
+  })
+
+  it('shortcut handler calls focus() and select() on the search input', async () => {
+    const wrapper = mount(TaskHubTab)
+    await flushPromises()
+
+    const input = wrapper.find<HTMLInputElement>('.th-search-input')
+    expect(input.exists()).toBe(true)
+
+    const focusSpy = vi.spyOn(input.element, 'focus')
+    const selectSpy = vi.spyOn(input.element, 'select')
+
+    const call = mockRegisterShortcut.mock.calls.find(
+      (c) => (c[0] as { key: string }).key === '/',
+    )
+    expect(call).toBeTruthy()
+    const handler = (call![0] as { handler: () => void }).handler
+    handler()
+
+    expect(focusSpy).toHaveBeenCalledTimes(1)
+    expect(selectSpy).toHaveBeenCalledTimes(1)
     wrapper.unmount()
   })
 })

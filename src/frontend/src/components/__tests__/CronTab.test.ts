@@ -5,11 +5,12 @@ import { mount, flushPromises } from '@vue/test-utils'
 // Hoisted setup
 // ---------------------------------------------------------------------------
 
-const { mockGet, mockPost, mockDel } = vi.hoisted(() => {
+const { mockGet, mockPost, mockDel, mockRegisterShortcut } = vi.hoisted(() => {
   const mockGet = vi.fn()
   const mockPost = vi.fn()
   const mockDel = vi.fn()
-  return { mockGet, mockPost, mockDel }
+  const mockRegisterShortcut = vi.fn()
+  return { mockGet, mockPost, mockDel, mockRegisterShortcut }
 })
 
 // ---------------------------------------------------------------------------
@@ -30,6 +31,14 @@ vi.mock('@/composables/useToast', () => ({
 
 vi.mock('@/composables/useConfirm', () => ({
   confirm: vi.fn().mockResolvedValue(false),
+}))
+
+vi.mock('@/composables/useKeyboardShortcuts', () => ({
+  useKeyboardShortcuts: () => ({
+    registerShortcut: mockRegisterShortcut,
+    unregisterShortcut: vi.fn(),
+    getShortcuts: vi.fn(() => []),
+  }),
 }))
 
 vi.mock('@/utils/format', () => ({
@@ -433,6 +442,55 @@ describe('CronTab', () => {
       await flushPromises()
 
       expect(wrapper.find('.watchdog-toggle input[type="checkbox"]').exists()).toBe(true)
+      wrapper.unmount()
+    })
+  })
+
+  // ── / shortcut focuses search input ───────────────────────────────────────
+
+  describe('/ shortcut focuses search input', () => {
+    it('registers a "/" shortcut on mount', async () => {
+      mockGet.mockResolvedValue(jobsResponse([makeJob()]))
+      const wrapper = mount(CronTab)
+      await flushPromises()
+
+      expect(mockRegisterShortcut).toHaveBeenCalledWith(
+        expect.objectContaining({ key: '/' }),
+      )
+      wrapper.unmount()
+    })
+
+    it('registers the shortcut with category "Actions"', async () => {
+      mockGet.mockResolvedValue(jobsResponse([makeJob()]))
+      const wrapper = mount(CronTab)
+      await flushPromises()
+
+      expect(mockRegisterShortcut).toHaveBeenCalledWith(
+        expect.objectContaining({ key: '/', category: 'Actions' }),
+      )
+      wrapper.unmount()
+    })
+
+    it('shortcut handler calls focus() on the search input when jobs exist', async () => {
+      mockGet.mockResolvedValue(jobsResponse([makeJob()]))
+      const wrapper = mount(CronTab)
+      await flushPromises()
+
+      const input = wrapper.find<HTMLInputElement>('.cron-search-input')
+      expect(input.exists()).toBe(true)
+
+      const focusSpy = vi.spyOn(input.element, 'focus')
+      const selectSpy = vi.spyOn(input.element, 'select')
+
+      const call = mockRegisterShortcut.mock.calls.find(
+        (c) => (c[0] as { key: string }).key === '/',
+      )
+      expect(call).toBeTruthy()
+      const handler = (call![0] as { handler: () => void }).handler
+      handler()
+
+      expect(focusSpy).toHaveBeenCalledTimes(1)
+      expect(selectSpy).toHaveBeenCalledTimes(1)
       wrapper.unmount()
     })
   })

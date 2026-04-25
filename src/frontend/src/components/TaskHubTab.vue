@@ -5,6 +5,7 @@ import { showToast } from '@/composables/useToast'
 import { confirm } from '@/composables/useConfirm'
 import TaskDetailModal from '@/components/TaskDetailModal.vue'
 import AddTaskModal from '@/components/AddTaskModal.vue'
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -106,6 +107,7 @@ const domain         = ref('all')
 const statusFilter   = ref('')
 const priorityFilter = ref('')
 const searchQuery    = ref('')
+const searchInputRef = ref<HTMLInputElement | null>(null)
 const searchTimer    = ref<ReturnType<typeof setTimeout>>()
 const tasks          = ref<TaskHubTask[]>([])
 const loading        = ref(false)
@@ -416,9 +418,20 @@ watch(
   },
 )
 
+const { registerShortcut } = useKeyboardShortcuts()
+
 onMounted(() => {
   fetchStats()
   fetchTasks()
+  registerShortcut({
+    key: '/',
+    handler: () => {
+      searchInputRef.value?.focus()
+      searchInputRef.value?.select()
+    },
+    description: '聚焦搜尋',
+    category: 'Actions',
+  })
 })
 
 onUnmounted(() => {
@@ -474,6 +487,7 @@ onUnmounted(() => {
           <option v-for="(p, v) in PRIORITY_MAP" :key="v" :value="v">{{ p.label }}</option>
         </select>
         <input
+          ref="searchInputRef"
           v-model="searchQuery"
           class="th-search-input"
           type="text"

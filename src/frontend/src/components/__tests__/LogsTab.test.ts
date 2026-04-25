@@ -22,6 +22,23 @@ vi.mock('@/composables/useToast', () => ({
 }))
 
 // ---------------------------------------------------------------------------
+// Hoisted mocks for useKeyboardShortcuts
+// ---------------------------------------------------------------------------
+
+const { mockRegisterShortcut } = vi.hoisted(() => {
+  const mockRegisterShortcut = vi.fn()
+  return { mockRegisterShortcut }
+})
+
+vi.mock('@/composables/useKeyboardShortcuts', () => ({
+  useKeyboardShortcuts: () => ({
+    registerShortcut: mockRegisterShortcut,
+    unregisterShortcut: vi.fn(),
+    getShortcuts: vi.fn(() => []),
+  }),
+}))
+
+// ---------------------------------------------------------------------------
 // Import component AFTER mocks
 // ---------------------------------------------------------------------------
 
@@ -477,6 +494,55 @@ describe('LogsTab — filter presets', () => {
     const text = wrapper.text()
     expect(text).toContain('儲存')
     expect(text).toContain('刪除')
+    wrapper.unmount()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Tests — / shortcut focuses search input
+// ---------------------------------------------------------------------------
+
+describe('LogsTab — / shortcut focuses search input', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('registers a "/" shortcut on mount', () => {
+    const { wrapper } = mountTab()
+    expect(mockRegisterShortcut).toHaveBeenCalledWith(
+      expect.objectContaining({ key: '/' }),
+    )
+    wrapper.unmount()
+  })
+
+  it('registers the shortcut with category "Actions"', () => {
+    const { wrapper } = mountTab()
+    expect(mockRegisterShortcut).toHaveBeenCalledWith(
+      expect.objectContaining({ key: '/', category: 'Actions' }),
+    )
+    wrapper.unmount()
+  })
+
+  it('shortcut handler calls focus() on the search input', async () => {
+    const { wrapper } = mountTab()
+    await nextTick()
+
+    const input = wrapper.find<HTMLInputElement>('.log-search-input')
+    expect(input.exists()).toBe(true)
+
+    const focusSpy = vi.spyOn(input.element, 'focus')
+    const selectSpy = vi.spyOn(input.element, 'select')
+
+    // Extract and call the registered handler
+    const call = mockRegisterShortcut.mock.calls.find(
+      (c) => (c[0] as { key: string }).key === '/',
+    )
+    expect(call).toBeTruthy()
+    const handler = (call![0] as { handler: () => void }).handler
+    handler()
+
+    expect(focusSpy).toHaveBeenCalledTimes(1)
+    expect(selectSpy).toHaveBeenCalledTimes(1)
     wrapper.unmount()
   })
 })
