@@ -80,6 +80,41 @@ vi.mock('@/components/AlertBadge.vue', () => ({
 }))
 
 // ---------------------------------------------------------------------------
+// Mock useKonamiCode — capture the callback for manual triggering in tests
+// ---------------------------------------------------------------------------
+
+const { capturedKonamiCallback } = vi.hoisted(() => {
+  const capturedKonamiCallback = { fn: null as (() => void) | null }
+  return { capturedKonamiCallback }
+})
+
+vi.mock('@/composables/useKonamiCode', () => ({
+  useKonamiCode: (cb: () => void) => {
+    capturedKonamiCallback.fn = cb
+  },
+}))
+
+// ---------------------------------------------------------------------------
+// Mock showToast
+// ---------------------------------------------------------------------------
+
+const { mockShowToast } = vi.hoisted(() => {
+  const mockShowToast = vi.fn()
+  return { mockShowToast }
+})
+
+vi.mock('@/composables/useToast', () => ({
+  showToast: mockShowToast,
+  useToast: () => ({
+    toasts: { value: [] },
+    showToast: mockShowToast,
+    dismissToast: vi.fn(),
+    dismissAll: vi.fn(),
+    ICONS: {},
+  }),
+}))
+
+// ---------------------------------------------------------------------------
 // Import App AFTER all mocks are in place
 // ---------------------------------------------------------------------------
 
@@ -279,6 +314,78 @@ describe('App.vue — Theme select dropdown', () => {
     await flushPromises()
 
     expect(wrapper.find('.header-theme-select').exists()).toBe(false)
+    wrapper.unmount()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Konami Code Easter Egg
+// ---------------------------------------------------------------------------
+
+describe('App.vue — Konami Code Easter Egg', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockRouteName.value = 'dashboard'
+    mockAppState.currentDesktopTab = 'monitor'
+    mockAppState.currentDetailAgentId = ''
+    capturedKonamiCallback.fn = null
+  })
+
+  it('celebrating is false before Konami is triggered', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(wrapper.find('.konami-celebrate').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('triggering Konami callback calls showToast with success', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(capturedKonamiCallback.fn).not.toBeNull()
+    capturedKonamiCallback.fn!()
+    await flushPromises()
+
+    expect(mockShowToast).toHaveBeenCalledWith(
+      expect.stringContaining('Konami'),
+      'success',
+    )
+    wrapper.unmount()
+  })
+
+  it('triggering Konami callback shows .konami-celebrate overlay', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    capturedKonamiCallback.fn!()
+    await flushPromises()
+
+    expect(wrapper.find('.konami-celebrate').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('.konami-celebrate renders 12 emoji spans', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    capturedKonamiCallback.fn!()
+    await flushPromises()
+
+    const emojis = wrapper.findAll('.konami-emoji')
+    expect(emojis).toHaveLength(12)
+    wrapper.unmount()
+  })
+
+  it('.konami-celebrate has aria-hidden="true"', async () => {
+    const wrapper = mount(App)
+    await flushPromises()
+
+    capturedKonamiCallback.fn!()
+    await flushPromises()
+
+    const overlay = wrapper.find('.konami-celebrate')
+    expect(overlay.attributes('aria-hidden')).toBe('true')
     wrapper.unmount()
   })
 })
