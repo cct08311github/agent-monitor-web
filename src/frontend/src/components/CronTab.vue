@@ -6,6 +6,7 @@ import { confirm } from '@/composables/useConfirm'
 import { fmtTime } from '@/utils/format'
 import type { CronJob } from '@/types/api'
 import { formatCronError } from '@/lib/cronError'
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 
 // ---------------------------------------------------------------------------
 // State
@@ -14,6 +15,7 @@ import { formatCronError } from '@/lib/cronError'
 const jobs = ref<CronJob[]>([])
 const loading = ref(false)
 
+const searchInputRef = ref<HTMLInputElement | null>(null)
 const searchQuery = ref('')
 const filterMode = ref<'all' | 'enabled' | 'disabled'>('all')
 const sortBy = ref<'name' | 'nextRun' | 'lastRun'>('name')
@@ -76,7 +78,20 @@ const isFiltered = computed(
 // Lifecycle
 // ---------------------------------------------------------------------------
 
-onMounted(() => fetchJobs())
+const { registerShortcut } = useKeyboardShortcuts()
+
+onMounted(() => {
+  fetchJobs()
+  registerShortcut({
+    key: '/',
+    handler: () => {
+      searchInputRef.value?.focus()
+      searchInputRef.value?.select()
+    },
+    description: '聚焦搜尋',
+    category: 'Actions',
+  })
+})
 
 // ---------------------------------------------------------------------------
 // API operations
@@ -206,6 +221,7 @@ function formatNextRun(ms: number | undefined): string {
       <!-- Filter bar -->
       <div class="cron-filter-bar">
         <input
+          ref="searchInputRef"
           v-model="searchQuery"
           class="cron-search-input"
           placeholder="搜尋名稱或 schedule"

@@ -5,6 +5,7 @@ import { showToast } from '@/composables/useToast'
 import { useDebouncedRef } from '@/composables/useDebouncedRef'
 import { useLogPause } from '@/composables/useLogPause'
 import { formatTs } from '@/lib/time'
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -135,10 +136,11 @@ const {
 const showTimestamp = ref(true)
 
 // ---------------------------------------------------------------------------
-// DOM ref
+// DOM refs
 // ---------------------------------------------------------------------------
 
 const terminalRef = ref<HTMLDivElement | null>(null)
+const searchInputRef = ref<HTMLInputElement | null>(null)
 
 // ---------------------------------------------------------------------------
 // Computed: visible lines after filter
@@ -551,8 +553,19 @@ function toggleRegexMode(): void {
 // Lifecycle
 // ---------------------------------------------------------------------------
 
+const { registerShortcut } = useKeyboardShortcuts()
+
 onMounted(() => {
   loadPresets()
+  registerShortcut({
+    key: '/',
+    handler: () => {
+      searchInputRef.value?.focus()
+      searchInputRef.value?.select()
+    },
+    description: '聚焦搜尋',
+    category: 'Actions',
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -612,6 +625,7 @@ defineExpose({
         </button>
         <div class="log-search-wrap">
           <input
+            ref="searchInputRef"
             v-model="filterText"
             :class="['log-search-input', { 'log-search-input--error': regexError !== null }]"
             placeholder="篩選..."
