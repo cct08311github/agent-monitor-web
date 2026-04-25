@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { Agent } from '@/types/api'
 import { formatTokens, formatTWD, getAgentEmoji, getStatusInfo } from '@/utils/format'
+import { computeAgentMood } from '@/utils/agentMood'
 import { appState } from '@/stores/appState'
 import AgentQuickDiagnose from '@/components/AgentQuickDiagnose.vue'
 
@@ -17,6 +18,15 @@ const emit = defineEmits<{
 }>()
 
 const showQuickDiagnose = ref(false)
+
+const mood = computed(() => {
+  const ext = props.agent as unknown as Record<string, unknown>
+  return computeAgentMood({
+    status: props.agent.status,
+    lastActivity: String(ext['lastActivity'] ?? ''),
+    currentTask: ext['currentTask'] as { task?: string } | undefined,
+  })
+})
 
 function handleCardClick() {
   emit('click', props.agent.id)
@@ -84,14 +94,23 @@ function getTokens(a: Agent): number {
         </div>
       </div>
 
-      <div
-        :class="['agent-status', getStatusInfo(agent.status).dotClass]"
-        role="status"
-        :aria-label="'狀態: ' + getStatusInfo(agent.status).text"
-      >
-        <span class="status-icon" aria-hidden="true">{{ getStatusInfo(agent.status).icon }}</span>
-        <span class="agent-status-dot" aria-hidden="true"></span>
-        {{ ' ' + getStatusInfo(agent.status).text }}
+      <div class="agent-card-header-right">
+        <div
+          class="agent-mood"
+          :title="mood.label + ' · ' + mood.reason"
+          :aria-label="`心情: ${mood.label} (${mood.reason})`"
+        >
+          {{ mood.emoji }}
+        </div>
+        <div
+          :class="['agent-status', getStatusInfo(agent.status).dotClass]"
+          role="status"
+          :aria-label="'狀態: ' + getStatusInfo(agent.status).text"
+        >
+          <span class="status-icon" aria-hidden="true">{{ getStatusInfo(agent.status).icon }}</span>
+          <span class="agent-status-dot" aria-hidden="true"></span>
+          {{ ' ' + getStatusInfo(agent.status).text }}
+        </div>
       </div>
     </div>
 
@@ -142,3 +161,22 @@ function getTokens(a: Agent): number {
     />
   </div>
 </template>
+
+<style scoped>
+.agent-card-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.agent-mood {
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: default;
+  user-select: none;
+  /* keep emoji crisp without layout shift */
+  width: 1.5rem;
+  text-align: center;
+}
+</style>
