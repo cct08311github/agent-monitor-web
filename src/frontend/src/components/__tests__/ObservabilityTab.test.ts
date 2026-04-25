@@ -5,6 +5,7 @@ import type {
   ApiErrorsResponse,
   AlertsRecentResponse,
   AlertConfigResponse,
+  AlertsHistoryResponse,
 } from '../ObservabilityTab.vue'
 import { formatExportTimestamp } from '@/lib/time'
 
@@ -133,6 +134,41 @@ const emptyAlertsFixture: AlertsRecentResponse = {
   data: { alerts: [] },
 }
 
+const alertHistoryFixture: AlertsHistoryResponse = {
+  success: true,
+  data: {
+    alerts: [
+      {
+        rule: 'cpu_critical',
+        severity: 'critical',
+        message: 'CPU 97.1% — 超過危急閾值 95%',
+        meta: { cpu: 97.1 },
+        ts: 1700001000000,
+      },
+      {
+        rule: 'memory_high',
+        severity: 'warning',
+        message: '記憶體 88.0% — 超過閾值 85%',
+        meta: { memory: 88.0 },
+        ts: 1700000500000,
+      },
+      {
+        rule: 'error_rate_high',
+        severity: 'warning',
+        message: '5xx error 率激增',
+        meta: { count: 7 },
+        ts: 1700000200000,
+      },
+    ],
+    total: 3,
+  },
+}
+
+const emptyHistoryFixture: AlertsHistoryResponse = {
+  success: true,
+  data: { alerts: [], total: 0 },
+}
+
 const alertConfigFixture: AlertConfigResponse = {
   success: true,
   data: {
@@ -158,6 +194,7 @@ function setupMockBothSuccess() {
   mockGet.mockImplementation((url: string) => {
     if (url.includes('/api/read/metrics')) return Promise.resolve(metricsFixture)
     if (url.includes('/api/read/errors/recent')) return Promise.resolve(errorsFixture)
+    if (url.includes('/api/alerts/history')) return Promise.resolve(alertHistoryFixture)
     if (url.includes('/api/alerts/recent')) return Promise.resolve(alertsFixture)
     if (url.includes('/api/alerts/config')) return Promise.resolve(alertConfigFixture)
     return Promise.reject(new Error('Unknown URL'))
@@ -168,6 +205,7 @@ function setupMockBothEmpty() {
   mockGet.mockImplementation((url: string) => {
     if (url.includes('/api/read/metrics')) return Promise.resolve(emptyMetricsFixture)
     if (url.includes('/api/read/errors/recent')) return Promise.resolve(emptyErrorsFixture)
+    if (url.includes('/api/alerts/history')) return Promise.resolve(emptyHistoryFixture)
     if (url.includes('/api/alerts/recent')) return Promise.resolve(emptyAlertsFixture)
     if (url.includes('/api/alerts/config')) return Promise.resolve(alertConfigFixture)
     return Promise.reject(new Error('Unknown URL'))
@@ -1076,6 +1114,226 @@ describe('ObservabilityTab', () => {
       const d = new Date(2026, 3, 24, 9, 5, 1)
       const ts = formatExportTimestamp(d)
       expect(ts).toMatch(/^\d{8}-\d{6}$/)
+    })
+  })
+
+  // ── Alert history panel ──────────────────────────────────────────────────
+
+  describe('alert history panel', () => {
+    it('toggle button is rendered in Active Alerts section', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const toggleBtn = wrapper.find('[data-testid="history-toggle"]')
+      expect(toggleBtn.exists()).toBe(true)
+      expect(toggleBtn.text()).toContain('顯示完整歷程')
+      wrapper.unmount()
+    })
+
+    it('clicking toggle shows history section', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const toggleBtn = wrapper.find('[data-testid="history-toggle"]')
+      await toggleBtn.trigger('click')
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Alert 完整歷程')
+      wrapper.unmount()
+    })
+
+    it('clicking toggle calls fetchAlertHistory (GET /api/alerts/history)', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      mockGet.mockClear()
+      const toggleBtn = wrapper.find('[data-testid="history-toggle"]')
+      await toggleBtn.trigger('click')
+      await flushPromises()
+
+      expect(mockGet).toHaveBeenCalledWith(expect.stringContaining('/api/alerts/history'))
+      wrapper.unmount()
+    })
+
+    it('history table renders fixture rows after expanding', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const toggleBtn = wrapper.find('[data-testid="history-toggle"]')
+      await toggleBtn.trigger('click')
+      await flushPromises()
+
+      const text = wrapper.text()
+      expect(text).toContain('CPU 97.1% — 超過危急閾值 95%')
+      expect(text).toContain('記憶體 88.0% — 超過閾值 85%')
+      expect(text).toContain('5xx error 率激增')
+      wrapper.unmount()
+    })
+
+    it('shows empty state when history is empty', async () => {
+      setupMockBothEmpty()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const toggleBtn = wrapper.find('[data-testid="history-toggle"]')
+      await toggleBtn.trigger('click')
+      await flushPromises()
+
+      const emptyEl = wrapper.find('[data-testid="history-empty"]')
+      expect(emptyEl.exists()).toBe(true)
+      expect(emptyEl.text()).toContain('無歷程資料')
+      wrapper.unmount()
+    })
+
+    it('shows error state when history fetch fails', async () => {
+      mockGet.mockImplementation((url: string) => {
+        if (url.includes('/api/alerts/history'))
+          return Promise.reject(new Error('History fetch failed'))
+        if (url.includes('/api/read/metrics')) return Promise.resolve(emptyMetricsFixture)
+        if (url.includes('/api/read/errors/recent')) return Promise.resolve(emptyErrorsFixture)
+        if (url.includes('/api/alerts/recent')) return Promise.resolve(emptyAlertsFixture)
+        if (url.includes('/api/alerts/config')) return Promise.resolve(alertConfigFixture)
+        return Promise.reject(new Error('Unknown URL'))
+      })
+
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const toggleBtn = wrapper.find('[data-testid="history-toggle"]')
+      await toggleBtn.trigger('click')
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('History fetch failed')
+      const retryBtn = wrapper.find('[data-testid="history-retry"]')
+      expect(retryBtn.exists()).toBe(true)
+      wrapper.unmount()
+    })
+
+    it('retry button in history error state calls fetchAlertHistory again', async () => {
+      mockGet.mockImplementation((url: string) => {
+        if (url.includes('/api/alerts/history'))
+          return Promise.reject(new Error('History fetch failed'))
+        if (url.includes('/api/read/metrics')) return Promise.resolve(emptyMetricsFixture)
+        if (url.includes('/api/read/errors/recent')) return Promise.resolve(emptyErrorsFixture)
+        if (url.includes('/api/alerts/recent')) return Promise.resolve(emptyAlertsFixture)
+        if (url.includes('/api/alerts/config')) return Promise.resolve(alertConfigFixture)
+        return Promise.reject(new Error('Unknown URL'))
+      })
+
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const toggleBtn = wrapper.find('[data-testid="history-toggle"]')
+      await toggleBtn.trigger('click')
+      await flushPromises()
+
+      // Fix mock and click retry
+      setupMockBothSuccess()
+      mockGet.mockClear()
+      const retryBtn = wrapper.find('[data-testid="history-retry"]')
+      await retryBtn.trigger('click')
+      await flushPromises()
+
+      expect(mockGet).toHaveBeenCalledWith(expect.stringContaining('/api/alerts/history'))
+      wrapper.unmount()
+    })
+
+    it('auto-refresh includes history fetch when expanded', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      // Expand history first
+      const toggleBtn = wrapper.find('[data-testid="history-toggle"]')
+      await toggleBtn.trigger('click')
+      await flushPromises()
+
+      mockGet.mockClear()
+      vi.advanceTimersByTime(10_000)
+      await flushPromises()
+
+      // Should include history call: metrics + errors + alerts/recent + config + history = 5
+      const historyCalls = (mockGet.mock.calls as string[][]).filter((args) =>
+        args[0].includes('/api/alerts/history'),
+      )
+      expect(historyCalls.length).toBeGreaterThanOrEqual(1)
+      wrapper.unmount()
+    })
+
+    it('auto-refresh does NOT fetch history when collapsed', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      // History is collapsed by default — do not expand
+      mockGet.mockClear()
+      vi.advanceTimersByTime(10_000)
+      await flushPromises()
+
+      const historyCalls = (mockGet.mock.calls as string[][]).filter((args) =>
+        args[0].includes('/api/alerts/history'),
+      )
+      expect(historyCalls.length).toBe(0)
+      wrapper.unmount()
+    })
+
+    it('manual Refresh button fetches history when expanded', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      // Expand history
+      const toggleBtn = wrapper.find('[data-testid="history-toggle"]')
+      await toggleBtn.trigger('click')
+      await flushPromises()
+
+      mockGet.mockClear()
+      const refreshBtn = wrapper.findAll('button').find((b) => b.text().includes('Refresh'))
+      await refreshBtn?.trigger('click')
+      await flushPromises()
+
+      // metrics + errors + alerts/recent + config + history = 5 calls
+      expect(mockGet).toHaveBeenCalledTimes(5)
+      const historyCalls = (mockGet.mock.calls as string[][]).filter((args) =>
+        args[0].includes('/api/alerts/history'),
+      )
+      expect(historyCalls.length).toBe(1)
+      wrapper.unmount()
+    })
+
+    it('toggle button text changes to 收合 when expanded', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const toggleBtn = wrapper.find('[data-testid="history-toggle"]')
+      await toggleBtn.trigger('click')
+      await flushPromises()
+
+      expect(toggleBtn.text()).toContain('收合')
+      wrapper.unmount()
+    })
+
+    it('clicking toggle twice collapses history again', async () => {
+      setupMockBothSuccess()
+      const wrapper = mount(ObservabilityTab)
+      await flushPromises()
+
+      const toggleBtn = wrapper.find('[data-testid="history-toggle"]')
+      await toggleBtn.trigger('click')
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Alert 完整歷程')
+
+      await toggleBtn.trigger('click')
+      await flushPromises()
+
+      expect(wrapper.text()).not.toContain('Alert 完整歷程')
+      wrapper.unmount()
     })
   })
 })
