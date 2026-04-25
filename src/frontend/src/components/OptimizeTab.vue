@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from 'vue'
-import { getBasePath } from '@/composables/useApi'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { getBasePath, api } from '@/composables/useApi'
 import { showToast } from '@/composables/useToast'
 
 // ---------------------------------------------------------------------------
@@ -8,6 +8,12 @@ import { showToast } from '@/composables/useToast'
 // ---------------------------------------------------------------------------
 
 type Phase = 'idle' | 'running' | 'cooldown' | 'done' | 'error'
+
+interface HistoryEntry {
+  filename: string
+  date: string
+  size_bytes: number
+}
 
 // ---------------------------------------------------------------------------
 // State
@@ -21,6 +27,17 @@ const resultFilename = ref('')
 const resultSummary = ref('')
 const opusFailed = ref(false)
 const errorMsg = ref('')
+
+// History state
+const history = ref<HistoryEntry[]>([])
+const historyLoading = ref(false)
+const historyError = ref('')
+
+// Viewer state
+const viewingFilename = ref('')
+const viewingContent = ref('')
+const viewLoading = ref(false)
+const viewError = ref('')
 
 let es: EventSource | null = null
 let cooldownTimer: ReturnType<typeof setInterval> | null = null
@@ -152,6 +169,68 @@ function startOptimize(): void {
 }
 
 // ---------------------------------------------------------------------------
+// History
+// ---------------------------------------------------------------------------
+
+async function fetchHistory(): Promise<void> {
+  historyLoading.value = true
+  historyError.value = ''
+  try {
+    const data = await api.get('/api/optimize/history') as { history: HistoryEntry[] }
+    history.value = data.history ?? []
+  } catch {
+    historyError.value = '無法載入過往報告'
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+async function viewPlan(filename: string): Promise<void> {
+  viewingFilename.value = filename
+  viewingContent.value = ''
+  viewError.value = ''
+  viewLoading.value = true
+  try {
+    const data = await api.get(`/api/optimize/result/${encodeURIComponent(filename)}`) as {
+      filename: string
+      content: string
+    }
+    viewingContent.value = data.content ?? ''
+  } catch {
+    viewError.value = '無法載入報告內容'
+  } finally {
+    viewLoading.value = false
+  }
+}
+
+function closeViewer(): void {
+  viewingFilename.value = ''
+  viewingContent.value = ''
+  viewError.value = ''
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// Refetch history when a run completes
+watch(phase, (newPhase) => {
+  if (newPhase === 'done') {
+    void fetchHistory()
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Lifecycle
+// ---------------------------------------------------------------------------
+
+onMounted(() => {
+  void fetchHistory()
+})
+
+// ---------------------------------------------------------------------------
 // Cleanup
 // ---------------------------------------------------------------------------
 
@@ -222,6 +301,38 @@ onUnmounted(() => {
       <h3>❌ 優化失敗</h3>
       <p>{{ errorMsg }}</p>
       <button class="btn btn-secondary" @click="startOptimize">重試</button>
+    </div>
+
+    <!-- History card -->
+    <div class="card optimize-history-card">
+      <h3>📋 過往報告</h3>
+      <div v-if="historyLoading" class="optimize-history-loading">載入中...</div>
+      <div v-else-if="historyError" class="optimize-history-error">{{ historyError }}</div>
+      <div v-else-if="history.length === 0" class="optimize-history-empty">尚無過往報告</div>
+      <ul v-else class="optimize-history-list">
+        <li
+          v-for="entry in history"
+          :key="entry.filename"
+          class="optimize-history-item"
+          :class="{ active: viewingFilename === entry.filename }"
+          @click="viewPlan(entry.filename)"
+        >
+          <span class="optimize-history-date">{{ entry.date }}</span>
+          <span class="optimize-history-filename">{{ entry.filename }}</span>
+          <span class="optimize-history-size">{{ formatSize(entry.size_bytes) }}</span>
+        </li>
+      </ul>
+
+      <!-- Inline viewer -->
+      <div v-if="viewingFilename" class="optimize-viewer">
+        <div class="optimize-viewer-header">
+          <span class="optimize-viewer-title">{{ viewingFilename }}</span>
+          <button class="btn btn-secondary optimize-viewer-close" @click="closeViewer">✕ 關閉</button>
+        </div>
+        <div v-if="viewLoading" class="optimize-viewer-loading">載入中...</div>
+        <div v-else-if="viewError" class="optimize-viewer-error">{{ viewError }}</div>
+        <pre v-else class="optimize-viewer-content">{{ viewingContent }}</pre>
+      </div>
     </div>
 
     <!-- Idle info card -->
@@ -382,6 +493,125 @@ onUnmounted(() => {
 .optimize-note {
   color: var(--text-muted);
   font-size: 13px;
+  margin: 0;
+}
+
+/* History card */
+.optimize-history-card {
+  padding: 20px;
+  margin-top: 16px;
+}
+
+.optimize-history-card h3 {
+  margin: 0 0 12px;
+}
+
+.optimize-history-loading,
+.optimize-history-error,
+.optimize-history-empty {
+  font-size: 14px;
+  color: var(--text-muted);
+  padding: 8px 0;
+}
+
+.optimize-history-error {
+  color: var(--danger, #ef4444);
+}
+
+.optimize-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.optimize-history-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  border: 1px solid transparent;
+  transition: background 0.15s;
+}
+
+.optimize-history-item:hover,
+.optimize-history-item.active {
+  background: var(--bg-secondary, #f3f4f6);
+  border-color: var(--border, #e5e7eb);
+}
+
+.optimize-history-date {
+  font-weight: 600;
+  min-width: 90px;
+}
+
+.optimize-history-filename {
+  flex: 1;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.optimize-history-size {
+  color: var(--text-muted);
+  min-width: 60px;
+  text-align: right;
+}
+
+/* Inline viewer */
+.optimize-viewer {
+  margin-top: 16px;
+  border-top: 1px solid var(--border, #e5e7eb);
+  padding-top: 16px;
+}
+
+.optimize-viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.optimize-viewer-title {
+  font-weight: 600;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.optimize-viewer-close {
+  flex-shrink: 0;
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+.optimize-viewer-loading,
+.optimize-viewer-error {
+  font-size: 14px;
+  color: var(--text-muted);
+  padding: 8px 0;
+}
+
+.optimize-viewer-error {
+  color: var(--danger, #ef4444);
+}
+
+.optimize-viewer-content {
+  background: var(--bg-secondary, #f9fafb);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 6px;
+  padding: 16px;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 480px;
+  overflow-y: auto;
   margin: 0;
 }
 </style>
