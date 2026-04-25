@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { useAuth } from '@/composables/useAuth'
@@ -12,6 +12,8 @@ import { useAmbientMode } from '@/composables/useAmbientMode'
 import { useVoiceCommand } from '@/composables/useVoiceCommand'
 import { parseVoice } from '@/utils/voiceParser'
 import { appState } from '@/stores/appState'
+import { api } from '@/composables/useApi'
+import { formatBadge, shouldShowBadge } from '@/utils/badgeFormat'
 import ToastContainer from '@/components/ToastContainer.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AlertBadge from '@/components/AlertBadge.vue'
@@ -117,6 +119,92 @@ const heartbeatStats = computed(() => {
   }
 })
 
+// ── Per-tab badge counters ───────────────────────────────────────────────────
+
+/** 監控 / Agents — active agent count from latest dashboard */
+const monitorBadgeCount = computed<number>(() => {
+  const agents = appState.latestDashboard?.agents ?? []
+  return agents.filter(
+    (a) => a.status === 'active_executing' || a.status === 'active_recent',
+  ).length
+})
+
+/** Cron — enabled cron jobs count from latest dashboard */
+const cronBadgeCount = computed<number>(() => {
+  const jobs = appState.latestDashboard?.cron ?? []
+  return jobs.filter((j) => j.enabled).length
+})
+
+/** 日誌 / Logs — recent 5xx error count, polled every 30s */
+const logsBadgeCount = ref<number>(0)
+
+/** 告警 / Alerts — active (recent 5-min) alert count, polled every 30s */
+const alertsBadgeCount = ref<number>(0)
+
+const FIVE_MIN_MS = 5 * 60 * 1000
+
+interface ErrorEntry {
+  statusCode: number
+  timestamp: string | number
+}
+
+interface AlertEntry {
+  ts: number
+}
+
+interface ErrorsRecentResponse {
+  success: boolean
+  data?: { errors?: ErrorEntry[] }
+  errors?: ErrorEntry[]
+}
+
+interface AlertsRecentBadgeResponse {
+  success: boolean
+  data?: { alerts?: AlertEntry[] }
+  alerts?: AlertEntry[]
+}
+
+async function fetchBadgeCounts(): Promise<void> {
+  const cutoff = Date.now() - FIVE_MIN_MS
+  try {
+    const errRes = (await api.get('/api/read/errors/recent?limit=50')) as ErrorsRecentResponse
+    const errList: ErrorEntry[] = errRes.data?.errors ?? errRes.errors ?? []
+    logsBadgeCount.value = errList.filter((e) => {
+      const ts =
+        typeof e.timestamp === 'number'
+          ? e.timestamp
+          : new Date(e.timestamp).getTime()
+      return ts >= cutoff
+    }).length
+  } catch {
+    // Silent — badge must not break the rest of the UI
+  }
+
+  try {
+    const alertRes = (await api.get('/api/alerts/recent?limit=50')) as AlertsRecentBadgeResponse
+    const alertList: AlertEntry[] = alertRes.data?.alerts ?? alertRes.alerts ?? []
+    alertsBadgeCount.value = alertList.filter((a) => a.ts >= cutoff).length
+  } catch {
+    // Silent — badge must not break the rest of the UI
+  }
+}
+
+let badgePollInterval: ReturnType<typeof setInterval> | null = null
+
+onMounted(() => {
+  void fetchBadgeCounts()
+  badgePollInterval = setInterval(() => {
+    void fetchBadgeCounts()
+  }, 30_000)
+})
+
+onUnmounted(() => {
+  if (badgePollInterval !== null) {
+    clearInterval(badgePollInterval)
+    badgePollInterval = null
+  }
+})
+
 // ── Compact mode keyboard shortcut ─────────────────────────────────────────
 
 registerShortcut({
@@ -191,7 +279,24 @@ registerShortcut({
             role="tab"
             :aria-selected="activeDesktopTab === 'monitor'"
             @click="switchTab('monitor')"
-          >🖥️ 監控</button>
+          >
+            🖥️ 監控
+            <span
+              v-if="shouldShowBadge(monitorBadgeCount)"
+              class="tab-badge"
+              :aria-label="`${monitorBadgeCount} 個 active agents`"
+            >{{ formatBadge(monitorBadgeCount) }}</span>
+            <span
+              v-if="shouldShowBadge(cronBadgeCount)"
+              class="tab-badge tab-badge--cron"
+              :aria-label="`${cronBadgeCount} 個 enabled cron jobs`"
+            >{{ formatBadge(cronBadgeCount) }}</span>
+            <span
+              v-if="shouldShowBadge(alertsBadgeCount)"
+              class="tab-badge tab-badge--alert"
+              :aria-label="`${alertsBadgeCount} 個 active alerts`"
+            >{{ formatBadge(alertsBadgeCount) }}</span>
+          </button>
           <button
             :class="['desktop-tab', { active: activeDesktopTab === 'system' }]"
             role="tab"
@@ -203,7 +308,14 @@ registerShortcut({
             role="tab"
             :aria-selected="activeDesktopTab === 'logs'"
             @click="switchTab('logs')"
-          >⚙️ 日誌</button>
+          >
+            ⚙️ 日誌
+            <span
+              v-if="shouldShowBadge(logsBadgeCount)"
+              class="tab-badge tab-badge--error"
+              :aria-label="`${logsBadgeCount} 個 5xx 錯誤（最近 5 分鐘）`"
+            >{{ formatBadge(logsBadgeCount) }}</span>
+          </button>
           <button
             :class="['desktop-tab', { active: activeDesktopTab === 'chat' }]"
             role="tab"
@@ -473,6 +585,55 @@ registerShortcut({
   }
   to {
     filter: hue-rotate(360deg);
+  }
+}
+
+/* ── Per-tab badge counters ───────────────────────────────────────────────── */
+
+.desktop-tab {
+  position: relative;
+}
+
+.tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  vertical-align: middle;
+  margin-left: 5px;
+  background-color: var(--accent, #7c7cff);
+  color: #fff;
+  pointer-events: none;
+}
+
+/* Cron badge — secondary accent (purple) */
+.tab-badge--cron {
+  background-color: var(--purple, #a78bfa);
+}
+
+/* Alerts badge — danger red */
+.tab-badge--alert {
+  background-color: var(--red, #ef5f5f);
+}
+
+/* Log 5xx badge — orange warning */
+.tab-badge--error {
+  background-color: var(--orange, #e5a53d);
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-badge {
+    /* No pulse/scale animation — only static display */
+    animation: none;
+    transition: none;
   }
 }
 </style>
