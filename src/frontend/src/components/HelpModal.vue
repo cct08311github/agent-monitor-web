@@ -21,9 +21,19 @@ const emit = defineEmits<{
 
 const { getShortcuts } = useKeyboardShortcuts()
 
+const searchQuery = ref('')
+const searchInputRef = ref<HTMLInputElement | null>(null)
+
+interface DisplayShortcut {
+  key: string
+  description: string
+  rawKey: string
+  rawDescription: string
+}
+
 const groupedShortcuts = computed(() => {
   const all = getShortcuts()
-  const groups: Record<string, { key: string; description: string }[]> = {}
+  const groups: Record<string, DisplayShortcut[]> = {}
   for (const s of all) {
     const cat = s.category ?? 'General'
     if (!groups[cat]) groups[cat] = []
@@ -32,10 +42,36 @@ const groupedShortcuts = computed(() => {
     if (s.shift) displayKey = `Shift+${displayKey}`
     if (s.alt) displayKey = `Alt+${displayKey}`
     if (s.meta) displayKey = `Meta+${displayKey}`
-    groups[cat].push({ key: displayKey, description: s.description })
+    groups[cat].push({
+      key: displayKey,
+      description: s.description,
+      rawKey: s.key,
+      rawDescription: s.description,
+    })
   }
   return groups
 })
+
+const filteredShortcuts = computed(() => {
+  const query = searchQuery.value.trim().toLowerCase()
+  if (!query) return groupedShortcuts.value
+
+  const result: Record<string, DisplayShortcut[]> = {}
+  for (const [category, shortcuts] of Object.entries(groupedShortcuts.value)) {
+    const matched = shortcuts.filter(
+      (s) =>
+        s.description.toLowerCase().includes(query) ||
+        s.key.toLowerCase().includes(query) ||
+        s.rawKey.toLowerCase().includes(query),
+    )
+    if (matched.length > 0) {
+      result[category] = matched
+    }
+  }
+  return result
+})
+
+const hasResults = computed(() => Object.keys(filteredShortcuts.value).length > 0)
 
 // ---------------------------------------------------------------------------
 // Focus trap
@@ -48,10 +84,13 @@ watch(
   () => props.open,
   async (visible) => {
     if (visible) {
+      searchQuery.value = ''
       await nextTick()
       if (dialogRef.value) {
         trap.activate(dialogRef.value, () => emit('close'))
       }
+      await nextTick()
+      searchInputRef.value?.focus()
     } else {
       trap.deactivate()
     }
@@ -79,9 +118,20 @@ onUnmounted(() => {
           <button class="help-close-btn" aria-label="關閉" @click="$emit('close')">✕</button>
         </div>
 
+        <div class="help-search-bar">
+          <input
+            ref="searchInputRef"
+            v-model="searchQuery"
+            type="search"
+            class="help-search-input"
+            placeholder="搜尋 shortcut..."
+            aria-label="搜尋快捷鍵"
+          />
+        </div>
+
         <div class="help-body">
           <div
-            v-for="(shortcuts, category) in groupedShortcuts"
+            v-for="(shortcuts, category) in filteredShortcuts"
             :key="category"
             class="help-group"
           >
@@ -104,13 +154,21 @@ onUnmounted(() => {
             </table>
           </div>
 
-          <p v-if="Object.keys(groupedShortcuts).length === 0" class="help-empty">
+          <p
+            v-if="!hasResults && searchQuery.trim()"
+            class="help-empty help-no-match"
+          >
+            無符合 shortcut
+          </p>
+
+          <p v-if="!hasResults && !searchQuery.trim()" class="help-empty">
             目前沒有已註冊的快捷鍵。
           </p>
         </div>
 
         <div class="help-footer">
           <span class="help-hint">在輸入框中快捷鍵不生效（Esc 除外）</span>
+          <span class="help-cmdK-hint">按 <kbd class="help-kbd-inline">⌘K</kbd>（或 <kbd class="help-kbd-inline">Ctrl+K</kbd>）開啟 Command Palette → 行動模式</span>
         </div>
       </div>
     </div>
@@ -176,6 +234,38 @@ onUnmounted(() => {
   background: var(--color-surface-hover, #313244);
 }
 
+.help-search-bar {
+  padding: 0.625rem 1.25rem;
+  border-bottom: 1px solid var(--color-border, #313244);
+  flex-shrink: 0;
+}
+
+.help-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--color-surface-raised, #181825);
+  border: 1px solid var(--color-border, #313244);
+  border-radius: 0.5rem;
+  color: var(--color-text, #cdd6f4);
+  font-size: 0.875rem;
+  padding: 0.45rem 0.75rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.help-search-input::placeholder {
+  color: var(--color-muted, #6c7086);
+}
+
+.help-search-input:focus {
+  border-color: var(--color-accent, #89b4fa);
+}
+
+/* Remove native search clear button in Webkit */
+.help-search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
 .help-body {
   overflow-y: auto;
   padding: 1rem 1.25rem;
@@ -239,6 +329,18 @@ onUnmounted(() => {
   box-shadow: 0 1px 0 var(--color-border, #313244);
 }
 
+.help-kbd-inline {
+  display: inline-block;
+  background: var(--color-surface-raised, #181825);
+  border: 1px solid var(--color-border, #313244);
+  border-radius: 0.25rem;
+  padding: 0.05rem 0.35rem;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-size: 0.7rem;
+  color: var(--color-text, #cdd6f4);
+  white-space: nowrap;
+}
+
 .help-empty {
   font-size: 0.875rem;
   color: var(--color-muted, #6c7086);
@@ -246,14 +348,28 @@ onUnmounted(() => {
   padding: 1rem 0;
 }
 
+.help-no-match {
+  color: var(--color-muted, #6c7086);
+}
+
 .help-footer {
   padding: 0.625rem 1.25rem;
   border-top: 1px solid var(--color-border, #313244);
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
 }
 
 .help-hint {
   font-size: 0.75rem;
   color: var(--color-muted, #6c7086);
+}
+
+.help-cmdK-hint {
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--color-accent, #89b4fa);
+  opacity: 0.85;
 }
 </style>

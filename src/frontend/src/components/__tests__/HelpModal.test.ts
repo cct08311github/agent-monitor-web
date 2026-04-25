@@ -37,6 +37,7 @@ const SAMPLE_SHORTCUTS = [
   { key: '1', description: '切到 Monitor', category: 'Navigation' },
   { key: '2', description: '切到 System', category: 'Navigation' },
   { key: '?', shift: true, description: '顯示快捷鍵清單', category: 'Actions' },
+  { key: 'r', description: 'Refresh data', category: 'Actions' },
 ]
 
 describe('HelpModal', () => {
@@ -165,5 +166,115 @@ describe('HelpModal', () => {
     const wrapper = mount(HelpModal, { ...MOUNT_OPTS, props: { open: true } })
     wrapper.unmount()
     expect(mockDeactivate).toHaveBeenCalled()
+  })
+
+  // -------------------------------------------------------------------------
+  // Search filter — Issue #373
+  // -------------------------------------------------------------------------
+
+  it('renders search input when modal is open', () => {
+    const wrapper = mount(HelpModal, { ...MOUNT_OPTS, props: { open: true } })
+    const input = document.querySelector('.help-search-input') as HTMLInputElement
+    expect(input).not.toBeNull()
+    expect(input.placeholder).toBe('搜尋 shortcut...')
+    wrapper.unmount()
+  })
+
+  it('filters shortcuts by description when user types', async () => {
+    const wrapper = mount(HelpModal, { ...MOUNT_OPTS, props: { open: true } })
+    const input = document.querySelector('.help-search-input') as HTMLInputElement
+    expect(input).not.toBeNull()
+    // Trigger input with value matching only one shortcut description
+    input.value = 'Monitor'
+    input.dispatchEvent(new Event('input'))
+    await flushPromises()
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('切到 Monitor')
+    expect(text).not.toContain('切到 System')
+    wrapper.unmount()
+  })
+
+  it('filters shortcuts by key when user types', async () => {
+    const wrapper = mount(HelpModal, { ...MOUNT_OPTS, props: { open: true } })
+    const input = document.querySelector('.help-search-input') as HTMLInputElement
+    expect(input).not.toBeNull()
+    // Key "1" should match Navigation shortcut with key "1"
+    input.value = '1'
+    input.dispatchEvent(new Event('input'))
+    await flushPromises()
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('切到 Monitor')
+    // key "2" shortcut should not appear
+    expect(text).not.toContain('切到 System')
+    wrapper.unmount()
+  })
+
+  it('filters shortcuts by description case-insensitively', async () => {
+    const wrapper = mount(HelpModal, { ...MOUNT_OPTS, props: { open: true } })
+    const input = document.querySelector('.help-search-input') as HTMLInputElement
+    expect(input).not.toBeNull()
+    // Lowercase search for uppercase "Refresh"
+    input.value = 'refresh'
+    input.dispatchEvent(new Event('input'))
+    await flushPromises()
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('Refresh data')
+    expect(text).not.toContain('切到 Monitor')
+    wrapper.unmount()
+  })
+
+  it('shows all shortcuts when search query is empty', async () => {
+    const wrapper = mount(HelpModal, { ...MOUNT_OPTS, props: { open: true } })
+    const input = document.querySelector('.help-search-input') as HTMLInputElement
+    expect(input).not.toBeNull()
+    // Type something then clear
+    input.value = 'xyz'
+    input.dispatchEvent(new Event('input'))
+    await flushPromises()
+    input.value = ''
+    input.dispatchEvent(new Event('input'))
+    await flushPromises()
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('切到 Monitor')
+    expect(text).toContain('切到 System')
+    expect(text).toContain('Refresh data')
+    wrapper.unmount()
+  })
+
+  it('shows no-match message when search query has no results', async () => {
+    const wrapper = mount(HelpModal, { ...MOUNT_OPTS, props: { open: true } })
+    const input = document.querySelector('.help-search-input') as HTMLInputElement
+    expect(input).not.toBeNull()
+    input.value = 'zzznomatch999'
+    input.dispatchEvent(new Event('input'))
+    await flushPromises()
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('無符合 shortcut')
+    wrapper.unmount()
+  })
+
+  it('shows Cmd+K hint in footer', () => {
+    const wrapper = mount(HelpModal, { ...MOUNT_OPTS, props: { open: true } })
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('⌘K')
+    expect(text).toContain('Ctrl+K')
+    expect(text).toContain('Command Palette')
+    wrapper.unmount()
+  })
+
+  it('resets search query when modal reopens', async () => {
+    const wrapper = mount(HelpModal, { ...MOUNT_OPTS, props: { open: true } })
+    const input = document.querySelector('.help-search-input') as HTMLInputElement
+    input.value = 'something'
+    input.dispatchEvent(new Event('input'))
+    await flushPromises()
+    // Close then reopen
+    await wrapper.setProps({ open: false })
+    await flushPromises()
+    await wrapper.setProps({ open: true })
+    await flushPromises()
+    const freshInput = document.querySelector('.help-search-input') as HTMLInputElement
+    expect(freshInput.value).toBe('')
+    wrapper.unmount()
   })
 })
