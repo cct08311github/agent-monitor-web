@@ -34,6 +34,12 @@
     --color-info: var(--accent);
     --color-warning: var(--orange);
     --color-danger: var(--red);
+    /* Activity heatmap — 5 intensity levels (0 = empty, 4 = peak) */
+    --color-heatmap-0: #1e1e22;
+    --color-heatmap-1: #1e3a5f;
+    --color-heatmap-2: #1e5fa8;
+    --color-heatmap-3: #4c8ef5;
+    --color-heatmap-4: #7c7cff;
     /* Depth */
     --shadow-sm: none;
     --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.4);
@@ -99,6 +105,12 @@
     --shadow-lg: 0 4px 20px rgba(0, 0, 0, 0.08);
     --glass-bg: #fefefe;
     --glass-border: #d5d3ce;
+    /* Activity heatmap — light theme */
+    --color-heatmap-0: #edecea;
+    --color-heatmap-1: #c8d8f5;
+    --color-heatmap-2: #90b4f0;
+    --color-heatmap-3: #5a8eea;
+    --color-heatmap-4: #3a6de0;
 }
 
 /* ── Dark mode overrides ──────────────── */
@@ -146,6 +158,12 @@
     --shadow-lg: 0 4px 24px rgba(0, 255, 156, 0.12);
     --glass-bg: #14081f;
     --glass-border: #00ff9c33;
+    /* Activity heatmap — neon theme */
+    --color-heatmap-0: #0e0520;
+    --color-heatmap-1: #003322;
+    --color-heatmap-2: #006644;
+    --color-heatmap-3: #00bb77;
+    --color-heatmap-4: #00ff9c;
 }
 
 /* ── Retro theme — 80s terminal: warm paper + dark-red + mono ─ */
