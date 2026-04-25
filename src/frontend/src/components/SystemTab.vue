@@ -12,6 +12,13 @@ import {
 } from '@/utils/costHeatmap'
 import { buildForecast } from '@/utils/costForecast'
 import type { Forecast } from '@/utils/costForecast'
+import {
+  topByCost,
+  topByTokens,
+  topByActivity,
+  rankEmoji,
+} from '@/utils/leaderboard'
+import type { AgentLike, ActivitySummary as LeaderboardActivitySummary } from '@/utils/leaderboard'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -134,6 +141,34 @@ const topAgentActivity = computed<AgentActivitySummary[]>(() => {
   return [...agentActivityData.value]
     .sort((a, b) => b.active_minutes - a.active_minutes)
     .slice(0, 10)
+})
+
+// ---------------------------------------------------------------------------
+// Wall of Fame leaderboard computeds
+// ---------------------------------------------------------------------------
+
+const leaderboardCost = computed(() => {
+  const agents: AgentLike[] = (appState.latestDashboard?.agents ?? []).map(a => ({
+    id: a.id,
+    costs: { month: a.costUSD, total: a.costUSD },
+  }))
+  return topByCost(agents)
+})
+
+const leaderboardTokens = computed(() => {
+  const agents: AgentLike[] = (appState.latestDashboard?.agents ?? []).map(a => ({
+    id: a.id,
+    tokens: { total: a.tokenUsage },
+  }))
+  return topByTokens(agents)
+})
+
+const leaderboardActivity = computed(() => {
+  const summary: LeaderboardActivitySummary[] = agentActivityData.value.map(a => ({
+    agent_id: a.agent_id,
+    active_minutes: a.active_minutes,
+  }))
+  return topByActivity(summary)
 })
 
 // ---------------------------------------------------------------------------
@@ -596,6 +631,80 @@ watch(tokenChartRef, (el) => {
 <template>
   <div class="system-tab">
     <!-- ---------------------------------------------------------------- -->
+    <!-- Wall of Fame Card                                                 -->
+    <!-- ---------------------------------------------------------------- -->
+    <div class="wof-card" data-testid="wof-card">
+      <h2 class="wof-title">🏆 Wall of Fame</h2>
+      <div class="wof-grid">
+        <!-- Leaderboard: Top Cost -->
+        <div class="wof-board" data-testid="wof-board-cost">
+          <h3 class="wof-board-title">💰 費用排行</h3>
+          <div v-if="leaderboardCost.length === 0" class="wof-empty" data-testid="wof-empty-cost">無資料</div>
+          <ul v-else class="wof-list">
+            <li
+              v-for="entry in leaderboardCost"
+              :key="entry.agentId"
+              class="wof-entry"
+              :class="{ 'wof-entry--podium': entry.rank <= 3 }"
+            >
+              <span class="wof-rank">{{ rankEmoji(entry.rank) }}</span>
+              <span class="wof-agent-id">{{ entry.agentId }}</span>
+              <span class="wof-value">${{ entry.value.toFixed(4) }}</span>
+              <div
+                class="wof-bar"
+                :style="{ width: leaderboardCost[0] ? (entry.value / leaderboardCost[0].value * 100).toFixed(1) + '%' : '0%' }"
+              />
+            </li>
+          </ul>
+        </div>
+
+        <!-- Leaderboard: Top Tokens -->
+        <div class="wof-board" data-testid="wof-board-tokens">
+          <h3 class="wof-board-title">🔢 Token 排行</h3>
+          <div v-if="leaderboardTokens.length === 0" class="wof-empty" data-testid="wof-empty-tokens">無資料</div>
+          <ul v-else class="wof-list">
+            <li
+              v-for="entry in leaderboardTokens"
+              :key="entry.agentId"
+              class="wof-entry"
+              :class="{ 'wof-entry--podium': entry.rank <= 3 }"
+            >
+              <span class="wof-rank">{{ rankEmoji(entry.rank) }}</span>
+              <span class="wof-agent-id">{{ entry.agentId }}</span>
+              <span class="wof-value">{{ formatTokens(entry.value) }}</span>
+              <div
+                class="wof-bar"
+                :style="{ width: leaderboardTokens[0] ? (entry.value / leaderboardTokens[0].value * 100).toFixed(1) + '%' : '0%' }"
+              />
+            </li>
+          </ul>
+        </div>
+
+        <!-- Leaderboard: Top Activity -->
+        <div class="wof-board" data-testid="wof-board-activity">
+          <h3 class="wof-board-title">⏱ 活躍度排行</h3>
+          <div v-if="leaderboardActivity.length === 0" class="wof-empty" data-testid="wof-empty-activity">無資料</div>
+          <ul v-else class="wof-list">
+            <li
+              v-for="entry in leaderboardActivity"
+              :key="entry.agentId"
+              class="wof-entry"
+              :class="{ 'wof-entry--podium': entry.rank <= 3 }"
+            >
+              <span class="wof-rank">{{ rankEmoji(entry.rank) }}</span>
+              <span class="wof-agent-id">{{ entry.agentId }}</span>
+              <span class="wof-value">{{ formatActiveMinutes(entry.value) }}</span>
+              <div
+                class="wof-bar"
+                :style="{ width: leaderboardActivity[0] ? (entry.value / leaderboardActivity[0].value * 100).toFixed(1) + '%' : '0%' }"
+              />
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------------------------------------------------------------- -->
     <!-- Smart Insights Card                                               -->
     <!-- ---------------------------------------------------------------- -->
     <div class="insights-card" data-testid="insights-card">
@@ -944,6 +1053,108 @@ watch(tokenChartRef, (el) => {
 </template>
 
 <style scoped>
+/* ------------------------------------------------------------------ */
+/* Wall of Fame Card                                                    */
+/* ------------------------------------------------------------------ */
+
+.wof-card {
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  background: var(--surface-base, #fff);
+}
+
+.wof-title {
+  margin: 0 0 14px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+}
+
+.wof-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.wof-board {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wof-board-title {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.wof-empty {
+  font-size: 12px;
+  color: var(--text-muted, #94a3b8);
+  padding: 4px 0;
+}
+
+.wof-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wof-entry {
+  display: grid;
+  grid-template-columns: 2rem 1fr auto;
+  grid-template-rows: auto 4px;
+  column-gap: 6px;
+  align-items: center;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: var(--surface-raised, #f8fafc);
+}
+
+.wof-entry--podium {
+  background: color-mix(in srgb, var(--accent, #3b82f6) 6%, transparent);
+}
+
+.wof-rank {
+  font-size: 13px;
+  text-align: center;
+  line-height: 1;
+}
+
+.wof-agent-id {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  color: var(--text-primary, #1e293b);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wof-value {
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted, #64748b);
+  white-space: nowrap;
+}
+
+.wof-bar {
+  grid-column: 1 / -1;
+  height: 3px;
+  background: var(--accent, #3b82f6);
+  border-radius: 2px;
+  min-width: 2px;
+  transition: width 0.3s ease;
+}
+
 /* ------------------------------------------------------------------ */
 /* Smart Insights Card                                                  */
 /* ------------------------------------------------------------------ */
