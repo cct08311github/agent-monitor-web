@@ -5,6 +5,8 @@ import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { useAuth } from '@/composables/useAuth'
 import { useKonamiCode } from '@/composables/useKonamiCode'
 import { showToast } from '@/composables/useToast'
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { useCompactMode } from '@/composables/useCompactMode'
 import { appState } from '@/stores/appState'
 import ToastContainer from '@/components/ToastContainer.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -15,6 +17,8 @@ const router = useRouter()
 const { effectiveTheme, currentTheme, setTheme } = useTheme()
 const currentThemeLabel = computed(() => currentTheme.value)
 const { username, logout: doLogout } = useAuth()
+const { compact, toggleCompact } = useCompactMode()
+const { registerShortcut } = useKeyboardShortcuts()
 
 const isLoginPage = computed(() => route.name === 'login')
 
@@ -75,10 +79,20 @@ function celebrate() {
 }
 
 useKonamiCode(celebrate)
+
+// ── Compact mode keyboard shortcut ─────────────────────────────────────────
+
+registerShortcut({
+  key: 'd',
+  shift: true,
+  handler: () => toggleCompact(),
+  description: '切換 compact 模式',
+  category: 'Actions',
+})
 </script>
 
 <template>
-  <div id="vue-app" :data-theme="effectiveTheme">
+  <div id="vue-app" :data-theme="effectiveTheme" :class="{ 'compact-mode': compact }">
     <header v-if="!isLoginPage" class="app-header">
       <!-- Match existing HTML structure exactly for CSS compatibility -->
       <div class="header-left">
@@ -131,6 +145,12 @@ useKonamiCode(celebrate)
           @click="openPalette"
         >⌘<span class="cmd-k-hint">K</span></button>
         <AlertBadge v-if="!isLoginPage" />
+        <button
+          class="header-btn icon-only"
+          :title="`Compact 模式 (${compact ? 'ON' : 'OFF'})`"
+          :aria-pressed="compact"
+          @click="toggleCompact"
+        >📐</button>
         <select
           :value="currentTheme"
           class="header-theme-select"
@@ -182,6 +202,34 @@ useKonamiCode(celebrate)
 @import './assets/css/overhaul.css';
 @import './assets/css/ux-patterns.css';
 @import './assets/css/vue-fixes.css';
+
+/* ── Compact density mode ─────────────────────────────────────────────────── */
+
+#vue-app.compact-mode .detail-card,
+#vue-app.compact-mode .agent-card,
+#vue-app.compact-mode .obs-card,
+#vue-app.compact-mode .alert-card,
+#vue-app.compact-mode .info-card,
+#vue-app.compact-mode .summary-card,
+#vue-app.compact-mode .sys-card,
+#vue-app.compact-mode .health-card,
+#vue-app.compact-mode .insights-card,
+#vue-app.compact-mode .wof-card {
+  padding: 0.6em !important;
+  font-size: 0.88em;
+}
+
+#vue-app.compact-mode .detail-card-title,
+#vue-app.compact-mode .obs-card-title,
+#vue-app.compact-mode .health-card-title,
+#vue-app.compact-mode .insights-card-title {
+  font-size: 0.95em;
+  margin-bottom: 0.4em;
+}
+
+#vue-app.compact-mode table {
+  font-size: 0.86em;
+}
 </style>
 
 <style scoped>
