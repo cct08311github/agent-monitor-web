@@ -761,3 +761,150 @@ describe('SystemTab — Cost Heatmap card', () => {
     wrapper.unmount()
   })
 })
+
+// ---------------------------------------------------------------------------
+// SystemTab — Cost Forecast card
+// ---------------------------------------------------------------------------
+
+function makeHistoryWithCostForecast(costHistory: Array<{ ts: string; total_cost: number }>) {
+  return {
+    success: true,
+    history: [],
+    costHistory,
+    topSpenders: [],
+    modelUsage: [],
+    agentActivity: [],
+  }
+}
+
+function recentIsoForecast(offsetDays: number, hour: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - offsetDays)
+  d.setHours(hour, 0, 0, 0)
+  return d.toISOString()
+}
+
+describe('SystemTab — Cost Forecast card', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  // 1. Renders forecast card section header
+  it('renders forecast section header', async () => {
+    mockGet.mockResolvedValue(makeHistoryWithCostForecast([
+      { ts: recentIsoForecast(1, 10), total_cost: 0.5 },
+      { ts: recentIsoForecast(0, 10), total_cost: 0.6 },
+    ]))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="forecast-section"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('成本預測')
+    wrapper.unmount()
+  })
+
+  // 2. Empty state when costHistory has < 2 days (basis_days < 2)
+  it('shows empty state when basis_days < 2', async () => {
+    // Only one data point → aggregateDaily returns 1 day → basis_days=1 < 2
+    mockGet.mockResolvedValue(makeHistoryWithCostForecast([
+      { ts: recentIsoForecast(0, 10), total_cost: 1.0 },
+    ]))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const empty = wrapper.find('[data-testid="forecast-empty"]')
+    expect(empty.exists()).toBe(true)
+    expect(empty.text()).toContain('資料不足')
+    expect(wrapper.find('[data-testid="forecast-content"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  // 3. Shows content when costHistory has >= 2 days
+  it('renders forecast content with 7d and 30d rows when basis_days >= 2', async () => {
+    const points = Array.from({ length: 5 }, (_, i) => ({
+      ts: recentIsoForecast(4 - i, 10),
+      total_cost: 0.5 + i * 0.1,
+    }))
+    mockGet.mockResolvedValue(makeHistoryWithCostForecast(points))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="forecast-content"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="forecast-7d"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="forecast-30d"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('下 7 天 預估')
+    expect(wrapper.text()).toContain('下 30 天 預估')
+    wrapper.unmount()
+  })
+
+  // 4. Confidence badge displays correct label for low confidence (basis_days < 7)
+  it('shows low confidence badge when basis_days < 7', async () => {
+    const points = Array.from({ length: 3 }, (_, i) => ({
+      ts: recentIsoForecast(2 - i, 10),
+      total_cost: 1.0,
+    }))
+    mockGet.mockResolvedValue(makeHistoryWithCostForecast(points))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const badge = wrapper.find('[data-testid="forecast-confidence"]')
+    expect(badge.exists()).toBe(true)
+    expect(badge.classes()).toContain('forecast-confidence--low')
+    expect(badge.text()).toContain('低')
+    wrapper.unmount()
+  })
+
+  // 5. Confidence badge shows high confidence for perfect-fit data over 10+ days
+  it('shows high confidence badge when rSquared > 0.5 and N >= 7', async () => {
+    // Perfect ascending line over 10 days → rSquared=1
+    const points = Array.from({ length: 10 }, (_, i) => ({
+      ts: recentIsoForecast(9 - i, 10),
+      total_cost: (i + 1) * 0.10,
+    }))
+    mockGet.mockResolvedValue(makeHistoryWithCostForecast(points))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const badge = wrapper.find('[data-testid="forecast-confidence"]')
+    expect(badge.exists()).toBe(true)
+    expect(badge.classes()).toContain('forecast-confidence--high')
+    expect(badge.text()).toContain('高')
+    wrapper.unmount()
+  })
+
+  // 6. Trend arrow shows ↑ for increasing data
+  it('shows upward trend indicator for increasing cost data', async () => {
+    const points = Array.from({ length: 7 }, (_, i) => ({
+      ts: recentIsoForecast(6 - i, 10),
+      total_cost: (i + 1) * 0.50,
+    }))
+    mockGet.mockResolvedValue(makeHistoryWithCostForecast(points))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const trend = wrapper.find('[data-testid="forecast-trend"]')
+    expect(trend.exists()).toBe(true)
+    expect(trend.text()).toContain('↑')
+    wrapper.unmount()
+  })
+
+  // 7. Basis days text is shown
+  it('displays basis_days text in the meta section', async () => {
+    const points = Array.from({ length: 5 }, (_, i) => ({
+      ts: recentIsoForecast(4 - i, 10),
+      total_cost: 0.5,
+    }))
+    mockGet.mockResolvedValue(makeHistoryWithCostForecast(points))
+    const wrapper = mount(SystemTab)
+    await flushPromises()
+
+    const basis = wrapper.find('[data-testid="forecast-basis"]')
+    expect(basis.exists()).toBe(true)
+    expect(basis.text()).toContain('天資料')
+    wrapper.unmount()
+  })
+})
