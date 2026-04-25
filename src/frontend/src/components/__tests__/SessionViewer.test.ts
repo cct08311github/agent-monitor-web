@@ -29,6 +29,23 @@ vi.mock('@/lib/focusTrap', () => ({
 }))
 
 // ---------------------------------------------------------------------------
+// localStorage stub (for annotation tests)
+// ---------------------------------------------------------------------------
+
+const lsStore: Record<string, string> = {}
+const localStorageMock = {
+  getItem: vi.fn((k: string) => lsStore[k] ?? null),
+  setItem: vi.fn((k: string, v: string) => { lsStore[k] = v }),
+  removeItem: vi.fn((k: string) => { delete lsStore[k] }),
+  clear: vi.fn(() => { for (const k of Object.keys(lsStore)) delete lsStore[k] }),
+}
+Object.defineProperty(globalThis, 'localStorage', {
+  value: localStorageMock,
+  writable: true,
+  configurable: true,
+})
+
+// ---------------------------------------------------------------------------
 // Import component AFTER mocks
 // ---------------------------------------------------------------------------
 
@@ -440,6 +457,129 @@ describe('SessionViewer — expand truncated message', () => {
     await nextTick()
 
     expect(wrapper.find('.sv-expand-btn').exists()).toBe(false)
+    wrapper.unmount()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 8. Annotation feature
+// ---------------------------------------------------------------------------
+
+describe('SessionViewer — annotation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorageMock.clear()
+  })
+
+  it('renders 📝 annotate button on each message', async () => {
+    const msgs = makeMessages({ role: 'assistant', text: 'hello' }, { role: 'user', text: 'world' })
+    mockGet.mockResolvedValue({ success: true, messages: msgs })
+
+    const wrapper = mountViewer()
+    await flushPromises()
+    await nextTick()
+
+    const annotateBtns = wrapper.findAll('.sv-annotate-btn')
+    expect(annotateBtns).toHaveLength(2)
+    wrapper.unmount()
+  })
+
+  it('calls window.prompt and saves annotation when user enters text', async () => {
+    const msgs = makeMessages({ role: 'assistant', text: 'annotate me' })
+    mockGet.mockResolvedValue({ success: true, messages: msgs })
+
+    const mockPrompt = vi.fn().mockReturnValue('my note')
+    vi.stubGlobal('prompt', mockPrompt)
+
+    const wrapper = mountViewer()
+    await flushPromises()
+    await nextTick()
+
+    await wrapper.find('.sv-annotate-btn').trigger('click')
+    await nextTick()
+
+    expect(mockPrompt).toHaveBeenCalled()
+    // annotation note block should now be visible
+    expect(wrapper.find('.sv-annotation-note').exists()).toBe(true)
+    expect(wrapper.find('.sv-annotation-note').text()).toContain('my note')
+    expect(mockShowToast).toHaveBeenCalledWith(expect.stringContaining('annotation'), 'success')
+
+    vi.unstubAllGlobals()
+    wrapper.unmount()
+  })
+
+  it('deletes annotation when user enters empty string', async () => {
+    const msgs = makeMessages({ role: 'assistant', text: 'annotate me' })
+    mockGet.mockResolvedValue({ success: true, messages: msgs })
+
+    // First: add an annotation
+    const mockPrompt = vi.fn()
+      .mockReturnValueOnce('initial note')
+      .mockReturnValueOnce('')
+    vi.stubGlobal('prompt', mockPrompt)
+
+    const wrapper = mountViewer()
+    await flushPromises()
+    await nextTick()
+
+    await wrapper.find('.sv-annotate-btn').trigger('click')
+    await nextTick()
+
+    expect(wrapper.find('.sv-annotation-note').exists()).toBe(true)
+
+    // Then: delete by entering empty string
+    await wrapper.find('.sv-annotate-btn').trigger('click')
+    await nextTick()
+
+    expect(wrapper.find('.sv-annotation-note').exists()).toBe(false)
+    expect(mockShowToast).toHaveBeenLastCalledWith(expect.stringContaining('刪除'), 'success')
+
+    vi.unstubAllGlobals()
+    wrapper.unmount()
+  })
+
+  it('does nothing when user cancels prompt (null)', async () => {
+    const msgs = makeMessages({ role: 'assistant', text: 'test' })
+    mockGet.mockResolvedValue({ success: true, messages: msgs })
+
+    const mockPrompt = vi.fn().mockReturnValue(null)
+    vi.stubGlobal('prompt', mockPrompt)
+
+    const wrapper = mountViewer()
+    await flushPromises()
+    await nextTick()
+
+    await wrapper.find('.sv-annotate-btn').trigger('click')
+    await nextTick()
+
+    expect(wrapper.find('.sv-annotation-note').exists()).toBe(false)
+    expect(mockShowToast).not.toHaveBeenCalled()
+
+    vi.unstubAllGlobals()
+    wrapper.unmount()
+  })
+
+  it('loads persisted annotations from localStorage on mount', async () => {
+    // Pre-populate localStorage with an existing annotation
+    const agentId = 'agent-1'
+    const sessionId = 'session-abc123'
+    lsStore[`oc_session_notes:${agentId}:${sessionId}`] = JSON.stringify([
+      { msgIndex: 0, note: 'persisted note', ts: Date.now() },
+    ])
+
+    const msgs = makeMessages({ role: 'assistant', text: 'hello' })
+    mockGet.mockResolvedValue({ success: true, messages: msgs })
+
+    const wrapper = mount(SessionViewer, {
+      props: { agentId, sessionId },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    await nextTick()
+
+    expect(wrapper.find('.sv-annotation-note').exists()).toBe(true)
+    expect(wrapper.find('.sv-annotation-note').text()).toContain('persisted note')
+
     wrapper.unmount()
   })
 })
