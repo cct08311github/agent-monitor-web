@@ -143,6 +143,27 @@ function fmtHistTs(ts: string): string {
   }
 }
 
+// ── Diagnose ──────────────────────────────────────────────────────────────────
+
+import { diagnoseAgent, type DiagnosticFinding } from '@/utils/agentDiagnose'
+
+const diagnoseFindings = ref<DiagnosticFinding[] | null>(null)
+
+function severityIcon(sev: string): string {
+  if (sev === 'critical') return '🔴'
+  if (sev === 'warning') return '🟠'
+  if (sev === 'info') return '🔵'
+  return '✅'
+}
+
+function runDiagnose(): void {
+  diagnoseFindings.value = diagnoseAgent({
+    agent: agent.value ?? {},
+    sessions: sessions.value,
+    history: history.value,
+  })
+}
+
 // ── Session search ────────────────────────────────────────────────────────────
 
 const sessionSearchQuery = ref('')
@@ -252,6 +273,27 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
       <div style="display:flex;gap:8px;margin-top:12px">
         <button class="ctrl-btn accent" style="flex:1" @click="$emit('chat', agentId)">💬 對話</button>
         <button class="ctrl-btn" style="flex:1" @click="$emit('model-switch', agentId, agent?.model || '')">🔄 切換模型</button>
+      </div>
+
+      <!-- Diagnose Card -->
+      <div class="detail-card">
+        <div class="detail-card-title">
+          🩺 診斷
+          <button type="button" class="ctrl-btn diagnose-run-btn" @click="runDiagnose">執行診斷</button>
+        </div>
+        <div v-if="diagnoseFindings === null" style="color:var(--text-muted);font-size:12px;padding:4px 0">
+          點擊「執行診斷」分析此 agent 當前狀態
+        </div>
+        <div v-else>
+          <div
+            v-for="(f, i) in diagnoseFindings"
+            :key="`${f.check}-${i}`"
+            class="diagnose-finding"
+          >
+            <span class="diagnose-icon" aria-hidden="true">{{ severityIcon(f.severity) }}</span>
+            <span class="diagnose-message">{{ f.message }}</span>
+          </div>
+        </div>
       </div>
 
       <!-- History Trend Card -->
@@ -410,6 +452,32 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
   border-color: var(--blue, #89b4fa);
 }
 
+.diagnose-run-btn {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 2px 8px;
+}
+.detail-card-title {
+  display: flex;
+  align-items: center;
+}
+.diagnose-finding {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 4px 0;
+}
+.diagnose-icon {
+  flex-shrink: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.diagnose-message {
+  flex: 1;
+  color: var(--text-primary);
+}
 .sessions-empty-search {
   font-size: 12px;
   color: var(--text-muted, #6c7086);
