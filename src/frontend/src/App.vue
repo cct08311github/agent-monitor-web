@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useTheme } from '@/composables/useTheme'
+import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { useAuth } from '@/composables/useAuth'
 import { appState } from '@/stores/appState'
 import ToastContainer from '@/components/ToastContainer.vue'
@@ -10,7 +10,8 @@ import AlertBadge from '@/components/AlertBadge.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { effectiveTheme, currentTheme, cycleTheme } = useTheme()
+const { effectiveTheme, currentTheme, setTheme } = useTheme()
+const currentThemeLabel = computed(() => currentTheme.value)
 const { username, logout: doLogout } = useAuth()
 
 const isLoginPage = computed(() => route.name === 'login')
@@ -25,12 +26,6 @@ const cmdKHint = computed(() => (isMac.value ? '⌘K' : 'Ctrl+K'))
 function openPalette() {
   appState.commandPaletteRequest++
 }
-
-const themeIcon = computed(() => {
-  if (currentTheme.value === 'light') return '☀️'
-  if (currentTheme.value === 'dark') return '🌙'
-  return '🌓'
-})
 
 async function handleLogout() {
   await doLogout()
@@ -109,7 +104,19 @@ const activeDesktopTab = computed<DesktopTab>(() => {
           @click="openPalette"
         >⌘<span class="cmd-k-hint">K</span></button>
         <AlertBadge v-if="!isLoginPage" />
-        <button class="header-btn icon-only" :title="themeIcon" @click="cycleTheme">{{ themeIcon }}</button>
+        <select
+          :value="currentTheme"
+          class="header-theme-select"
+          :title="`目前主題: ${currentThemeLabel}`"
+          aria-label="主題"
+          @change="setTheme(($event.target as HTMLSelectElement).value as ThemeMode)"
+        >
+          <option value="light">☀️ Light</option>
+          <option value="dark">🌙 Dark</option>
+          <option value="auto">🌓 Auto</option>
+          <option value="neon">⚡ Neon</option>
+          <option value="retro">📟 Retro</option>
+        </select>
         <span style="font-size:12px;color:var(--text-muted);margin:0 4px">{{ username }}</span>
         <button
           class="header-btn icon-only"
@@ -158,5 +165,28 @@ const activeDesktopTab = computed<DesktopTab>(() => {
   font-size: 11px;
   font-weight: 600;
   margin-left: 1px;
+}
+
+.header-theme-select {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.header-theme-select:hover,
+.header-theme-select:focus {
+  border-color: var(--accent);
+  color: var(--accent);
+  outline: none;
 }
 </style>
