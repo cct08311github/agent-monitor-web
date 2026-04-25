@@ -39,6 +39,35 @@ export function formatRelativeTime(ts: number, now: number = Date.now()): string
 }
 
 /**
+ * Format a future epoch ms timestamp as a human-readable countdown string.
+ *
+ * Rules:
+ *  - invalid / non-positive target  → '未排程'
+ *  - diff ≤ 30 000 ms (≤30 s)       → '即將執行'
+ *  - diff > 30 000 ms               → '秒後' / '分 秒後' / '小時 分後'
+ *  - overdue by > 60 000 ms         → '逾期 N 分鐘'
+ *  - overdue by ≤ 60 000 ms         → '即將執行'  (grace window)
+ *
+ * @param targetMs - epoch milliseconds of the scheduled run
+ * @param now      - reference point (defaults to Date.now()); injectable for tests
+ */
+export function formatCountdown(targetMs: number, now: number = Date.now()): string {
+  if (!Number.isFinite(targetMs) || targetMs <= 0) return '未排程'
+  const diff = targetMs - now
+  if (diff <= -60000) {
+    const overdueMin = Math.floor(-diff / 60000)
+    return `逾期 ${overdueMin} 分鐘`
+  }
+  if (diff <= 30000) return '即將執行'
+  const sec = Math.floor(diff / 1000)
+  const min = Math.floor(sec / 60)
+  const hr = Math.floor(min / 60)
+  if (hr > 0) return `${hr} 小時 ${min % 60} 分後`
+  if (min > 0) return `${min} 分 ${sec % 60} 秒後`
+  return `${sec} 秒後`
+}
+
+/**
  * Format a Date into YYYYMMDD-HHMMSS (local timezone).
  * Used as a safe filename timestamp component — only [A-Za-z0-9-] chars.
  */

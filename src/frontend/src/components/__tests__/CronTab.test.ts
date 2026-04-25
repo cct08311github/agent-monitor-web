@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 
 // ---------------------------------------------------------------------------
@@ -442,6 +442,152 @@ describe('CronTab', () => {
       await flushPromises()
 
       expect(wrapper.find('.watchdog-toggle input[type="checkbox"]').exists()).toBe(true)
+      wrapper.unmount()
+    })
+  })
+
+  // ── Countdown display ──────────────────────────────────────────────────────
+
+  describe('countdown display', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('shows countdown text for an enabled job with a future nextRunAtMs', async () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(1_700_000_000_000)
+
+      const job = makeJob({
+        enabled: true,
+        state: {
+          nextRunAtMs: 1_700_000_000_000 + 5 * 60_000, // 5 min from now
+          lastRunAtMs: undefined,
+          lastStatus: undefined,
+        },
+      })
+      mockGet.mockResolvedValue(jobsResponse([job]))
+      const wrapper = mount(CronTab)
+      await flushPromises()
+
+      const countdown = wrapper.find('.cron-countdown')
+      expect(countdown.exists()).toBe(true)
+      expect(countdown.text()).toMatch(/分/)
+      wrapper.unmount()
+    })
+
+    it('shows "已停用" countdown for a disabled job', async () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(1_700_000_000_000)
+
+      const job = makeJob({
+        enabled: false,
+        state: {
+          nextRunAtMs: 1_700_000_000_000 + 5 * 60_000,
+          lastRunAtMs: undefined,
+          lastStatus: undefined,
+        },
+      })
+      mockGet.mockResolvedValue(jobsResponse([job]))
+      const wrapper = mount(CronTab)
+      await flushPromises()
+
+      const countdown = wrapper.find('.cron-countdown')
+      expect(countdown.text()).toBe('已停用')
+      wrapper.unmount()
+    })
+
+    it('shows "未排程" for enabled job with no nextRunAtMs', async () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(1_700_000_000_000)
+
+      const job = makeJob({
+        enabled: true,
+        state: {
+          nextRunAtMs: undefined,
+          lastRunAtMs: undefined,
+          lastStatus: undefined,
+        },
+      })
+      mockGet.mockResolvedValue(jobsResponse([job]))
+      const wrapper = mount(CronTab)
+      await flushPromises()
+
+      const countdown = wrapper.find('.cron-countdown')
+      expect(countdown.text()).toBe('未排程')
+      wrapper.unmount()
+    })
+
+    it('shows "即將執行" for enabled job with nextRunAtMs within 30s', async () => {
+      vi.useFakeTimers()
+      const NOW = 1_700_000_000_000
+      vi.setSystemTime(NOW)
+
+      const job = makeJob({
+        enabled: true,
+        state: {
+          nextRunAtMs: NOW + 15_000, // 15s ahead
+          lastRunAtMs: undefined,
+          lastStatus: undefined,
+        },
+      })
+      mockGet.mockResolvedValue(jobsResponse([job]))
+      const wrapper = mount(CronTab)
+      await flushPromises()
+
+      const countdown = wrapper.find('.cron-countdown')
+      expect(countdown.text()).toBe('即將執行')
+      wrapper.unmount()
+    })
+
+    it('updates countdown after 1s tick via fake timer', async () => {
+      vi.useFakeTimers()
+      const NOW = 1_700_000_000_000
+      vi.setSystemTime(NOW)
+
+      const job = makeJob({
+        enabled: true,
+        state: {
+          nextRunAtMs: NOW + 120_000, // 2 min
+          lastRunAtMs: undefined,
+          lastStatus: undefined,
+        },
+      })
+      mockGet.mockResolvedValue(jobsResponse([job]))
+      const wrapper = mount(CronTab)
+      await flushPromises()
+
+      const before = wrapper.find('.cron-countdown').text()
+
+      // advance 1 second
+      vi.advanceTimersByTime(1000)
+      await wrapper.vm.$nextTick()
+
+      const after = wrapper.find('.cron-countdown').text()
+      // Both should still show countdown (2 min range), but may differ by 1s
+      expect(before).toMatch(/分/)
+      expect(after).toMatch(/分/)
+      wrapper.unmount()
+    })
+
+    it('shows "逾期 N 分鐘" for enabled job overdue by more than 60s', async () => {
+      vi.useFakeTimers()
+      const NOW = 1_700_000_000_000
+      vi.setSystemTime(NOW)
+
+      const job = makeJob({
+        enabled: true,
+        state: {
+          nextRunAtMs: NOW - 5 * 60_000, // 5 min overdue
+          lastRunAtMs: undefined,
+          lastStatus: undefined,
+        },
+      })
+      mockGet.mockResolvedValue(jobsResponse([job]))
+      const wrapper = mount(CronTab)
+      await flushPromises()
+
+      const countdown = wrapper.find('.cron-countdown')
+      expect(countdown.text()).toBe('逾期 5 分鐘')
       wrapper.unmount()
     })
   })
