@@ -4,6 +4,7 @@ import type { Agent } from '@/types/api'
 import { formatTokens, formatTWD, getAgentEmoji, getStatusInfo } from '@/utils/format'
 import { computeAgentMood } from '@/utils/agentMood'
 import { appState } from '@/stores/appState'
+import { showToast } from '@/composables/useToast'
 import AgentQuickDiagnose from '@/components/AgentQuickDiagnose.vue'
 
 const props = defineProps<{
@@ -15,6 +16,7 @@ const emit = defineEmits<{
   (e: 'click', id: string): void
   (e: 'chat', id: string): void
   (e: 'model-switch', id: string, currentModel: string): void
+  (e: 'compare', idA: string, idB: string): void
 }>()
 
 const showQuickDiagnose = ref(false)
@@ -74,6 +76,45 @@ function getTokens(a: Agent): number {
   const tokens = ext['tokens'] as Record<string, unknown> | undefined
   return Number(tokens?.['total'] ?? a.tokenUsage ?? 0)
 }
+
+// ---------------------------------------------------------------------------
+// Compare button logic
+// ---------------------------------------------------------------------------
+
+const isFirstSelected = computed(
+  () => appState.compareSelection?.firstAgentId === props.agent.id,
+)
+
+const compareButtonTitle = computed(() => {
+  if (isFirstSelected.value) return '取消選擇（點擊以取消）'
+  if (appState.compareSelection?.firstAgentId) return `與 ${appState.compareSelection.firstAgentId} 比較`
+  return '選擇此 agent 作為比較對象'
+})
+
+function onCompareClick(event: MouseEvent) {
+  event.stopPropagation()
+
+  const sel = appState.compareSelection
+
+  if (!sel || sel.firstAgentId === null) {
+    // First selection
+    appState.compareSelection = { firstAgentId: props.agent.id }
+    showToast(`已選擇 ${props.agent.id}，再點一個 agent 進行比較`, 'info')
+    return
+  }
+
+  if (sel.firstAgentId === props.agent.id) {
+    // Cancel own selection
+    appState.compareSelection = null
+    showToast('已取消', 'info')
+    return
+  }
+
+  // Second selection — emit compare event, then clear state
+  const firstId = sel.firstAgentId
+  appState.compareSelection = null
+  emit('compare', firstId, props.agent.id)
+}
 </script>
 
 <template>
@@ -111,6 +152,14 @@ function getTokens(a: Agent): number {
           <span class="agent-status-dot" aria-hidden="true"></span>
           {{ ' ' + getStatusInfo(agent.status).text }}
         </div>
+        <!-- Compare button — visible on hover or when selected -->
+        <button
+          :class="['agent-compare-btn', { 'is-selected': isFirstSelected }]"
+          :title="compareButtonTitle"
+          :aria-label="compareButtonTitle"
+          :aria-pressed="isFirstSelected"
+          @click.stop="onCompareClick"
+        >⚖️</button>
       </div>
     </div>
 
@@ -178,5 +227,34 @@ function getTokens(a: Agent): number {
   /* keep emoji crisp without layout shift */
   width: 1.5rem;
   text-align: center;
+}
+
+/* Compare button — hidden by default, shown on card hover or when selected */
+.agent-compare-btn {
+  font-size: 0.85rem;
+  line-height: 1;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 2px 4px;
+  opacity: 0;
+  transition: opacity 0.15s, border-color 0.15s;
+  user-select: none;
+}
+
+.agent-compare-btn.is-selected {
+  opacity: 1;
+  border-color: var(--accent, #3b82f6);
+  background-color: var(--accent-bg, rgba(59, 130, 246, 0.1));
+}
+
+.agent-card:hover .agent-compare-btn {
+  opacity: 0.7;
+}
+
+.agent-card:hover .agent-compare-btn:hover {
+  opacity: 1;
+  border-color: var(--border, #e0e0e0);
 }
 </style>

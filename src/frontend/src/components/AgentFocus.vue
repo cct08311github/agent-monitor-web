@@ -11,6 +11,7 @@ const emit = defineEmits<{
   (e: 'agent-click', id: string): void
   (e: 'agent-chat', id: string): void
   (e: 'agent-model-switch', id: string, currentModel: string): void
+  (e: 'agent-compare', idA: string, idB: string): void
 }>()
 </script>
 
@@ -28,6 +29,7 @@ const emit = defineEmits<{
           @click="emit('agent-click', $event)"
           @chat="emit('agent-chat', $event)"
           @model-switch="(id, model) => emit('agent-model-switch', id, model)"
+          @compare="(idA, idB) => emit('agent-compare', idA, idB)"
         />
       </div>
     </template>

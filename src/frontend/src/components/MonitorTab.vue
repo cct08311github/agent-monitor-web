@@ -11,6 +11,8 @@ import SummaryCards from '@/components/SummaryCards.vue'
 import CronTab from '@/components/CronTab.vue'
 import TaskHubTab from '@/components/TaskHubTab.vue'
 import ObservabilityTab from '@/components/ObservabilityTab.vue'
+import AgentCompareModal from '@/components/AgentCompareModal.vue'
+import type { CompareAgentLike } from '@/utils/agentCompare'
 
 const emit = defineEmits<{
   (e: 'agent-click', agentId: string): void
@@ -111,6 +113,30 @@ const connectionLabel = computed(() => {
 const connectionClass = computed(() => connectionStatus.value)
 
 const freshnessLabel = computed(() => formatFreshnessLabel(freshness.value, dataAge.value))
+
+// ── Compare modal ─────────────────────────────────────────────────────────────
+
+const compareIds = ref<{ a: string; b: string } | null>(null)
+
+const compareAgentA = computed<CompareAgentLike | null>(() => {
+  if (!compareIds.value) return null
+  const agent = dashboard.value?.agents.find((ag) => ag.id === compareIds.value!.a)
+  return agent ? (agent as unknown as CompareAgentLike) : null
+})
+
+const compareAgentB = computed<CompareAgentLike | null>(() => {
+  if (!compareIds.value) return null
+  const agent = dashboard.value?.agents.find((ag) => ag.id === compareIds.value!.b)
+  return agent ? (agent as unknown as CompareAgentLike) : null
+})
+
+function openCompare(idA: string, idB: string) {
+  compareIds.value = { a: idA, b: idB }
+}
+
+function closeCompare() {
+  compareIds.value = null
+}
 </script>
 
 <template>
@@ -194,6 +220,7 @@ const freshnessLabel = computed(() => formatFreshnessLabel(freshness.value, data
         @agent-click="showAgentDetail"
         @agent-chat="(id: string) => emit('agent-chat', id)"
         @agent-model-switch="(id: string, model: string) => emit('agent-model-switch', id, model)"
+        @agent-compare="(idA: string, idB: string) => openCompare(idA, idB)"
       />
 
       <!-- Periphery: idle/dormant agents -->
@@ -234,5 +261,13 @@ const freshnessLabel = computed(() => formatFreshnessLabel(freshness.value, data
     <template v-else-if="activeSubTab === 'observability'">
       <ObservabilityTab />
     </template>
+
+    <!-- Compare Modal -->
+    <AgentCompareModal
+      v-if="compareIds && compareAgentA && compareAgentB"
+      :agentA="compareAgentA"
+      :agentB="compareAgentB"
+      @close="closeCompare"
+    />
   </div>
 </template>

@@ -51,6 +51,12 @@ export const appState = reactive({
    * Any component increments this; DashboardView watches and opens the palette.
    */
   commandPaletteRequest: 0,
+  /**
+   * Multi-agent comparison selection state.
+   * firstAgentId holds the first selected agent; set to null to clear.
+   * Set the whole field to null to fully deactivate comparison mode.
+   */
+  compareSelection: null as { firstAgentId: string | null } | null,
 })
 
 // Track mobile breakpoint changes reactively
