@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { api } from '@/composables/useApi'
 import { appState } from '@/stores/appState'
 import { formatRelativeTime } from '@/lib/time'
+import { showToast } from '@/composables/useToast'
 import NumberTicker from './NumberTicker.vue'
 
 // ---------------------------------------------------------------------------
@@ -32,6 +33,13 @@ const alerts = ref<AlertRecord[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 const flashing = ref(false)
+
+// ---------------------------------------------------------------------------
+// Alert cleared celebration state
+// ---------------------------------------------------------------------------
+
+const celebratingClear = ref(false)
+let celebrateTimeout: ReturnType<typeof setTimeout> | null = null
 
 // Popover state
 const showPopover = ref(false)
@@ -428,7 +436,45 @@ onUnmounted(() => {
     clearTimeout(hideTimer)
     hideTimer = null
   }
+  if (celebrateTimeout !== null) {
+    clearTimeout(celebrateTimeout)
+    celebrateTimeout = null
+  }
 })
+
+// ---------------------------------------------------------------------------
+// Alert cleared celebration helpers
+// ---------------------------------------------------------------------------
+
+/** Random horizontal position + staggered fall delay for each confetti emoji */
+function celebrationStyle(i: number): Record<string, string> {
+  // Use index-based determinism so SSR-safe (no Math.random in render)
+  const left = ((i * 137.508) % 100).toFixed(2) // golden-angle spread
+  const delay = ((i % 4) * 0.18).toFixed(2)
+  return {
+    left: `${left}%`,
+    animationDelay: `${delay}s`,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Watch recentAlerts → trigger celebration when count transitions to 0
+// ---------------------------------------------------------------------------
+
+watch(
+  () => recentAlerts.value.length,
+  (current, previous) => {
+    if (previous !== undefined && previous > 0 && current === 0) {
+      celebratingClear.value = true
+      showToast('🎉 All alerts cleared!', 'success')
+      if (celebrateTimeout !== null) clearTimeout(celebrateTimeout)
+      celebrateTimeout = setTimeout(() => {
+        celebratingClear.value = false
+        celebrateTimeout = null
+      }, 3000)
+    }
+  },
+)
 
 // ---------------------------------------------------------------------------
 // Flash on new alerts
@@ -575,6 +621,18 @@ function handleClick(): void {
       </div>
     </Transition>
   </div>
+
+  <!-- Alert cleared celebration overlay — full-screen confetti rain, 3 s -->
+  <Teleport to="body">
+    <div v-if="celebratingClear" class="alert-celebrate-overlay" aria-hidden="true">
+      <span
+        v-for="i in 8"
+        :key="i"
+        class="alert-celebrate-emoji"
+        :style="celebrationStyle(i)"
+      >🎉</span>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -862,5 +920,38 @@ function handleClick(): void {
 .fade-leave-to {
   opacity: 0;
   transform: translateY(-4px);
+}
+
+/* ── Alert cleared celebration overlay ────────────────────────────────────── */
+
+.alert-celebrate-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+@keyframes celebrationFall {
+  0% {
+    transform: translateY(-60px) rotate(0deg);
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.alert-celebrate-emoji {
+  position: absolute;
+  top: 0;
+  font-size: 28px;
+  line-height: 1;
+  animation: celebrationFall 2.8s ease-in forwards;
+  /* horizontal + delay set inline via celebrationStyle() */
 }
 </style>
