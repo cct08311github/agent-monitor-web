@@ -3,6 +3,7 @@
 const alertEngine = require('./alertEngine');
 const errorBuffer = require('./errorBuffer');
 const apiMetrics = require('./apiMetrics');
+const tsdbService = require('./tsdbService');
 
 /**
  * Build a composite health summary from in-memory observability data.
@@ -18,6 +19,8 @@ const apiMetrics = require('./apiMetrics');
  * @returns {{
  *   status: 'ok'|'degraded'|'critical',
  *   uptime_ms: number,
+ *   agents_total_count: number,
+ *   agents_active_count: number,
  *   alerts_recent_count: number,
  *   alerts_critical_count: number,
  *   alerts_warning_count: number,
@@ -27,6 +30,11 @@ const apiMetrics = require('./apiMetrics');
  * }}
  */
 function buildHealthSummary({ now = Date.now() } = {}) {
+    // ── Agent counts (from latest TSDB snapshot) ──────────────────────────────
+    const counts = typeof tsdbService.getLatestAgentCounts === 'function'
+        ? tsdbService.getLatestAgentCounts()
+        : null;
+
     // ── Alerts (5-minute window) ──────────────────────────────────────────────
     const FIVE_MIN = 5 * 60 * 1000;
     const allRecent = typeof alertEngine.getRecent === 'function'
@@ -65,6 +73,8 @@ function buildHealthSummary({ now = Date.now() } = {}) {
     return {
         status,
         uptime_ms: Math.round(process.uptime() * 1000),
+        agents_total_count: counts?.total ?? 0,
+        agents_active_count: counts?.active ?? 0,
         alerts_recent_count: recentAlerts.length,
         alerts_critical_count: criticalCount,
         alerts_warning_count: warningCount,
