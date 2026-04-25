@@ -37,16 +37,71 @@ const DOMAINS_WITH_PROJECT = ['work', 'sideproject'];
 
 let db = null;
 
+const COMMON_COLUMNS_DDL = `
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    status TEXT DEFAULT 'not_started',
+    priority TEXT DEFAULT 'medium',
+    due_date TEXT,
+    completed_at TEXT,
+    parent_id TEXT,
+    tags TEXT,
+    notes TEXT,
+    notion_page_id TEXT,
+    notion_dirty INTEGER DEFAULT 0,
+    notion_synced_at TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+`;
+
+const SCHEMA_STATEMENTS = [
+    `CREATE TABLE IF NOT EXISTS work_tasks (
+        ${COMMON_COLUMNS_DDL},
+        assignee TEXT,
+        project TEXT
+    )`,
+    `CREATE TABLE IF NOT EXISTS personal_tasks (
+        ${COMMON_COLUMNS_DDL}
+    )`,
+    `CREATE TABLE IF NOT EXISTS sideproject_tasks (
+        ${COMMON_COLUMNS_DDL},
+        project TEXT,
+        github_repo TEXT,
+        github_issue_id TEXT,
+        github_pr_id TEXT,
+        github_branch TEXT,
+        dev_status TEXT,
+        automation_level TEXT
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_work_status ON work_tasks(status)`,
+    `CREATE INDEX IF NOT EXISTS idx_personal_status ON personal_tasks(status)`,
+    `CREATE INDEX IF NOT EXISTS idx_sideproject_status ON sideproject_tasks(status)`,
+];
+
+function ensureSchema(database) {
+    for (const stmt of SCHEMA_STATEMENTS) {
+        database.prepare(stmt).run();
+    }
+}
+
 function getDb() {
     if (db) return db;
     try {
+        const fs = require('fs');
+        const path = require('path');
         const Database = require('better-sqlite3');
         const { dbPath } = getTaskHubConfig();
-        db = new Database(dbPath, { readonly: false, fileMustExist: true });
+        // Ensure parent directory exists so first-time bootstrap works on a fresh machine.
+        fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+        const fresh = !fs.existsSync(dbPath);
+        // fileMustExist=false so a missing file is auto-created; schema is applied immediately
+        // for fresh installs, idempotently for existing ones.
+        db = new Database(dbPath, { readonly: false, fileMustExist: false });
         db.pragma('journal_mode = WAL');
         db.pragma('synchronous = NORMAL');
         db.pragma('foreign_keys = ON');
-        logger.info('taskhub_db_connected', { dbPath });
+        ensureSchema(db);
+        logger.info('taskhub_db_connected', { dbPath, fresh });
         return db;
     } catch (err) {
         logger.error('taskhub_db_connect_error', { details: logger.toErrorFields(err) });
