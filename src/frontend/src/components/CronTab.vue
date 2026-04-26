@@ -22,6 +22,7 @@ import {
   filterJobsByTag,
 } from '@/utils/cronTags'
 import { useCronAliases } from '@/composables/useCronAliases'
+import { filterCronJobsByQuery } from '@/utils/cronSearchFilter'
 import { loadPins, togglePin as cronTogglePin, isPinned, partition } from '@/utils/cronPins'
 import {
   loadArchived as loadCronArchived,
@@ -115,16 +116,12 @@ const selectedCronTag = ref<string | null>(null)
 // ---------------------------------------------------------------------------
 
 const filteredJobs = computed<CronJob[]>(() => {
-  const query = searchQuery.value.trim().toLowerCase()
-
-  // 1. Search by name OR schedule.expr (case-insensitive substring)
-  let result = query
-    ? jobs.value.filter((j) => {
-        const nameMatch = j.name.toLowerCase().includes(query)
-        const exprMatch = (j.schedule?.expr ?? '').toLowerCase().includes(query)
-        return nameMatch || exprMatch
-      })
-    : [...jobs.value]
+  // 1. Fuzzy search across id, display name (alias-aware), description, schedule.expr
+  let result = filterCronJobsByQuery(
+    jobs.value,
+    searchQuery.value,
+    (j) => displayCronName(j.id, j.name),
+  )
 
   // 2. Filter by enabled/disabled
   if (filterMode.value === 'enabled') {
