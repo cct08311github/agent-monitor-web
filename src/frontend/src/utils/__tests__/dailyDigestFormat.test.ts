@@ -9,6 +9,7 @@ function makeData(overrides: Partial<DigestData> = {}): DigestData {
     errors24h: 3,
     activeAlerts: 1,
     enabledCronJobs: 7,
+    captureCountToday: 0,
     ...overrides,
   }
 }
@@ -80,5 +81,23 @@ describe('formatDigestForClipboard', () => {
   it('includes enabled cron jobs count', () => {
     const result = formatDigestForClipboard(makeData({ enabledCronJobs: 7 }))
     expect(result).toContain('Cron jobs enabled: 7')
+  })
+
+  // 9. captures count when > 0
+  it('includes Captures (today) with count 5', () => {
+    const result = formatDigestForClipboard(makeData({ captureCountToday: 5 }))
+    expect(result).toContain('Captures (today): 5')
+  })
+
+  // 10. captures count when 0 — must not be omitted
+  it('includes Captures (today): 0 when count is zero', () => {
+    const result = formatDigestForClipboard(makeData({ captureCountToday: 0 }))
+    expect(result).toContain('Captures (today): 0')
+  })
+
+  // 11. DigestData type accepts captureCountToday field
+  it('DigestData accepts captureCountToday field', () => {
+    const data: DigestData = makeData({ captureCountToday: 12 })
+    expect(data.captureCountToday).toBe(12)
   })
 })

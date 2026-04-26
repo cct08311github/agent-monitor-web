@@ -6,6 +6,7 @@ import { useToast } from '@/composables/useToast'
 import { writeClipboardText, isClipboardWriteSupported } from '@/utils/clipboardWrite'
 import { formatDigestForClipboard } from '@/utils/dailyDigestFormat'
 import type { DigestData } from '@/utils/dailyDigestFormat'
+import { useQuickCapture } from '@/composables/useQuickCapture'
 
 const props = defineProps<{
   dashboard: DashboardPayload | null
@@ -24,6 +25,19 @@ const activeAgentCount = computed(() =>
 const enabledCronCount = computed(() =>
   props.dashboard?.cron?.filter((c) => c.enabled).length ?? 0,
 )
+
+// ---------------------------------------------------------------------------
+// Captures today — counted from useQuickCapture shared state
+// ---------------------------------------------------------------------------
+
+const { captures } = useQuickCapture()
+
+const captureCountToday = computed(() => {
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  const startMs = start.getTime()
+  return captures.value.filter((c) => c.createdAt >= startMs).length
+})
 
 // ---------------------------------------------------------------------------
 // Errors + alerts fetched from API
@@ -80,6 +94,7 @@ async function onCopy(): Promise<void> {
     errors24h: errors24h.value,
     activeAlerts: activeAlerts.value,
     enabledCronJobs: enabledCronCount.value,
+    captureCountToday: captureCountToday.value,
   }
   const text = formatDigestForClipboard(data)
   const ok = await writeClipboardText(text)
@@ -141,6 +156,10 @@ onUnmounted(() => {
       <li class="digest-row">
         <span class="digest-label">🕒 Cron jobs enabled</span>
         <span class="digest-value">{{ enabledCronCount }}</span>
+      </li>
+      <li class="digest-row">
+        <span class="digest-label">📝 Captures (today)</span>
+        <span class="digest-value">{{ captureCountToday }}</span>
       </li>
     </ul>
   </div>
