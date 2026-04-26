@@ -425,3 +425,193 @@ describe('QuickCaptureList — bulk select', () => {
     wrapper.unmount()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Keyboard navigation tests
+// ---------------------------------------------------------------------------
+
+describe('QuickCaptureList — keyboard navigation', () => {
+  beforeEach(() => {
+    mockCaptures.mockReturnValue([
+      makeCapture('k1', 'First capture'),
+      makeCapture('k2', 'Second capture'),
+      makeCapture('k3', 'Third capture'),
+    ])
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  async function waitFlush(n = 4): Promise<void> {
+    for (let i = 0; i < n; i++) await Promise.resolve()
+  }
+
+  function pressKey(key: string, opts: KeyboardEventInit = {}): void {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, ...opts }))
+  }
+
+  it('ArrowDown advances highlightedIdx and adds highlight class to correct item', async () => {
+    const wrapper = mount(QuickCaptureList, { attachTo: document.body })
+    await waitFlush()
+
+    // Initially no item is highlighted
+    expect(document.querySelectorAll('.qcl-item--keynav-highlight').length).toBe(0)
+
+    // First ArrowDown: index goes from -1 to 0 (first item)
+    pressKey('ArrowDown')
+    await waitFlush()
+    const highlighted = document.querySelectorAll('.qcl-item--keynav-highlight')
+    expect(highlighted.length).toBe(1)
+
+    wrapper.unmount()
+  })
+
+  it('ArrowDown clamps at list length - 1', async () => {
+    const wrapper = mount(QuickCaptureList, { attachTo: document.body })
+    await waitFlush()
+
+    // Press ArrowDown many times (more than list length of 3)
+    for (let i = 0; i < 10; i++) {
+      pressKey('ArrowDown')
+      await waitFlush()
+    }
+
+    // Should still have exactly 1 highlighted item (last one, not overflown)
+    expect(document.querySelectorAll('.qcl-item--keynav-highlight').length).toBe(1)
+
+    // The highlighted item should be the last one
+    const items = document.querySelectorAll('.qcl-item')
+    const lastItem = items[items.length - 1]
+    expect(lastItem.classList.contains('qcl-item--keynav-highlight')).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  it('ArrowUp decreases highlightedIdx and clamps at 0', async () => {
+    const wrapper = mount(QuickCaptureList, { attachTo: document.body })
+    await waitFlush()
+
+    // Navigate to second item first
+    pressKey('ArrowDown')
+    await waitFlush()
+    pressKey('ArrowDown')
+    await waitFlush()
+
+    // Now press ArrowUp many times
+    for (let i = 0; i < 10; i++) {
+      pressKey('ArrowUp')
+      await waitFlush()
+    }
+
+    // Should be at first item (clamped at 0)
+    const items = document.querySelectorAll('.qcl-item')
+    expect(items[0].classList.contains('qcl-item--keynav-highlight')).toBe(true)
+    // No other item highlighted
+    let highlightCount = 0
+    for (const item of items) {
+      if (item.classList.contains('qcl-item--keynav-highlight')) highlightCount++
+    }
+    expect(highlightCount).toBe(1)
+
+    wrapper.unmount()
+  })
+
+  it('Enter on highlighted item triggers edit mode for that capture', async () => {
+    const wrapper = mount(QuickCaptureList, { attachTo: document.body })
+    await waitFlush()
+
+    // Navigate to first item
+    pressKey('ArrowDown')
+    await waitFlush()
+
+    // Press Enter to edit
+    pressKey('Enter')
+    await waitFlush()
+
+    // Edit textarea should appear
+    const textarea = document.querySelector('.qcl-edit-textarea')
+    expect(textarea).not.toBeNull()
+
+    wrapper.unmount()
+  })
+
+  it('input target check: when an input has focus ArrowDown does NOT change highlight', async () => {
+    const wrapper = mount(QuickCaptureList, { attachTo: document.body })
+    await waitFlush()
+
+    // Initially no highlight
+    expect(document.querySelectorAll('.qcl-item--keynav-highlight').length).toBe(0)
+
+    // Simulate keydown on the input element directly (target = INPUT)
+    const input = document.querySelector('.qc-search') as HTMLInputElement
+    expect(input).not.toBeNull()
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+    await waitFlush()
+
+    // No item should be highlighted because input had focus (target is INPUT)
+    expect(document.querySelectorAll('.qcl-item--keynav-highlight').length).toBe(0)
+
+    wrapper.unmount()
+  })
+
+  it('Space toggles bulk-select on highlighted item', async () => {
+    const wrapper = mount(QuickCaptureList, { attachTo: document.body })
+    await waitFlush()
+
+    // Navigate to first item
+    pressKey('ArrowDown')
+    await waitFlush()
+
+    // Press Space to toggle selection
+    pressKey(' ')
+    await waitFlush()
+
+    // The bulk action bar should now be visible (one item selected)
+    const bar = document.querySelector('[data-testid="capture-bulk-action-bar"]')
+    expect(bar).not.toBeNull()
+
+    wrapper.unmount()
+  })
+
+  it('Cmd+A selects all displayed captures', async () => {
+    const wrapper = mount(QuickCaptureList, { attachTo: document.body })
+    await waitFlush()
+
+    // Press Cmd+A
+    pressKey('a', { metaKey: true })
+    await waitFlush()
+
+    // Count hint should show all 3 selected
+    const countHint = document.querySelector('.qcl-bulk-count-hint')
+    expect(countHint).not.toBeNull()
+    expect(countHint!.textContent).toContain('3')
+
+    wrapper.unmount()
+  })
+
+  it('highlightedIdx resets to -1 when displayed list changes', async () => {
+    const wrapper = mount(QuickCaptureList, { attachTo: document.body })
+    await waitFlush()
+
+    // Navigate to second item
+    pressKey('ArrowDown')
+    await waitFlush()
+    pressKey('ArrowDown')
+    await waitFlush()
+    expect(document.querySelectorAll('.qcl-item--keynav-highlight').length).toBe(1)
+
+    // Change the displayed list by updating captures (simulate filter change)
+    mockCaptures.mockReturnValue([makeCapture('k4', 'New single capture')])
+    // Trigger reactivity by dispatching input on search
+    const searchInput = document.querySelector('.qc-search') as HTMLInputElement
+    searchInput.value = 'New'
+    searchInput.dispatchEvent(new Event('input', { bubbles: true }))
+    await waitFlush()
+
+    // After displayed changes, highlight should be reset
+    expect(document.querySelectorAll('.qcl-item--keynav-highlight').length).toBe(0)
+
+    wrapper.unmount()
+  })
+})
