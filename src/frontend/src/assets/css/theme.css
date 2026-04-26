@@ -195,6 +195,56 @@
     --glass-border: #c9b890;
 }
 
+/* ── Color-blind safe palette — Okabe-Ito variant ────────────────────── */
+/*
+ * Prevalence: ~8% male, ~0.5% female with color vision deficiency (CVD).
+ * Okabe-Ito (2008) designed this palette to be distinguishable for all
+ * common CVD types (deuteranopia, protanopia, tritanopia).
+ *
+ * Applied via data-palette="cb-safe" on <html>; overrides 4 semantic tokens
+ * and their base color vars so the change cascades through all themes.
+ *
+ * Hex mapping:
+ *   danger  → vermilion    #d55e00
+ *   success → bluish-green #009e73
+ *   warning → yellow       #f0e442
+ *   info    → sky-blue     #56b4e9
+ */
+:root[data-palette="cb-safe"] {
+    --red: #d55e00;
+    --red-light: rgba(213, 94, 0, 0.08);
+    --green: #009e73;
+    --green-light: rgba(0, 158, 115, 0.08);
+    --orange: #f0e442;
+    --orange-light: rgba(240, 228, 66, 0.08);
+    --accent: #56b4e9;
+    --accent-light: rgba(86, 180, 233, 0.1);
+    /* Semantic alias overrides (resolve immediately, not via var(--red) chain) */
+    --color-danger: #d55e00;
+    --color-success: #009e73;
+    --color-warning: #f0e442;
+    --color-info: #56b4e9;
+}
+
+/* Ensure overrides apply inside all named themes too */
+[data-theme="dark"][data-palette="cb-safe"],
+[data-theme="light"][data-palette="cb-safe"],
+[data-theme="neon"][data-palette="cb-safe"],
+[data-theme="retro"][data-palette="cb-safe"] {
+    --red: #d55e00;
+    --red-light: rgba(213, 94, 0, 0.08);
+    --green: #009e73;
+    --green-light: rgba(0, 158, 115, 0.08);
+    --orange: #f0e442;
+    --orange-light: rgba(240, 228, 66, 0.08);
+    --accent: #56b4e9;
+    --accent-light: rgba(86, 180, 233, 0.1);
+    --color-danger: #d55e00;
+    --color-success: #009e73;
+    --color-warning: #f0e442;
+    --color-info: #56b4e9;
+}
+
 /* ── Theme Toggle ─────────────────────── */
 .theme-toggle-container { display: inline-flex; align-items: center; }
 .theme-toggle-btn {

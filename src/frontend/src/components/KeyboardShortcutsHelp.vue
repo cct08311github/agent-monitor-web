@@ -12,10 +12,14 @@ import { groupByCategory, SHORTCUTS } from '@/data/keyboardShortcuts'
 import { createFocusTrap } from '@/lib/focusTrap'
 import { useOnboardingTour } from '@/composables/useOnboardingTour'
 import { useQuietHoursSetting } from '@/composables/useQuietHoursSetting'
+import { useColorPalette } from '@/composables/useColorPalette'
+import { useToast } from '@/composables/useToast'
 
 const { isOpen, close } = useKeyboardShortcutsHelp()
 const { restart: restartTour } = useOnboardingTour()
 const { open: openQuietHours } = useQuietHoursSetting()
+const { isCbSafe, togglePalette } = useColorPalette()
+const toast = useToast()
 
 function handleRestartTour(): void {
   close()
@@ -25,6 +29,11 @@ function handleRestartTour(): void {
 function handleOpenQuietHours(): void {
   close()
   openQuietHours()
+}
+
+function handleToggleCbPalette(): void {
+  togglePalette()
+  toast.success(isCbSafe() ? '已切換為色盲友善色盤' : '已恢復預設色盤')
 }
 
 // ---------------------------------------------------------------------------
@@ -125,6 +134,9 @@ onUnmounted(() => {
             </button>
             <button class="ksh-quiet-hours-btn" @click="handleOpenQuietHours">
               🌙 安靜時段
+            </button>
+            <button class="ksh-cb-palette-btn" @click="handleToggleCbPalette">
+              🎨 色盲友善 {{ isCbSafe() ? '已啟用' : '預設' }}
             </button>
           </div>
         </div>
@@ -324,6 +336,23 @@ onUnmounted(() => {
 }
 
 .ksh-quiet-hours-btn:hover {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-text, #cdd6f4);
+}
+
+.ksh-cb-palette-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.375rem;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.5;
+}
+
+.ksh-cb-palette-btn:hover {
   color: var(--color-text, #cdd6f4);
   border-color: var(--color-text, #cdd6f4);
 }
