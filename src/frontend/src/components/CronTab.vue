@@ -31,6 +31,7 @@ import {
   unarchiveJob as doUnarchiveJob,
 } from '@/utils/cronArchive'
 import { CRON_FILTER_DEFAULTS, hasActiveCronFilters } from '@/utils/cronFilterDefaults'
+import { buildCronCsv } from '@/utils/cronCsvExport'
 
 // ---------------------------------------------------------------------------
 // State
@@ -316,6 +317,31 @@ async function runJob(id: string, name?: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// CSV export
+// ---------------------------------------------------------------------------
+
+function exportCsv(): void {
+  const { aliases } = useCronAliases()
+  const { filename, content } = buildCronCsv({
+    jobs: jobs.value,
+    aliases: aliases.value,
+    tagsMap: cronTagsMap.value,
+    archivedIds: archivedIds.value,
+    pinnedIds: pinnedIds.value,
+  })
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  showToast(`📊 已匯出 ${jobs.value.length} 筆 cron jobs`, 'success')
+}
+
+// ---------------------------------------------------------------------------
 // Clear all filters
 // ---------------------------------------------------------------------------
 
@@ -502,6 +528,14 @@ function getNextRunCountdown(job: CronJob): string {
           @click="clearAllCronFilters"
         >
           清除全部篩選 ✕
+        </button>
+
+        <button
+          class="cron-export-csv-btn"
+          title="匯出 CSV"
+          @click="exportCsv"
+        >
+          📊 匯出 CSV
         </button>
       </div>
 
@@ -1202,5 +1236,28 @@ function getNextRunCountdown(job: CronJob): string {
 
 .cron-stats-footer .stat:first-child {
   padding-left: 0;
+}
+
+/* ── CSV export button ───────────────────────────────────────────── */
+
+.cron-export-csv-btn {
+  padding: 5px 11px;
+  font-size: 12px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.cron-export-csv-btn:hover {
+  background: var(--surface2, rgba(255, 255, 255, 0.07));
+  color: var(--text, #e2e8f0);
+  border-color: var(--accent, #6366f1);
 }
 </style>
