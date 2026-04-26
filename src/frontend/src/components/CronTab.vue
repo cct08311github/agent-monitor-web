@@ -12,9 +12,12 @@ import { buildMarkers, formatRelative } from '@/utils/cronTimeline'
 import type { TimelineMarker } from '@/utils/cronTimeline'
 import { humanizeCron } from '@/utils/cronHumanizer'
 import { computeCronStats } from '@/utils/cronStats'
+import { computeCronInsights } from '@/utils/cronInsights'
+import type { CronInsights } from '@/utils/cronInsights'
 import CronNextFires from '@/components/CronNextFires.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import CronJobNotes from '@/components/CronJobNotes.vue'
+import CronInsightsPanel from '@/components/CronInsights.vue'
 import {
   loadAllCronTags,
   addCronTag,
@@ -192,6 +195,16 @@ const stats = computed(() =>
     jobs: jobs.value,
     archivedIds: archivedIds.value,
     pinnedIds: pinnedIds.value,
+    tagsMap: cronTagsMap.value,
+  }),
+)
+
+// Insights panel toggle
+const showCronInsights = ref(false)
+
+const cronInsights = computed<CronInsights>(() =>
+  computeCronInsights({
+    jobs: jobs.value,
     tagsMap: cronTagsMap.value,
   }),
 )
@@ -537,6 +550,20 @@ function getNextRunCountdown(job: CronJob): string {
         >
           📊 匯出 CSV
         </button>
+
+        <button
+          :class="['cron-insights-btn', { active: showCronInsights }]"
+          :title="showCronInsights ? '隱藏統計' : '顯示統計'"
+          :aria-pressed="showCronInsights"
+          @click="showCronInsights = !showCronInsights"
+        >
+          📈 統計
+        </button>
+      </div>
+
+      <!-- Insights panel -->
+      <div v-if="showCronInsights" class="cron-insights-panel">
+        <CronInsightsPanel :insights="cronInsights" />
       </div>
 
       <!-- Tag chip bar -->
@@ -1259,5 +1286,44 @@ function getNextRunCountdown(job: CronJob): string {
   background: var(--surface2, rgba(255, 255, 255, 0.07));
   color: var(--text, #e2e8f0);
   border-color: var(--accent, #6366f1);
+}
+
+/* ── Insights toggle button ──────────────────────────────────────── */
+
+.cron-insights-btn {
+  padding: 5px 11px;
+  font-size: 12px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.cron-insights-btn:hover {
+  background: var(--surface2, rgba(255, 255, 255, 0.07));
+  color: var(--text, #e2e8f0);
+  border-color: var(--accent, #6366f1);
+}
+
+.cron-insights-btn.active {
+  background: var(--accent, #6366f1);
+  border-color: var(--accent, #6366f1);
+  color: #fff;
+}
+
+/* ── Insights panel ──────────────────────────────────────────────── */
+
+.cron-insights-panel {
+  margin-bottom: 14px;
+  padding: 12px 16px;
+  background: var(--surface2, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 8px;
 }
 </style>
