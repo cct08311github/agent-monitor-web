@@ -17,6 +17,7 @@ import { createFocusTrap } from '@/lib/focusTrap'
 import { tagCounts, captureHasTag } from '@/utils/quickCaptureTags'
 import { computeCaptureStats } from '@/utils/captureStats'
 import { computeWeeklyTrend, trendLabel } from '@/utils/captureWeeklyTrend'
+import { computeStreak } from '@/utils/captureStreak'
 import { buildExport } from '@/utils/quickCaptureExport'
 import { buildCaptureBackup, parseCaptureBackup, restoreCaptureBackup } from '@/utils/captureExportJson'
 import { buildCaptureCsv } from '@/utils/captureCsvExport'
@@ -127,6 +128,8 @@ const tags = computed(() => tagCounts(captures.value))
 const stats = computed(() => computeCaptureStats(captures.value, archivedIds.value, pinnedIds.value))
 
 const trend = computed(() => computeWeeklyTrend(captures.value))
+
+const streak = computed(() => computeStreak(captures.value))
 
 function applyFilters(list: Capture[]): Capture[] {
   // Date range is applied first (broadest filter)
@@ -1163,6 +1166,15 @@ function onImport(e: Event): void {
                 aria-label="`週趨勢：${trendLabel(trend)}`"
               >{{ trendLabel(trend) }}</span>
             </template>
+            <template v-if="streak.current > 0">
+              <span class="stat-sep" aria-hidden="true">·</span>
+              <span
+                class="stat streak-stat"
+                :title="`連續 ${streak.current} 天紀錄${streak.activeToday ? '' : '（今天還沒寫！）'} · 歷史最佳 ${streak.best} 天`"
+              >🔥 連續 {{ streak.current }} 天<span v-if="!streak.activeToday" class="streak-warning"> (今天還沒寫!)</span></span>
+              <span class="stat-sep" aria-hidden="true">·</span>
+              <span class="stat" title="歷史最長連續天數">🎯 best: {{ streak.best }} 天</span>
+            </template>
           </footer>
           <button class="qcl-clear-btn" @click="handleClearAll">
             🗑 清空全部
@@ -2129,6 +2141,17 @@ function onImport(e: Event): void {
 .trend-flat {
   color: var(--color-muted, #6c7086);
   background: transparent;
+}
+
+/* ── Streak chips ────────────────────────────────────────────────────────── */
+
+.streak-stat {
+  color: var(--peach, #fab387);
+}
+
+.streak-warning {
+  color: var(--yellow, #f9e2af);
+  font-style: italic;
 }
 
 /* ── Insights button ────────────────────────────────────────────────────── */
