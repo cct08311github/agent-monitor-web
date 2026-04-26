@@ -9,7 +9,10 @@
 //   2. getPermission()      — browser granted permission
 //   3. isHidden()           — tab is in background
 //   4. isQuiet()            — not in quiet hours
+//   5. isSnoozedNow()       — not in ad-hoc snooze window (#584)
 // ---------------------------------------------------------------------------
+
+import { isSnoozedNow as isNotifySnoozed } from '@/utils/notifySnooze'
 
 const KEY = 'oc_desktop_notify_enabled'
 
@@ -79,6 +82,9 @@ export function showNotification(
 
   const isQuiet = guards?.isQuiet ?? (() => false)
   if (isQuiet()) return null
+
+  // Guard 5: ad-hoc snooze (#584)
+  if (isNotifySnoozed()) return null
 
   try {
     const notification = new Notification(title, { body, icon: '/favicon.ico', ...opts })

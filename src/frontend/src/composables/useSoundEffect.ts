@@ -14,6 +14,7 @@ import { ref, computed } from 'vue'
 import { isSoundEnabled, setSoundEnabled } from '@/utils/soundPrefs'
 import { playBeep, type BeepVariant } from '@/utils/soundEffect'
 import { isQuietNow } from '@/composables/useQuietHours'
+import { isSnoozedNow as isNotifySnoozed } from '@/utils/notifySnooze'
 
 // Module-scoped state — shared across all useSoundEffect() calls
 const enabled = ref(isSoundEnabled())
@@ -42,6 +43,7 @@ export function useSoundEffect() {
     play: (variant: BeepVariant): void => {
       if (!enabled.value) return
       if (isQuietNow()) return
+      if (isNotifySnoozed()) return // ad-hoc snooze (#584)
       playBeep(variant)
     },
   }
