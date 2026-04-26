@@ -11,6 +11,7 @@ import { showToast } from '@/composables/useToast'
 import { appState } from '@/stores/appState'
 import type { Agent } from '@/types/api'
 import { computeFreshness } from '@/lib/freshness'
+import { recordMessage } from '@/composables/useMessageRate'
 
 export type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting'
 export type CostRange = 'today' | 'week' | 'month' | 'all'
@@ -166,6 +167,7 @@ export function useDashboard() {
         }
       },
       onMessage(event) {
+        recordMessage()
         try {
           const data = JSON.parse(event.data) as typeof appState.latestDashboard
           if (data?.success) {
