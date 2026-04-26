@@ -23,6 +23,11 @@ import {
 } from '@/utils/cronTags'
 import { useCronAliases } from '@/composables/useCronAliases'
 import { loadPins, togglePin as cronTogglePin, isPinned, partition } from '@/utils/cronPins'
+import {
+  loadArchived as loadCronArchived,
+  archiveJob as doArchiveJob,
+  unarchiveJob as doUnarchiveJob,
+} from '@/utils/cronArchive'
 
 // ---------------------------------------------------------------------------
 // State
@@ -38,6 +43,22 @@ const searchInputRef = ref<HTMLInputElement | null>(null)
 const searchQuery = ref('')
 const filterMode = ref<'all' | 'enabled' | 'disabled'>('all')
 const sortBy = ref<'name' | 'nextRun' | 'lastRun'>('name')
+
+// ---------------------------------------------------------------------------
+// Cron archive
+// ---------------------------------------------------------------------------
+const archivedIds = ref<Set<string>>(loadCronArchived())
+const showArchived = ref(false)
+
+function onArchiveJob(id: string): void {
+  archivedIds.value = doArchiveJob(id)
+  showToast('已封存', 'info')
+}
+
+function onUnarchiveJob(id: string): void {
+  archivedIds.value = doUnarchiveJob(id)
+  showToast('已還原', 'info')
+}
 
 // ---------------------------------------------------------------------------
 // Cron pins
@@ -142,8 +163,16 @@ const filteredJobs = computed<CronJob[]>(() => {
   return [...pinned, ...rest]
 })
 
+const activeJobs = computed<CronJob[]>(() =>
+  filteredJobs.value.filter((j) => !archivedIds.value.has(j.id)),
+)
+
+const archivedJobs = computed<CronJob[]>(() =>
+  filteredJobs.value.filter((j) => archivedIds.value.has(j.id)),
+)
+
 const hasJobs = computed(() => jobs.value.length > 0)
-const hasResults = computed(() => filteredJobs.value.length > 0)
+const hasResults = computed(() => activeJobs.value.length > 0 || archivedJobs.value.length > 0)
 const isFiltered = computed(
   () => searchQuery.value.trim() !== '' || filterMode.value !== 'all' || selectedCronTag.value !== null,
 )
@@ -460,10 +489,10 @@ function getNextRunCountdown(job: CronJob): string {
         :description="isFiltered ? '請嘗試調整搜尋或篩選條件' : '目前沒有已排程的定時任務'"
       />
 
-      <!-- Cron job grid -->
+      <!-- Cron job grid (active jobs only) -->
       <div v-else class="cron-grid">
         <div
-          v-for="job in filteredJobs"
+          v-for="job in activeJobs"
           :key="job.id"
           :class="['agent-card', { dormant: !job.enabled, 'cron-pinned': isPinned(pinnedIds, job.id) }]"
           style="cursor: default"
@@ -531,6 +560,15 @@ function getNextRunCountdown(job: CronJob): string {
                 @click="runJob(job.id, job.name)"
               >
                 ▶️ 執行
+              </button>
+
+              <!-- Archive button -->
+              <button
+                class="cron-archive-btn"
+                title="封存任務"
+                @click="onArchiveJob(job.id)"
+              >
+                📦
               </button>
 
               <!-- Delete button -->
@@ -634,6 +672,60 @@ function getNextRunCountdown(job: CronJob): string {
 
           <!-- Per-job collapsible notes -->
           <CronJobNotes :job-id="job.id" />
+        </div>
+      </div>
+
+      <!-- Archived section toggle -->
+      <button
+        v-if="archivedJobs.length > 0"
+        class="cron-archived-toggle"
+        @click="showArchived = !showArchived"
+      >
+        {{ showArchived ? '隱藏已封存' : `顯示已封存 (${archivedJobs.length})` }}
+      </button>
+
+      <!-- Archived jobs grid -->
+      <div v-if="showArchived && archivedJobs.length > 0" class="cron-grid cron-archived-grid">
+        <div
+          v-for="job in archivedJobs"
+          :key="job.id"
+          class="agent-card cron-archived-card"
+          style="cursor: default"
+        >
+          <!-- Card header -->
+          <div class="agent-card-header">
+            <!-- Name block -->
+            <div class="agent-card-name">
+              <div class="agent-avatar">📦</div>
+              <div>
+                <div class="cron-name-row">
+                  <span class="agent-name" :title="job.id">{{ displayCronName(job.id, job.name) }}</span>
+                </div>
+                <div class="agent-hostname">
+                  {{ job.schedule?.expr ?? 'Once' }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Restore button -->
+            <div style="display: flex; align-items: center; gap: 8px">
+              <button
+                class="cron-unarchive-btn"
+                title="還原任務"
+                @click="onUnarchiveJob(job.id)"
+              >
+                還原
+              </button>
+            </div>
+          </div>
+
+          <!-- Card body (minimal) -->
+          <div class="agent-card-body">
+            <div class="agent-info-row">
+              <span class="agent-info-label">排程</span>
+              <span class="agent-info-value">{{ job.schedule?.expr ?? '一次性' }}</span>
+            </div>
+          </div>
         </div>
       </div>
     </template>
@@ -940,5 +1032,81 @@ function getNextRunCountdown(job: CronJob): string {
 
 .agent-card.cron-pinned {
   border-left: 3px solid var(--accent, #6366f1);
+}
+
+/* ── Archive button ──────────────────────────────────────────────── */
+
+.cron-archive-btn {
+  padding: 0 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.35;
+  line-height: 1;
+  transition: opacity 0.15s;
+}
+
+.cron-archive-btn:hover {
+  opacity: 0.9;
+}
+
+/* ── Archived section toggle ─────────────────────────────────────── */
+
+.cron-archived-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 6px 14px;
+  font-size: 12px;
+  border: 1px dashed var(--border, rgba(255, 255, 255, 0.18));
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.cron-archived-toggle:hover {
+  background: var(--surface2, rgba(255, 255, 255, 0.05));
+  color: var(--text, #e2e8f0);
+  border-color: var(--accent, #6366f1);
+}
+
+/* ── Archived grid ───────────────────────────────────────────────── */
+
+.cron-archived-grid {
+  margin-top: 10px;
+}
+
+.cron-archived-card {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+/* ── Restore (unarchive) button ──────────────────────────────────── */
+
+.cron-unarchive-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.2));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.cron-unarchive-btn:hover {
+  background: var(--surface2, rgba(255, 255, 255, 0.07));
+  color: var(--text, #e2e8f0);
+  border-color: var(--accent, #6366f1);
 }
 </style>
