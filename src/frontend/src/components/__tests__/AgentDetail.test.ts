@@ -328,7 +328,7 @@ describe('AgentDetail — sessions search', () => {
 
     const searchInput = wrapper.find('.session-search-input')
     expect(searchInput.exists()).toBe(true)
-    expect(searchInput.attributes('placeholder')).toContain('session id')
+    expect(searchInput.attributes('placeholder')).toContain('session')
 
     wrapper.unmount()
   })

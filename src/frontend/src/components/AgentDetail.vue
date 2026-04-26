@@ -205,13 +205,13 @@ function runDiagnose(): void {
 
 // ── Session search ────────────────────────────────────────────────────────────
 
+import { filterSessionsByQuery } from '@/utils/sessionSearchFilter'
+
 const sessionSearchQuery = ref('')
 
-const filteredSessions = computed(() => {
-  const q = sessionSearchQuery.value.trim().toLowerCase()
-  if (!q) return sessions.value
-  return sessions.value.filter((s) => s.id.toLowerCase().includes(q))
-})
+const filteredSessions = computed(() =>
+  filterSessionsByQuery(sessions.value, sessionSearchQuery.value),
+)
 
 // ── Session bookmarks ─────────────────────────────────────────────────────────
 
@@ -448,8 +448,8 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
           <input
             v-if="sessions.length > 0"
             v-model="sessionSearchQuery"
-            type="text"
-            placeholder="搜尋 session id..."
+            type="search"
+            placeholder="搜尋 session..."
             class="session-search-input"
           >
         </div>
