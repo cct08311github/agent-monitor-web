@@ -8,6 +8,12 @@ import { useToast } from '@/composables/useToast'
 import { loadHistory, recordCommand, pickRecents } from '@/utils/commandHistory'
 import { fuzzyMatch } from '@/utils/fuzzyScore'
 import { groupByCategory } from '@/utils/commandGroups'
+import {
+  loadCollapsed,
+  saveCollapsed,
+  toggleCollapsed,
+  isCollapsed,
+} from '@/utils/commandGroupCollapse'
 
 const toast = useToast()
 
@@ -238,6 +244,21 @@ function toggleFavorite(id: string): void {
   persistFavorites()
 }
 
+// ---------------------------------------------------------------------------
+// Collapsed groups state & persistence
+// Favorites and Recent sections are excluded — they are not user-collapsible.
+// ---------------------------------------------------------------------------
+
+const NON_COLLAPSIBLE_CATEGORIES: ReadonlySet<string> = new Set(['Favorites', 'Recent'])
+
+const collapsed = ref(loadCollapsed())
+
+function toggleGroup(category: string): void {
+  if (NON_COLLAPSIBLE_CATEGORIES.has(category)) return
+  collapsed.value = toggleCollapsed(collapsed.value, category)
+  saveCollapsed(collapsed.value)
+}
+
 onMounted(() => {
   loadRecents()
   loadFavorites()
@@ -268,13 +289,21 @@ const recentCommands = computed<Command[]>(() => pickRecents(allCommands.value, 
 const filteredCommands = computed<Command[]>(() => {
   const q = query.value.trim()
   if (!q) {
-    // Empty query: recent commands first, then all other commands (no duplication)
+    // Empty query: recent commands first, then all other commands (no duplication).
+    // In non-search mode, commands belonging to a collapsed category are excluded
+    // from the flat list so keyboard navigation skips them.
     const recentIdSet = new Set(recentIds.value)
     const nonRecent = allCommands.value.filter((cmd) => !recentIdSet.has(cmd.id))
-    return [...recentCommands.value, ...nonRecent]
+
+    // Build ordered list respecting collapse state
+    const visibleRecents = recentCommands.value // Recent is non-collapsible
+    const visibleNonRecent = nonRecent.filter(
+      (cmd) => !isCollapsed(collapsed.value, cmd.category),
+    )
+    return [...visibleRecents, ...visibleNonRecent]
   }
 
-  // Fuzzy score-based matching: label is primary key, description is secondary (discounted)
+  // Search mode: show ALL matching commands regardless of collapse state
   return fuzzyMatch(
     allCommands.value,
     q,
@@ -455,7 +484,23 @@ function flatIndex(cmd: Command): number {
               :key="group.category"
               class="cp-group"
             >
-              <div v-if="group.category" class="cp-group-header">{{ group.category }}</div>
+              <!-- Non-collapsible groups (Favorites, Recent, search results) use a plain header -->
+              <div
+                v-if="group.category && (query.trim() || NON_COLLAPSIBLE_CATEGORIES.has(group.category))"
+                class="cp-group-header"
+              >{{ group.category }}</div>
+              <!-- Collapsible groups use a button header with chevron + count via CSS pseudo-elements
+                   so button.textContent stays equal to the bare category name (tests rely on this). -->
+              <button
+                v-else-if="group.category"
+                class="cp-group-header cp-group-header--toggle"
+                type="button"
+                :data-collapsed="isCollapsed(collapsed, group.category)"
+                :data-count="group.commands.length"
+                :aria-expanded="!isCollapsed(collapsed, group.category)"
+                @click="toggleGroup(group.category)"
+              >{{ group.category }}</button>
+              <template v-if="!isCollapsed(collapsed, group.category) || query.trim()">
               <button
                 v-for="cmd in group.commands"
                 :key="cmd.id"
@@ -495,6 +540,7 @@ function flatIndex(cmd: Command): number {
                   @keydown.space.stop.prevent="toggleFavorite(cmd.id)"
                 >★</span>
               </button>
+              </template>
             </div>
           </template>
 
@@ -614,6 +660,44 @@ function flatIndex(cmd: Command): number {
   letter-spacing: 0.06em;
   color: var(--color-accent, #89b4fa);
   padding: 0.5rem 1rem 0.25rem;
+}
+
+/* Collapsible toggle variant — reset button defaults, keep header look.
+   Chevron (::before) and count (::after) are CSS-only so button.textContent
+   stays equal to the bare category name — existing tests rely on this. */
+.cp-group-header--toggle {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  gap: 0.35rem;
+}
+
+.cp-group-header--toggle:hover {
+  opacity: 0.8;
+}
+
+.cp-group-header--toggle::before {
+  content: '▼';
+  font-size: 0.6rem;
+  flex-shrink: 0;
+  /* No transition — prefers-reduced-motion safe */
+}
+
+.cp-group-header--toggle[data-collapsed='true']::before {
+  content: '▶';
+}
+
+.cp-group-header--toggle::after {
+  content: '(' attr(data-count) ')';
+  font-weight: 400;
+  opacity: 0.6;
+  margin-left: auto;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .cp-item {
