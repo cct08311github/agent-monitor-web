@@ -5,6 +5,7 @@ import {
   installNotificationBadge,
   teardownNotificationBadge,
 } from '../useNotificationBadge'
+import { _resetFlashState } from '@/utils/titleFlash'
 
 // ---------------------------------------------------------------------------
 // Helpers to control document.hidden
@@ -26,11 +27,24 @@ beforeEach(() => {
   // Always start with tab "visible" and fresh state
   setDocumentHidden(false)
   teardownNotificationBadge()
+  // Disable title flash so it does not interfere with badge title assertions
+  _resetFlashState()
+  vi.stubGlobal('localStorage', {
+    getItem: (k: string) =>
+      k === 'oc_title_flash_enabled' ? '0' : null,
+    setItem: () => {},
+    removeItem: () => {},
+    clear: () => {},
+    key: () => null,
+    length: 0,
+  })
 })
 
 afterEach(() => {
   teardownNotificationBadge()
+  _resetFlashState()
   vi.useRealTimers()
+  vi.unstubAllGlobals()
 })
 
 // ---------------------------------------------------------------------------

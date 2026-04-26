@@ -24,6 +24,7 @@ import type { WatchStopHandle } from 'vue'
 import { isQuietNow } from '@/composables/useQuietHours'
 import { useDesktopNotify } from '@/composables/useDesktopNotify'
 import { useNotifyPrompt } from '@/composables/useNotifyPrompt'
+import { useTitleFlash } from '@/composables/useTitleFlash'
 
 // ---------------------------------------------------------------------------
 // Module-scoped state — shared across all useNotificationBadge() calls
@@ -64,6 +65,8 @@ export function useNotificationBadge(): NotificationBadgeApi {
           'Agent Monitor',
           alertMessage ?? '新警示已觸發',
         )
+        // Flash the tab title to attract peripheral-vision attention
+        useTitleFlash().flash()
       }
       // Show gentle opt-in banner on first alert if permission is still default
       useNotifyPrompt().maybeOpen()
