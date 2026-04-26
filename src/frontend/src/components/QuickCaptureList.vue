@@ -38,6 +38,7 @@ import { hasCaptureOnDate, captureDateRange } from '@/utils/captureDateNav'
 import CaptureHeatmap from './CaptureHeatmap.vue'
 import CaptureBulkActionBar from './CaptureBulkActionBar.vue'
 import HighlightedText from './HighlightedText.vue'
+import MarkdownText from './MarkdownText.vue'
 
 const { isListOpen, captures, archivedIds, activeCaptures, archivedCaptures, pinnedIds, closeList, remove, archive, unarchive, clear, update, togglePin, isPinned, openWithPrefill } = useQuickCapture()
 
@@ -809,7 +810,8 @@ function onImport(e: Event): void {
                 <!-- Display mode -->
                 <template v-else>
                   <p class="qcl-item-body">
-                    <HighlightedText :text="capture.body" :query="searchQuery" />
+                    <HighlightedText v-if="searchQuery.trim()" :text="capture.body" :query="searchQuery" />
+                    <MarkdownText v-else :text="capture.body" />
                   </p>
                   <div class="qcl-item-actions">
                     <button
@@ -897,7 +899,8 @@ function onImport(e: Event): void {
                     </div>
                     <template v-else>
                       <p class="qcl-item-body">
-                        <HighlightedText :text="capture.body" :query="searchQuery" />
+                        <HighlightedText v-if="searchQuery.trim()" :text="capture.body" :query="searchQuery" />
+                        <MarkdownText v-else :text="capture.body" />
                       </p>
                       <div class="qcl-item-actions">
                         <button
@@ -969,7 +972,8 @@ function onImport(e: Event): void {
                     </div>
                     <template v-else>
                       <p class="qcl-item-body">
-                        <HighlightedText :text="capture.body" :query="searchQuery" />
+                        <HighlightedText v-if="searchQuery.trim()" :text="capture.body" :query="searchQuery" />
+                        <MarkdownText v-else :text="capture.body" />
                       </p>
                       <div class="qcl-item-actions">
                         <button
@@ -1011,7 +1015,8 @@ function onImport(e: Event): void {
                     <span class="qcl-item-time">{{ formatTime(capture.createdAt) }}</span>
                   </div>
                   <p class="qcl-item-body">
-                    <HighlightedText :text="capture.body" :query="searchQuery" />
+                    <HighlightedText v-if="searchQuery.trim()" :text="capture.body" :query="searchQuery" />
+                    <MarkdownText v-else :text="capture.body" />
                   </p>
                   <div class="qcl-item-actions">
                     <button
