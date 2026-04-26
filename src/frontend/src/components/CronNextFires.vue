@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { nextFireTimes } from '@/utils/cronNextFires'
+import { useTimezone } from '@/composables/useTimezone'
 
 const props = withDefaults(
   defineProps<{
@@ -12,16 +13,10 @@ const props = withDefaults(
 
 const result = computed(() => nextFireTimes(props.expression, props.count))
 
-const fmt = new Intl.DateTimeFormat('zh-TW', {
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-})
+const { format } = useTimezone()
 
 function formatTime(d: Date): string {
-  return fmt.format(d)
+  return format(d, { style: 'short' })
 }
 </script>
 

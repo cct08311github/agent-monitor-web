@@ -6,7 +6,7 @@
  * State is driven by the shared useKeyboardShortcutsHelp composable;
  * mount this component once in App.vue.
  */
-import { watch, nextTick, onUnmounted, ref } from 'vue'
+import { watch, nextTick, onUnmounted, ref, computed } from 'vue'
 import { useKeyboardShortcutsHelp } from '@/composables/useKeyboardShortcutsHelp'
 import { groupByCategory, SHORTCUTS } from '@/data/keyboardShortcuts'
 import { createFocusTrap } from '@/lib/focusTrap'
@@ -16,6 +16,7 @@ import { useColorPalette } from '@/composables/useColorPalette'
 import { useToast } from '@/composables/useToast'
 import { useWhatsNew } from '@/composables/useWhatsNew'
 import { useSoundEffect } from '@/composables/useSoundEffect'
+import { useTimezone } from '@/composables/useTimezone'
 
 const { isOpen, close } = useKeyboardShortcutsHelp()
 const { restart: restartTour } = useOnboardingTour()
@@ -24,6 +25,14 @@ const { isCbSafe, togglePalette } = useColorPalette()
 const toast = useToast()
 const { open: openWhatsNew } = useWhatsNew()
 const { isEnabled: soundEnabled, toggle: toggleSound } = useSoundEffect()
+const { mode: tzMode, toggle: toggleTz } = useTimezone()
+
+const tzLabel = computed(() => (tzMode.value === 'utc' ? 'UTC' : '本地時間'))
+
+function handleToggleTz(): void {
+  toggleTz()
+  toast.info(`時區: ${tzMode.value === 'utc' ? 'UTC' : '本地時間'}`)
+}
 
 function handleRestartTour(): void {
   close()
@@ -157,6 +166,9 @@ onUnmounted(() => {
             </button>
             <button class="ksh-sound-btn" @click="handleToggleSound">
               🔔 音效 {{ soundEnabled ? '已啟用' : '關閉' }}
+            </button>
+            <button class="ksh-tz-btn" @click="handleToggleTz">
+              🌐 {{ tzLabel }}
             </button>
           </div>
         </div>
@@ -407,6 +419,23 @@ onUnmounted(() => {
 }
 
 .ksh-sound-btn:hover {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-text, #cdd6f4);
+}
+
+.ksh-tz-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.375rem;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.5;
+}
+
+.ksh-tz-btn:hover {
   color: var(--color-text, #cdd6f4);
   border-color: var(--color-text, #cdd6f4);
 }
