@@ -19,6 +19,7 @@ import { computeCaptureStats } from '@/utils/captureStats'
 import { computeWeeklyTrend, trendLabel } from '@/utils/captureWeeklyTrend'
 import { buildExport } from '@/utils/quickCaptureExport'
 import { buildCaptureBackup, parseCaptureBackup, restoreCaptureBackup } from '@/utils/captureExportJson'
+import { buildCaptureCsv } from '@/utils/captureCsvExport'
 import { isClipboardWriteSupported, writeClipboardText } from '@/utils/clipboardWrite'
 import { formatCaptureForClipboard } from '@/utils/captureFormat'
 import { useToast } from '@/composables/useToast'
@@ -556,6 +557,24 @@ function onExportJson(): void {
   useToast().success('已匯出 capture 備份')
 }
 
+function onCsvExport(): void {
+  const { filename, content } = buildCaptureCsv(captures.value)
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  try {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.style.display = 'none'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+  useToast().success(`已匯出 ${captures.value.length} 筆 (CSV)`)
+}
+
 function onImportJsonClick(): void {
   importFileRef.value?.click()
 }
@@ -622,6 +641,12 @@ function onImport(e: Event): void {
               aria-label="匯出 captures 為 JSON 備份檔"
               @click="onExportJson"
             >📥 匯出 JSON</button>
+            <button
+              class="qcl-download-btn qc-csv-btn"
+              :disabled="!captures.length"
+              aria-label="匯出所有 captures 為 CSV 檔案"
+              @click="onCsvExport"
+            >📊 匯出 CSV</button>
             <button
               class="qcl-download-btn"
               aria-label="從 JSON 備份檔匯入 captures"
