@@ -10,6 +10,7 @@
 import { ref, watch, nextTick } from 'vue'
 import { useQuickCapture } from '@/composables/useQuickCapture'
 import { useToast } from '@/composables/useToast'
+import { readClipboardText, isClipboardReadSupported } from '@/utils/clipboardRead'
 
 const props = defineProps<{
   currentContext: string
@@ -42,6 +43,20 @@ function handleSave(): void {
 
 function handleClose(): void {
   close()
+}
+
+async function onPaste(): Promise<void> {
+  const txt = await readClipboardText()
+  if (txt === null) {
+    toast.warning('無法讀取剪貼簿，請檢查瀏覽器權限')
+    return
+  }
+  if (!txt) {
+    toast.info('剪貼簿是空的')
+    return
+  }
+  text.value = text.value ? `${text.value}\n${txt}` : txt
+  toast.info('已貼入剪貼簿內容')
 }
 
 function handleKeydown(e: KeyboardEvent): void {
@@ -77,6 +92,17 @@ function handleKeydown(e: KeyboardEvent): void {
 
         <!-- Body -->
         <div class="qc-body">
+          <div class="qc-body-toolbar">
+            <button
+              class="qcm-paste"
+              :disabled="!isClipboardReadSupported()"
+              :title="isClipboardReadSupported() ? '從剪貼簿貼上' : '瀏覽器不支援剪貼簿讀取'"
+              type="button"
+              @click="onPaste"
+            >
+              📋 貼上
+            </button>
+          </div>
           <textarea
             ref="taRef"
             v-model="text"
@@ -250,13 +276,49 @@ function handleKeydown(e: KeyboardEvent): void {
   white-space: nowrap;
 }
 
+/* ── Body toolbar ─────────────────────────────────────────────────────── */
+
+.qc-body-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.375rem;
+}
+
+.qcm-paste {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  border-radius: 0.375rem;
+  color: var(--color-muted, #6c7086);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.25rem 0.5rem;
+  line-height: 1.5;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.qcm-paste:hover:not(:disabled) {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-accent, #89b4fa);
+  background: rgba(137, 180, 250, 0.08);
+}
+
+.qcm-paste:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 /* ── Reduced motion ─────────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
   .qc-overlay,
   .qc-card,
   .qc-btn,
-  .qc-textarea {
+  .qc-textarea,
+  .qcm-paste {
     transition: none;
     animation: none;
   }
