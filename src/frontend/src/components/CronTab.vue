@@ -11,6 +11,7 @@ import { formatCountdown } from '@/lib/time'
 import { buildMarkers, formatRelative } from '@/utils/cronTimeline'
 import type { TimelineMarker } from '@/utils/cronTimeline'
 import { humanizeCron } from '@/utils/cronHumanizer'
+import { computeCronStats } from '@/utils/cronStats'
 import CronNextFires from '@/components/CronNextFires.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import CronJobNotes from '@/components/CronJobNotes.vue'
@@ -174,6 +175,15 @@ const isFiltered = computed(
   () => searchQuery.value.trim() !== '' || filterMode.value !== 'all' || selectedCronTag.value !== null,
 )
 const availableCronTags = computed(() => uniqueCronTags(cronTagsMap.value))
+
+const stats = computed(() =>
+  computeCronStats({
+    jobs: jobs.value,
+    archivedIds: archivedIds.value,
+    pinnedIds: pinnedIds.value,
+    tagsMap: cronTagsMap.value,
+  }),
+)
 
 // Up Next timeline: map CronJob state.nextRunAtMs → TimelineJob.nextRun
 const markers = computed<TimelineMarker[]>(() => {
@@ -725,6 +735,15 @@ function getNextRunCountdown(job: CronJob): string {
           </div>
         </div>
       </div>
+
+      <!-- Stats footer -->
+      <footer v-if="jobs.length" class="cron-stats-footer">
+        <span class="stat">共 {{ stats.total }} 個 jobs</span>
+        <span class="stat">啟用 {{ stats.enabled }}</span>
+        <span class="stat">已封存 {{ stats.archived }}</span>
+        <span class="stat">釘選 {{ stats.pinned }}</span>
+        <span class="stat">{{ stats.tagCount }} 個 tag</span>
+      </footer>
     </template>
   </div>
 </template>
@@ -1105,5 +1124,34 @@ function getNextRunCountdown(job: CronJob): string {
   background: var(--surface2, rgba(255, 255, 255, 0.07));
   color: var(--text, #e2e8f0);
   border-color: var(--accent, #6366f1);
+}
+
+/* ── Stats footer ────────────────────────────────────────────────── */
+
+.cron-stats-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0;
+  margin-top: 16px;
+  padding: 8px 12px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
+  background: var(--surface2, rgba(255, 255, 255, 0.03));
+}
+
+.cron-stats-footer .stat {
+  font-size: 11px;
+  color: var(--text-muted, #94a3b8);
+  padding: 0 10px;
+  line-height: 1.5;
+}
+
+.cron-stats-footer .stat + .stat {
+  border-left: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+}
+
+.cron-stats-footer .stat:first-child {
+  padding-left: 0;
 }
 </style>
