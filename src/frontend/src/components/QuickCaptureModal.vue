@@ -17,6 +17,7 @@ import {
   createSpeechRecognition,
   type SpeechRecognitionWrapper,
 } from '@/utils/speechRecognition'
+import { wrapSelection, prependLine } from '@/utils/markdownInsert'
 
 const props = defineProps<{
   currentContext: string
@@ -140,6 +141,59 @@ async function onPaste(): Promise<void> {
   toast.info('已貼入剪貼簿內容')
 }
 
+// ── Markdown toolbar helpers ──────────────────────────────────────────────
+
+/**
+ * Apply a wrap operation (bold/italic/code/link) to the current selection.
+ * Restores focus and updates the DOM selection after nextTick.
+ */
+function applyWrap(prefix: string, suffix: string, placeholder: string): void {
+  const ta = taRef.value
+  if (!ta) return
+  const { text: nextText, selectionStart, selectionEnd } = wrapSelection(
+    text.value,
+    ta.selectionStart,
+    ta.selectionEnd,
+    prefix,
+    suffix,
+    placeholder,
+  )
+  text.value = nextText
+  nextTick(() => {
+    ta.focus()
+    ta.setSelectionRange(selectionStart, selectionEnd)
+  })
+}
+
+function insertBold(): void {
+  applyWrap('**', '**', '粗體文字')
+}
+
+function insertItalic(): void {
+  applyWrap('*', '*', '斜體文字')
+}
+
+function insertCode(): void {
+  applyWrap('`', '`', 'code')
+}
+
+function insertLink(): void {
+  const url = window.prompt('連結 URL:', 'https://')
+  if (!url) return
+  applyWrap('[', `](${url})`, '連結文字')
+}
+
+function insertList(): void {
+  const ta = taRef.value
+  if (!ta) return
+  const { text: nextText, selectionStart } = prependLine(text.value, ta.selectionStart, '- ')
+  text.value = nextText
+  nextTick(() => {
+    ta.focus()
+    ta.setSelectionRange(selectionStart, selectionStart)
+  })
+}
+
 function handleKeydown(e: KeyboardEvent): void {
   if (e.key === 'Escape') {
     e.stopPropagation()
@@ -196,6 +250,25 @@ function handleKeydown(e: KeyboardEvent): void {
               🎤 {{ recording ? '錄音中...' : '語音' }}
             </button>
           </div>
+          <!-- Markdown toolbar -->
+          <div class="qcm-md-toolbar" role="toolbar" aria-label="Markdown 格式工具列">
+            <button class="qcm-md-btn" type="button" title="粗體 (Bold)" @click="insertBold">
+              <strong>B</strong>
+            </button>
+            <button class="qcm-md-btn" type="button" title="斜體 (Italic)" @click="insertItalic">
+              <em>I</em>
+            </button>
+            <button class="qcm-md-btn" type="button" title="行內程式碼 (Code)" @click="insertCode">
+              <code>&lt;&gt;</code>
+            </button>
+            <button class="qcm-md-btn" type="button" title="連結 (Link)" @click="insertLink">
+              🔗
+            </button>
+            <button class="qcm-md-btn qcm-md-btn--wide" type="button" title="清單 (List)" @click="insertList">
+              - 清單
+            </button>
+          </div>
+
           <textarea
             ref="taRef"
             v-model="text"
@@ -471,6 +544,51 @@ function handleKeydown(e: KeyboardEvent): void {
   opacity: 0.5;
 }
 
+/* ── Markdown toolbar ───────────────────────────────────────────────────── */
+
+.qcm-md-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.375rem;
+  flex-wrap: wrap;
+}
+
+.qcm-md-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  border-radius: 0.3rem;
+  color: var(--color-muted, #6c7086);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.45rem;
+  min-width: 1.75rem;
+  line-height: 1.5;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  font-family: inherit;
+}
+
+.qcm-md-btn--wide {
+  padding-left: 0.55rem;
+  padding-right: 0.55rem;
+  min-width: unset;
+}
+
+.qcm-md-btn:hover {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-accent, #89b4fa);
+  background: rgba(137, 180, 250, 0.08);
+}
+
+.qcm-md-btn:focus-visible {
+  outline: 2px solid var(--color-accent, #89b4fa);
+  outline-offset: 1px;
+}
+
 /* ── Reduced motion ─────────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
@@ -480,7 +598,8 @@ function handleKeydown(e: KeyboardEvent): void {
   .qc-textarea,
   .qcm-paste,
   .qcm-mic,
-  .qcm-char-count {
+  .qcm-char-count,
+  .qcm-md-btn {
     transition: none;
     animation: none;
   }
