@@ -23,6 +23,11 @@ import {
   archiveCapture as archiveUtil,
   unarchiveCapture as unarchiveUtil,
 } from '@/utils/captureArchive'
+import {
+  loadPins,
+  togglePin as togglePinUtil,
+  isPinned as isPinnedUtil,
+} from '@/utils/capturePins'
 
 // ---------------------------------------------------------------------------
 // Module-scoped shared state
@@ -32,6 +37,7 @@ const isOpen = ref(false)
 const isListOpen = ref(false)
 const captures = ref<Capture[]>(loadCaptures())
 const archivedIds = ref<Set<string>>(loadArchived())
+const pinnedIds = ref<string[]>(loadPins())
 
 let installed = false
 let keydownHandler: ((e: KeyboardEvent) => void) | null = null
@@ -64,6 +70,7 @@ export function useQuickCapture() {
     isListOpen,
     captures,
     archivedIds,
+    pinnedIds,
     activeCaptures,
     archivedCaptures,
     open: () => {
@@ -111,6 +118,10 @@ export function useQuickCapture() {
       clearUtil()
       captures.value = []
     },
+    togglePin: (id: string): void => {
+      pinnedIds.value = togglePinUtil(id)
+    },
+    isPinned: (id: string): boolean => isPinnedUtil(pinnedIds.value, id),
   }
 }
 

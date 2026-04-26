@@ -71,11 +71,15 @@ vi.mock('@/composables/useQuickCapture', async () => {
         captures,
         activeCaptures,
         archivedCaptures,
+        pinnedIds: vue.ref([] as string[]),
         closeList: vi.fn(),
         remove: vi.fn(),
         archive: vi.fn(),
         unarchive: vi.fn(),
         clear: vi.fn(),
+        update: vi.fn(),
+        togglePin: vi.fn(),
+        isPinned: vi.fn(() => false),
       }
     },
   }

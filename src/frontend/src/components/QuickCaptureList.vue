@@ -17,10 +17,11 @@ import { tagCounts, captureHasTag } from '@/utils/quickCaptureTags'
 import { buildExport } from '@/utils/quickCaptureExport'
 import { useToast } from '@/composables/useToast'
 import { fuzzyScore } from '@/utils/fuzzyScore'
+import { partition } from '@/utils/capturePins'
 import type { Capture } from '@/utils/quickCapture'
 import CaptureHeatmap from './CaptureHeatmap.vue'
 
-const { isListOpen, captures, activeCaptures, archivedCaptures, closeList, remove, archive, unarchive, clear, update } = useQuickCapture()
+const { isListOpen, captures, activeCaptures, archivedCaptures, pinnedIds, closeList, remove, archive, unarchive, clear, update, togglePin, isPinned } = useQuickCapture()
 
 // Inline edit state
 const editingId = ref<string | null>(null)
@@ -50,7 +51,13 @@ function applyFilters(list: Capture[]): Capture[] {
   return list
 }
 
-const displayed = computed(() => applyFilters([...activeCaptures.value]))
+const displayed = computed(() => {
+  const filtered = applyFilters([...activeCaptures.value])
+  // When no search/tag filter is active, honour pin order; otherwise keep
+  // filtered relevance order but still float pinned items to the top.
+  const { pinned, rest } = partition(filtered, pinnedIds.value)
+  return [...pinned, ...rest]
+})
 
 const displayedArchived = computed(() => applyFilters([...archivedCaptures.value]))
 
@@ -83,6 +90,12 @@ onUnmounted(() => {
 
 function handleClose(): void {
   closeList()
+}
+
+function handlePin(c: Capture): void {
+  const wasPinned = isPinned(c.id)
+  togglePin(c.id)
+  useToast().info(wasPinned ? '已取消釘選' : '已釘選')
 }
 
 function handleArchive(c: Capture): void {
@@ -262,7 +275,10 @@ function onDownload(): void {
                 v-for="capture in displayed"
                 :key="capture.id"
                 class="qcl-item"
-                :class="{ 'qcl-item--editing': editingId === capture.id }"
+                :class="{
+                  'qcl-item--editing': editingId === capture.id,
+                  'qcl-item--pinned': isPinned(capture.id),
+                }"
               >
                 <div class="qcl-item-meta">
                   <span class="qcl-item-context">{{ capture.context }}</span>
@@ -291,6 +307,13 @@ function onDownload(): void {
                 <template v-else>
                   <p class="qcl-item-body">{{ capture.body }}</p>
                   <div class="qcl-item-actions">
+                    <button
+                      class="qcl-pin-btn"
+                      :class="{ 'qcl-pin-btn--active': isPinned(capture.id) }"
+                      :aria-label="isPinned(capture.id) ? `取消釘選：${capture.body.slice(0, 30)}` : `釘選：${capture.body.slice(0, 30)}`"
+                      :title="isPinned(capture.id) ? '取消釘選' : '釘選'"
+                      @click="handlePin(capture)"
+                    >📌</button>
                     <button
                       class="qcl-edit-btn"
                       :aria-label="`編輯：${capture.body.slice(0, 30)}`"
@@ -796,6 +819,37 @@ function onDownload(): void {
   border-color: var(--color-muted, #6c7086);
 }
 
+/* ── Pin button ─────────────────────────────────────────────────────────── */
+
+.qcl-pin-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.25rem;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  line-height: 1.5;
+  opacity: 0.5;
+}
+
+.qcl-pin-btn:hover {
+  opacity: 1;
+  border-color: var(--color-accent, #89b4fa);
+}
+
+.qcl-pin-btn--active {
+  opacity: 1;
+  border-color: var(--color-accent, #89b4fa);
+  background: rgba(137, 180, 250, 0.1);
+}
+
+/* Pinned items have a subtle left-border accent */
+.qcl-item--pinned {
+  border-left: 3px solid var(--color-accent, #89b4fa);
+}
+
 /* ── Archive button ─────────────────────────────────────────────────────── */
 
 .qcl-archive-btn {
@@ -865,6 +919,7 @@ function onDownload(): void {
   .qcl-download-btn,
   .qcl-delete-btn,
   .qcl-edit-btn,
+  .qcl-pin-btn,
   .qcl-archive-btn,
   .qcl-archive-toggle-btn,
   .qcl-unarchive-btn,
