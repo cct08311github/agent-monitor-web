@@ -69,6 +69,7 @@ vi.mock('@/composables/useQuickCapture', async () => {
       return {
         isListOpen: vue.ref(true),
         captures,
+        archivedIds: vue.ref(new Set<string>()),
         activeCaptures,
         archivedCaptures,
         pinnedIds: vue.ref([] as string[]),

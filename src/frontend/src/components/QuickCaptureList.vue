@@ -15,6 +15,7 @@ import { useQuickCapture } from '@/composables/useQuickCapture'
 import { useBulkSelect } from '@/composables/useBulkSelect'
 import { createFocusTrap } from '@/lib/focusTrap'
 import { tagCounts, captureHasTag } from '@/utils/quickCaptureTags'
+import { computeCaptureStats } from '@/utils/captureStats'
 import { buildExport } from '@/utils/quickCaptureExport'
 import { buildCaptureBackup, parseCaptureBackup, restoreCaptureBackup } from '@/utils/captureExportJson'
 import { isClipboardWriteSupported, writeClipboardText } from '@/utils/clipboardWrite'
@@ -34,7 +35,7 @@ import CaptureHeatmap from './CaptureHeatmap.vue'
 import CaptureBulkActionBar from './CaptureBulkActionBar.vue'
 import HighlightedText from './HighlightedText.vue'
 
-const { isListOpen, captures, activeCaptures, archivedCaptures, pinnedIds, closeList, remove, archive, unarchive, clear, update, togglePin, isPinned, openWithPrefill } = useQuickCapture()
+const { isListOpen, captures, archivedIds, activeCaptures, archivedCaptures, pinnedIds, closeList, remove, archive, unarchive, clear, update, togglePin, isPinned, openWithPrefill } = useQuickCapture()
 
 // ---------------------------------------------------------------------------
 // Bulk selection
@@ -79,6 +80,8 @@ function toggleSort(): void {
 }
 
 const tags = computed(() => tagCounts(captures.value))
+
+const stats = computed(() => computeCaptureStats(captures.value, archivedIds.value, pinnedIds.value))
 
 function applyFilters(list: Capture[]): Capture[] {
   // Date range is applied first (broadest filter)
@@ -895,6 +898,15 @@ function onImport(e: Event): void {
 
         <!-- Footer -->
         <div v-if="captures.length > 0" class="qcl-footer">
+          <footer class="qcl-stats-footer" aria-label="Capture 統計摘要">
+            <span class="stat">共 {{ stats.total }} 筆</span>
+            <span class="stat-sep" aria-hidden="true">·</span>
+            <span class="stat">已封存 {{ stats.archived }}</span>
+            <span class="stat-sep" aria-hidden="true">·</span>
+            <span class="stat">釘選 {{ stats.pinned }}</span>
+            <span class="stat-sep" aria-hidden="true">·</span>
+            <span class="stat">{{ stats.tagCount }} 個 tag<template v-if="stats.topTag"> (top: #{{ stats.topTag.tag }} {{ stats.topTag.count }})</template></span>
+          </footer>
           <button class="qcl-clear-btn" @click="handleClearAll">
             🗑 清空全部
           </button>
@@ -1312,6 +1324,30 @@ function onImport(e: Event): void {
   padding: 0.625rem 1.25rem;
   border-top: 1px solid var(--color-border, #313244);
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* ── Stats footer ────────────────────────────────────────────────────────── */
+
+.qcl-stats-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--color-muted, #6c7086);
+  line-height: 1.5;
+}
+
+.stat {
+  white-space: nowrap;
+}
+
+.stat-sep {
+  color: var(--color-border, #313244);
+  user-select: none;
 }
 
 .qcl-clear-btn {
