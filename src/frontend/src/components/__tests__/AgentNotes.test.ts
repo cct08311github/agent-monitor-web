@@ -234,6 +234,45 @@ describe('AgentNotes', () => {
     wrapper.unmount()
   })
 
+  // ── Markdown toolbar ──────────────────────────────────────────────────────
+
+  it('renders all 5 markdown toolbar buttons', async () => {
+    const wrapper = mountNotes()
+    await nextTick()
+
+    const toolbar = wrapper.find('.agent-notes-md-toolbar')
+    expect(toolbar.exists()).toBe(true)
+
+    const buttons = toolbar.findAll('button')
+    expect(buttons).toHaveLength(5)
+
+    wrapper.unmount()
+  })
+
+  it('clicking B wraps selected text in ** bold markers **', async () => {
+    const wrapper = mountNotes()
+    await nextTick()
+
+    // Set textarea content and simulate a selection
+    const textarea = wrapper.find('textarea')
+    await textarea.setValue('hello world')
+    await nextTick()
+
+    // Simulate selection of "world" (start=6, end=11)
+    const ta = textarea.element as HTMLTextAreaElement
+    ta.selectionStart = 6
+    ta.selectionEnd = 11
+
+    // Click bold button
+    const boldBtn = wrapper.find('.agent-notes-md-toolbar button:first-child')
+    await boldBtn.trigger('click')
+    await nextTick()
+
+    expect(ta.value).toBe('hello **world**')
+
+    wrapper.unmount()
+  })
+
   // ── Footer meta ───────────────────────────────────────────────────────────
 
   it('shows "尚未儲存" footer when no note exists', async () => {

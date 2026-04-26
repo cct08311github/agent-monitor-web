@@ -5,6 +5,7 @@ import { loadAlias } from '@/utils/agentAliases'
 import { buildExport } from '@/utils/agentNotesExport'
 import { relativeTimeFromNow } from '@/utils/relativeTime'
 import { useToast } from '@/composables/useToast'
+import { wrapSelection, prependLine } from '@/utils/markdownInsert'
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -17,6 +18,7 @@ const props = defineProps<{
 const text = ref('')
 const updatedAt = ref<number | null>(null)
 const relativeLabel = ref('尚未儲存')
+const textareaRef = ref<HTMLTextAreaElement | null>(null)
 
 // ── Debounce save ─────────────────────────────────────────────────────────────
 
@@ -131,6 +133,59 @@ function onClear(): void {
   toast.info('筆記已清除')
 }
 
+// ── Markdown toolbar ──────────────────────────────────────────────────────────
+
+/**
+ * Apply a wrap operation (bold/italic/code/link) to the current selection.
+ * Restores focus and cursor position after the DOM update.
+ */
+function applyWrap(prefix: string, suffix: string, placeholder: string): void {
+  const ta = textareaRef.value
+  if (!ta) return
+  const { text: nextText, selectionStart, selectionEnd } = wrapSelection(
+    text.value,
+    ta.selectionStart,
+    ta.selectionEnd,
+    prefix,
+    suffix,
+    placeholder,
+  )
+  text.value = nextText
+  nextTick(() => {
+    ta.focus()
+    ta.setSelectionRange(selectionStart, selectionEnd)
+  })
+}
+
+function insertBold(): void {
+  applyWrap('**', '**', '粗體文字')
+}
+
+function insertItalic(): void {
+  applyWrap('*', '*', '斜體文字')
+}
+
+function insertCode(): void {
+  applyWrap('`', '`', 'code')
+}
+
+function insertLink(): void {
+  const url = window.prompt('連結 URL:', 'https://')
+  if (!url) return
+  applyWrap('[', `](${url})`, '連結文字')
+}
+
+function insertList(): void {
+  const ta = textareaRef.value
+  if (!ta) return
+  const { text: nextText, selectionStart } = prependLine(text.value, ta.selectionStart, '- ')
+  text.value = nextText
+  nextTick(() => {
+    ta.focus()
+    ta.setSelectionRange(selectionStart, selectionStart)
+  })
+}
+
 // ── Download / Export ─────────────────────────────────────────────────────────
 
 const canExport = computed(() => text.value.trim().length > 0 && updatedAt.value !== null)
@@ -165,7 +220,25 @@ function onDownload(): void {
     <div class="agent-notes-header">
       <span class="agent-notes-label">📝 筆記</span>
     </div>
+    <div class="agent-notes-md-toolbar" role="toolbar" aria-label="Markdown 格式工具列">
+      <button class="agent-notes-md-btn" type="button" title="粗體" @click="insertBold">
+        <strong>B</strong>
+      </button>
+      <button class="agent-notes-md-btn" type="button" title="斜體" @click="insertItalic">
+        <em>I</em>
+      </button>
+      <button class="agent-notes-md-btn" type="button" title="行內程式碼" @click="insertCode">
+        <code>&lt;&gt;</code>
+      </button>
+      <button class="agent-notes-md-btn" type="button" title="連結" @click="insertLink">
+        🔗
+      </button>
+      <button class="agent-notes-md-btn agent-notes-md-btn--wide" type="button" title="清單" @click="insertList">
+        - 清單
+      </button>
+    </div>
     <textarea
+      ref="textareaRef"
       v-model="text"
       class="agent-notes-textarea"
       rows="6"
@@ -304,5 +377,59 @@ function onDownload(): void {
 .agent-notes-clear-btn:hover {
   border-color: var(--red, #f38ba8);
   color: var(--red, #f38ba8);
+}
+
+/* ── Markdown toolbar ─────────────────────────────────────────────────────── */
+
+.agent-notes-md-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.agent-notes-md-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: none;
+  border: 1px solid var(--border, #45475a);
+  border-radius: 3px;
+  color: var(--text-muted, #6c7086);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  min-width: 24px;
+  line-height: 1.5;
+  font-family: inherit;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.agent-notes-md-btn--wide {
+  min-width: unset;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.agent-notes-md-btn:hover {
+  color: var(--text, #cdd6f4);
+  border-color: var(--blue, #89b4fa);
+  background: rgba(137, 180, 250, 0.08);
+}
+
+.agent-notes-md-btn:focus-visible {
+  outline: 2px solid var(--blue, #89b4fa);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-notes-md-btn {
+    transition: none;
+  }
 }
 </style>
