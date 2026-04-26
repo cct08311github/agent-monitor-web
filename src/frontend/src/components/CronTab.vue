@@ -13,6 +13,7 @@ import type { TimelineMarker } from '@/utils/cronTimeline'
 import { humanizeCron } from '@/utils/cronHumanizer'
 import CronNextFires from '@/components/CronNextFires.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import CronJobNotes from '@/components/CronJobNotes.vue'
 import {
   loadAllCronTags,
   addCronTag,
@@ -630,6 +631,9 @@ function getNextRunCountdown(job: CronJob): string {
               {{ job.description ?? '無描述' }}
             </div>
           </div>
+
+          <!-- Per-job collapsible notes -->
+          <CronJobNotes :job-id="job.id" />
         </div>
       </div>
     </template>

@@ -27,6 +27,15 @@ vi.mock('@/composables/useApi', () => ({
 
 vi.mock('@/composables/useToast', () => ({
   showToast: vi.fn(),
+  useToast: () => ({
+    info: vi.fn(),
+    success: vi.fn(),
+    warning: vi.fn(),
+    error: vi.fn(),
+    show: vi.fn(),
+    dismiss: vi.fn(),
+    clear: vi.fn(),
+  }),
 }))
 
 vi.mock('@/composables/useConfirm', () => ({
