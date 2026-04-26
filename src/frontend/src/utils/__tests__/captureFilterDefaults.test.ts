@@ -5,14 +5,16 @@ import type { FilterState } from '../captureFilterDefaults'
 const defaults: FilterState = {
   searchQuery: FILTER_DEFAULTS.searchQuery,
   selectedTag: FILTER_DEFAULTS.selectedTag,
+  selectedContext: FILTER_DEFAULTS.selectedContext,
   dateRangeState: { ...FILTER_DEFAULTS.dateRangeState },
   sortOrder: FILTER_DEFAULTS.sortOrder,
 }
 
 describe('FILTER_DEFAULTS', () => {
-  it('has all 4 expected keys', () => {
+  it('has all 5 expected keys', () => {
     expect(FILTER_DEFAULTS).toHaveProperty('searchQuery')
     expect(FILTER_DEFAULTS).toHaveProperty('selectedTag')
+    expect(FILTER_DEFAULTS).toHaveProperty('selectedContext')
     expect(FILTER_DEFAULTS).toHaveProperty('dateRangeState')
     expect(FILTER_DEFAULTS).toHaveProperty('sortOrder')
   })
@@ -23,6 +25,10 @@ describe('FILTER_DEFAULTS', () => {
 
   it('selectedTag default is null', () => {
     expect(FILTER_DEFAULTS.selectedTag).toBeNull()
+  })
+
+  it('selectedContext default is null', () => {
+    expect(FILTER_DEFAULTS.selectedContext).toBeNull()
   })
 
   it('dateRangeState default range is "all"', () => {
@@ -51,6 +57,10 @@ describe('hasActiveFilters', () => {
     expect(hasActiveFilters({ ...defaults, selectedTag: 'work' })).toBe(true)
   })
 
+  it('returns true when selectedContext is set', () => {
+    expect(hasActiveFilters({ ...defaults, selectedContext: 'LogsTab' })).toBe(true)
+  })
+
   it('returns true when dateRangeState.range is not "all"', () => {
     expect(hasActiveFilters({ ...defaults, dateRangeState: { range: 'today' } })).toBe(true)
     expect(hasActiveFilters({ ...defaults, dateRangeState: { range: 'last7d' } })).toBe(true)
@@ -68,6 +78,7 @@ describe('hasActiveFilters', () => {
       hasActiveFilters({
         searchQuery: 'test',
         selectedTag: 'vue',
+        selectedContext: 'LogsTab',
         dateRangeState: { range: 'today' },
         sortOrder: 'asc',
       }),
