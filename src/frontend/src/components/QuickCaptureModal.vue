@@ -148,6 +148,12 @@ function handleKeydown(e: KeyboardEvent): void {
             placeholder="記下你的想法..."
             aria-label="快速記錄內容"
           />
+          <span
+            class="qcm-char-count"
+            :class="{ 'is-dimmed': !text.length }"
+            aria-live="polite"
+            aria-atomic="true"
+          >{{ text.length }} 字</span>
         </div>
 
         <!-- Footer -->
@@ -348,6 +354,21 @@ function handleKeydown(e: KeyboardEvent): void {
   cursor: not-allowed;
 }
 
+/* ── Char counter ───────────────────────────────────────────────────────── */
+
+.qcm-char-count {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--color-muted, #6c7086);
+  text-align: right;
+  transition: opacity 0.15s;
+}
+
+.qcm-char-count.is-dimmed {
+  opacity: 0.5;
+}
+
 /* ── Reduced motion ─────────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
@@ -355,7 +376,8 @@ function handleKeydown(e: KeyboardEvent): void {
   .qc-card,
   .qc-btn,
   .qc-textarea,
-  .qcm-paste {
+  .qcm-paste,
+  .qcm-char-count {
     transition: none;
     animation: none;
   }
