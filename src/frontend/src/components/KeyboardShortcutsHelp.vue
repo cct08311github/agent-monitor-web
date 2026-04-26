@@ -11,13 +11,20 @@ import { useKeyboardShortcutsHelp } from '@/composables/useKeyboardShortcutsHelp
 import { groupByCategory, SHORTCUTS } from '@/data/keyboardShortcuts'
 import { createFocusTrap } from '@/lib/focusTrap'
 import { useOnboardingTour } from '@/composables/useOnboardingTour'
+import { useQuietHoursSetting } from '@/composables/useQuietHoursSetting'
 
 const { isOpen, close } = useKeyboardShortcutsHelp()
 const { restart: restartTour } = useOnboardingTour()
+const { open: openQuietHours } = useQuietHoursSetting()
 
 function handleRestartTour(): void {
   close()
   restartTour()
+}
+
+function handleOpenQuietHours(): void {
+  close()
+  openQuietHours()
 }
 
 // ---------------------------------------------------------------------------
@@ -112,9 +119,14 @@ onUnmounted(() => {
         <!-- Footer -->
         <div class="ksh-footer">
           <span class="ksh-hint">在輸入框中快捷鍵不生效（Esc 除外）</span>
-          <button class="ksh-restart-tour-btn" @click="handleRestartTour">
-            🎓 重新觀看引導
-          </button>
+          <div class="ksh-footer-actions">
+            <button class="ksh-restart-tour-btn" @click="handleRestartTour">
+              🎓 重新觀看引導
+            </button>
+            <button class="ksh-quiet-hours-btn" @click="handleOpenQuietHours">
+              🌙 安靜時段
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -275,6 +287,13 @@ onUnmounted(() => {
   color: var(--color-muted, #6c7086);
 }
 
+.ksh-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .ksh-restart-tour-btn {
   background: none;
   border: 1px solid var(--color-border, #313244);
@@ -288,6 +307,23 @@ onUnmounted(() => {
 }
 
 .ksh-restart-tour-btn:hover {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-text, #cdd6f4);
+}
+
+.ksh-quiet-hours-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.375rem;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.5;
+}
+
+.ksh-quiet-hours-btn:hover {
   color: var(--color-text, #cdd6f4);
   border-color: var(--color-text, #cdd6f4);
 }

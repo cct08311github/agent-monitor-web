@@ -27,6 +27,7 @@ import ConnectionStatus from '@/components/ConnectionStatus.vue'
 import KeyboardShortcutsHelp from '@/components/KeyboardShortcutsHelp.vue'
 import { installShortcutsHelpHotkey } from '@/composables/useKeyboardShortcutsHelp'
 import OnboardingTour from '@/components/OnboardingTour.vue'
+import QuietHoursSetting from '@/components/QuietHoursSetting.vue'
 import {
   installOnboardingAutoStart,
   teardownOnboardingAutoStart,
@@ -482,6 +483,7 @@ registerShortcut({
     <ConfirmDialog />
     <KeyboardShortcutsHelp />
     <OnboardingTour />
+    <QuietHoursSetting />
 
     <!-- Konami Code Easter Egg -->
     <div v-if="celebrating" class="konami-celebrate" aria-hidden="true">
