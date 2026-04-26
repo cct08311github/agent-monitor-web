@@ -23,6 +23,7 @@ import { ref, watch } from 'vue'
 import type { WatchStopHandle } from 'vue'
 import { isQuietNow } from '@/composables/useQuietHours'
 import { useDesktopNotify } from '@/composables/useDesktopNotify'
+import { useNotifyPrompt } from '@/composables/useNotifyPrompt'
 
 // ---------------------------------------------------------------------------
 // Module-scoped state — shared across all useNotificationBadge() calls
@@ -64,6 +65,8 @@ export function useNotificationBadge(): NotificationBadgeApi {
           alertMessage ?? '新警示已觸發',
         )
       }
+      // Show gentle opt-in banner on first alert if permission is still default
+      useNotifyPrompt().maybeOpen()
     },
     clear: () => {
       unreadCount.value = 0
