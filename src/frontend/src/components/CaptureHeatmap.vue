@@ -22,6 +22,10 @@ const props = withDefaults(
   { days: 30 },
 )
 
+const emit = defineEmits<{
+  (e: 'select', dateKey: string): void
+}>()
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -77,6 +81,8 @@ function cellTitle(key: string, count: number): string {
         :height="CELL_SIZE"
         rx="3"
         :class="cellClass(cell.key)"
+        style="cursor: pointer"
+        @click="emit('select', cell.key)"
       ><title>{{ cellTitle(cell.key, counts.get(cell.key) ?? 0) }}</title></rect>
     </svg>
   </div>
@@ -108,7 +114,7 @@ function cellTitle(key: string, count: number): string {
 .cell-l3:hover,
 .cell-l4:hover {
   filter: brightness(1.3);
-  cursor: default;
+  cursor: pointer;
 }
 
 @media (prefers-reduced-motion: reduce) {

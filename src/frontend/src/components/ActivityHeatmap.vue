@@ -23,6 +23,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'reset'): void
+  (e: 'select', dateKey: string): void
 }>()
 
 // ---------------------------------------------------------------------------
@@ -191,6 +192,8 @@ function onReset(): void {
               :height="cellSize"
               rx="3"
               :class="cellClass(cell.key, cell.inRange)"
+              :style="cell.inRange ? 'cursor: pointer' : undefined"
+              @click="cell.inRange ? emit('select', cell.key) : undefined"
             ><title>{{ cellTitle(cell.key, cell.inRange, cell.dayOfWeek) }}</title></rect>
           </g>
         </g>
@@ -362,7 +365,7 @@ function onReset(): void {
 .cell-l3:hover,
 .cell-l4:hover {
   filter: brightness(1.3);
-  cursor: default;
+  cursor: pointer;
 }
 
 @media (prefers-reduced-motion: reduce) {

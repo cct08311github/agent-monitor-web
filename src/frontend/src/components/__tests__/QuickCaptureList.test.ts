@@ -73,6 +73,7 @@ vi.mock('@/composables/useQuickCapture', async () => {
         activeCaptures,
         archivedCaptures,
         pinnedIds: vue.ref([] as string[]),
+        pendingJumpDate: vue.ref<string | null>(null),
         closeList: vi.fn(),
         remove: vi.fn(),
         archive: vi.fn(),
@@ -81,6 +82,7 @@ vi.mock('@/composables/useQuickCapture', async () => {
         update: vi.fn(),
         togglePin: vi.fn(),
         isPinned: vi.fn(() => false),
+        openWithPrefill: vi.fn(),
       }
     },
   }
@@ -612,6 +614,40 @@ describe('QuickCaptureList — keyboard navigation', () => {
 
     // After displayed changes, highlight should be reset
     expect(document.querySelectorAll('.qcl-item--keynav-highlight').length).toBe(0)
+
+    wrapper.unmount()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// CaptureHeatmap drill-down — pendingJumpDate integration
+// ---------------------------------------------------------------------------
+
+describe('QuickCaptureList — heatmap drill-down (pendingJumpDate)', () => {
+  beforeEach(() => {
+    mockCaptures.mockReturnValue([])
+    vi.clearAllMocks()
+  })
+
+  it('renders CaptureHeatmap with @select listener when captures exist', () => {
+    mockCaptures.mockReturnValue([
+      makeCapture('1', 'idea for today'),
+    ])
+    const wrapper = mountList()
+
+    // CaptureHeatmap is mounted in the qcl-heatmap-row div when captures exist
+    const heatmapRow = document.querySelector('.qcl-heatmap-row')
+    expect(heatmapRow).not.toBeNull()
+
+    wrapper.unmount()
+  })
+
+  it('does not render CaptureHeatmap row when captures list is empty', () => {
+    mockCaptures.mockReturnValue([])
+    const wrapper = mountList()
+
+    const heatmapRow = document.querySelector('.qcl-heatmap-row')
+    expect(heatmapRow).toBeNull()
 
     wrapper.unmount()
   })

@@ -40,7 +40,7 @@ import CaptureBulkActionBar from './CaptureBulkActionBar.vue'
 import HighlightedText from './HighlightedText.vue'
 import MarkdownText from './MarkdownText.vue'
 
-const { isListOpen, captures, archivedIds, activeCaptures, archivedCaptures, pinnedIds, closeList, remove, archive, unarchive, clear, update, togglePin, isPinned, openWithPrefill } = useQuickCapture()
+const { isListOpen, captures, archivedIds, activeCaptures, archivedCaptures, pinnedIds, closeList, remove, archive, unarchive, clear, update, togglePin, isPinned, openWithPrefill, pendingJumpDate } = useQuickCapture()
 
 // ---------------------------------------------------------------------------
 // Bulk selection
@@ -240,6 +240,34 @@ function onJumpToDate(e: Event): void {
   const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' })
 }
+
+/**
+ * Handle a click on a heatmap cell.
+ * Switches to timeline mode, resets date-range filter so the target day is
+ * visible, then scrolls to its day-section.
+ */
+async function onHeatmapSelect(dateKey: string): Promise<void> {
+  viewMode.value = 'timeline'
+  saveViewMode('timeline')
+  dateRange.value = 'all'
+  await nextTick()
+  const el = document.getElementById(`day-section-${dateKey}`)
+  if (!el) {
+    useToast().info(`${dateKey} 無 capture`)
+    return
+  }
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' })
+}
+
+// When the list opens with a pending jump date (triggered by ActivityHeatmap
+// via useQuickCapture().openListWithJump), consume and execute the jump.
+watch([isListOpen, pendingJumpDate], async ([open, target]) => {
+  if (open && target) {
+    await onHeatmapSelect(target)
+    pendingJumpDate.value = null
+  }
+})
 
 function toggleTag(tag: string): void {
   selectedTag.value = selectedTag.value === tag ? null : tag
@@ -607,7 +635,7 @@ function onImport(e: Event): void {
 
         <!-- Capture frequency heatmap (30 days) -->
         <div v-if="captures.length > 0" class="qcl-heatmap-row">
-          <CaptureHeatmap :captures="captures" />
+          <CaptureHeatmap :captures="captures" @select="onHeatmapSelect" />
         </div>
 
         <!-- Archive toggle toolbar (only shown when archived items exist) -->
