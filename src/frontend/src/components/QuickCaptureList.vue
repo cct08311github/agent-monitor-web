@@ -16,6 +16,7 @@ import { useBulkSelect } from '@/composables/useBulkSelect'
 import { createFocusTrap } from '@/lib/focusTrap'
 import { tagCounts, captureHasTag } from '@/utils/quickCaptureTags'
 import { computeCaptureStats } from '@/utils/captureStats'
+import { computeWeeklyTrend, trendLabel } from '@/utils/captureWeeklyTrend'
 import { buildExport } from '@/utils/quickCaptureExport'
 import { buildCaptureBackup, parseCaptureBackup, restoreCaptureBackup } from '@/utils/captureExportJson'
 import { isClipboardWriteSupported, writeClipboardText } from '@/utils/clipboardWrite'
@@ -86,6 +87,8 @@ function toggleSort(): void {
 const tags = computed(() => tagCounts(captures.value))
 
 const stats = computed(() => computeCaptureStats(captures.value, archivedIds.value, pinnedIds.value))
+
+const trend = computed(() => computeWeeklyTrend(captures.value))
 
 function applyFilters(list: Capture[]): Capture[] {
   // Date range is applied first (broadest filter)
@@ -978,6 +981,15 @@ function onImport(e: Event): void {
             <span class="stat">釘選 {{ stats.pinned }}</span>
             <span class="stat-sep" aria-hidden="true">·</span>
             <span class="stat">{{ stats.tagCount }} 個 tag<template v-if="stats.topTag"> (top: #{{ stats.topTag.tag }} {{ stats.topTag.count }})</template></span>
+            <template v-if="trend">
+              <span class="stat-sep" aria-hidden="true">·</span>
+              <span
+                class="trend-chip"
+                :class="`trend-${trend.direction}`"
+                :title="`本週 ${trend.thisWeek} 筆 / 上週 ${trend.lastWeek} 筆`"
+                aria-label="`週趨勢：${trendLabel(trend)}`"
+              >{{ trendLabel(trend) }}</span>
+            </template>
           </footer>
           <button class="qcl-clear-btn" @click="handleClearAll">
             🗑 清空全部
@@ -1820,6 +1832,42 @@ function onImport(e: Event): void {
 .qcl-item--keynav-highlight {
   outline: 2px solid var(--color-accent, #89b4fa);
   outline-offset: -2px;
+}
+
+/* ── Weekly trend chip ──────────────────────────────────────────────────── */
+
+.trend-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+  cursor: default;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.trend-up {
+  color: var(--green, #a6e3a1);
+  background: rgba(166, 227, 161, 0.1);
+}
+
+.trend-new {
+  color: var(--color-accent, #89b4fa);
+  background: rgba(137, 180, 250, 0.1);
+}
+
+.trend-down {
+  color: var(--yellow, #f9e2af);
+  background: rgba(249, 226, 175, 0.1);
+}
+
+.trend-flat {
+  color: var(--color-muted, #6c7086);
+  background: transparent;
 }
 
 /* ── Reduced motion ─────────────────────────────────────────────────────── */
