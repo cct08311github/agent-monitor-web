@@ -61,6 +61,7 @@ import {
   teardownRecentAgentsHotkey,
 } from '@/composables/useRecentAgents'
 import NotifyPromptBanner from '@/components/NotifyPromptBanner.vue'
+import SettingsBackupMenu from '@/components/SettingsBackupMenu.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -573,6 +574,7 @@ registerShortcut({
       @select="onSelectRecentAgent"
       @close="closeRecentAgents"
     />
+    <SettingsBackupMenu />
 
     <!-- Konami Code Easter Egg -->
     <div v-if="celebrating" class="konami-celebrate" aria-hidden="true">
