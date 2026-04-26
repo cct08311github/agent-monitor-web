@@ -38,6 +38,11 @@ import {
   teardownMessageRateTicker,
 } from '@/composables/useMessageRate'
 import MessageRateSparkline from '@/components/MessageRateSparkline.vue'
+import WhatsNew from '@/components/WhatsNew.vue'
+import {
+  installWhatsNewAutoOpen,
+  teardownWhatsNewAutoOpen,
+} from '@/composables/useWhatsNew'
 
 const route = useRoute()
 const router = useRouter()
@@ -254,6 +259,7 @@ onMounted(() => {
   }, 30_000)
   _uninstallShortcutsHelp = installShortcutsHelpHotkey()
   installOnboardingAutoStart()
+  installWhatsNewAutoOpen()
 })
 
 onUnmounted(() => {
@@ -266,6 +272,7 @@ onUnmounted(() => {
   _uninstallShortcutsHelp?.()
   _uninstallShortcutsHelp = null
   teardownOnboardingAutoStart()
+  teardownWhatsNewAutoOpen()
 })
 
 // ── Compact mode keyboard shortcut ─────────────────────────────────────────
@@ -486,6 +493,7 @@ registerShortcut({
     <KeyboardShortcutsHelp />
     <OnboardingTour />
     <QuietHoursSetting />
+    <WhatsNew />
 
     <!-- Konami Code Easter Egg -->
     <div v-if="celebrating" class="konami-celebrate" aria-hidden="true">

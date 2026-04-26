@@ -14,12 +14,14 @@ import { useOnboardingTour } from '@/composables/useOnboardingTour'
 import { useQuietHoursSetting } from '@/composables/useQuietHoursSetting'
 import { useColorPalette } from '@/composables/useColorPalette'
 import { useToast } from '@/composables/useToast'
+import { useWhatsNew } from '@/composables/useWhatsNew'
 
 const { isOpen, close } = useKeyboardShortcutsHelp()
 const { restart: restartTour } = useOnboardingTour()
 const { open: openQuietHours } = useQuietHoursSetting()
 const { isCbSafe, togglePalette } = useColorPalette()
 const toast = useToast()
+const { open: openWhatsNew } = useWhatsNew()
 
 function handleRestartTour(): void {
   close()
@@ -34,6 +36,11 @@ function handleOpenQuietHours(): void {
 function handleToggleCbPalette(): void {
   togglePalette()
   toast.success(isCbSafe() ? '已切換為色盲友善色盤' : '已恢復預設色盤')
+}
+
+function handleOpenWhatsNew(): void {
+  close()
+  openWhatsNew()
 }
 
 // ---------------------------------------------------------------------------
@@ -137,6 +144,9 @@ onUnmounted(() => {
             </button>
             <button class="ksh-cb-palette-btn" @click="handleToggleCbPalette">
               🎨 色盲友善 {{ isCbSafe() ? '已啟用' : '預設' }}
+            </button>
+            <button class="ksh-whats-new-btn" @click="handleOpenWhatsNew">
+              ✨ 最近更新
             </button>
           </div>
         </div>
@@ -353,6 +363,23 @@ onUnmounted(() => {
 }
 
 .ksh-cb-palette-btn:hover {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-text, #cdd6f4);
+}
+
+.ksh-whats-new-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.375rem;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.5;
+}
+
+.ksh-whats-new-btn:hover {
   color: var(--color-text, #cdd6f4);
   border-color: var(--color-text, #cdd6f4);
 }
