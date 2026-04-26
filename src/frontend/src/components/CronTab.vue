@@ -21,6 +21,7 @@ import {
   filterJobsByTag,
 } from '@/utils/cronTags'
 import { useCronAliases } from '@/composables/useCronAliases'
+import { loadPins, togglePin as cronTogglePin, isPinned, partition } from '@/utils/cronPins'
 
 // ---------------------------------------------------------------------------
 // State
@@ -36,6 +37,17 @@ const searchInputRef = ref<HTMLInputElement | null>(null)
 const searchQuery = ref('')
 const filterMode = ref<'all' | 'enabled' | 'disabled'>('all')
 const sortBy = ref<'name' | 'nextRun' | 'lastRun'>('name')
+
+// ---------------------------------------------------------------------------
+// Cron pins
+// ---------------------------------------------------------------------------
+const pinnedIds = ref<string[]>(loadPins())
+
+function onTogglePin(id: string): void {
+  pinnedIds.value = cronTogglePin(id)
+  const pinned = isPinned(pinnedIds.value, id)
+  showToast(pinned ? '📌 已釘選' : '取消釘選', 'info')
+}
 
 // ---------------------------------------------------------------------------
 // Cron aliases
@@ -124,7 +136,9 @@ const filteredJobs = computed<CronJob[]>(() => {
     return 0
   })
 
-  return result
+  // 5. Float pinned jobs to top
+  const { pinned, rest } = partition(result, pinnedIds.value)
+  return [...pinned, ...rest]
 })
 
 const hasJobs = computed(() => jobs.value.length > 0)
@@ -450,7 +464,7 @@ function getNextRunCountdown(job: CronJob): string {
         <div
           v-for="job in filteredJobs"
           :key="job.id"
-          :class="['agent-card', { dormant: !job.enabled }]"
+          :class="['agent-card', { dormant: !job.enabled, 'cron-pinned': isPinned(pinnedIds, job.id) }]"
           style="cursor: default"
         >
           <!-- Card header -->
@@ -491,6 +505,15 @@ function getNextRunCountdown(job: CronJob): string {
 
             <!-- Controls -->
             <div style="display: flex; align-items: center; gap: 8px">
+              <!-- Pin button -->
+              <button
+                :class="['cron-pin-btn', { 'is-pinned': isPinned(pinnedIds, job.id) }]"
+                :title="isPinned(pinnedIds, job.id) ? '取消釘選' : '釘選到最上'"
+                @click="onTogglePin(job.id)"
+              >
+                📌
+              </button>
+
               <!-- Run button -->
               <button
                 class="cron-run-button"
@@ -886,5 +909,32 @@ function getNextRunCountdown(job: CronJob): string {
   font-size: 10px;
   color: var(--text-muted, #94a3b8);
   margin-top: 1px;
+}
+
+/* ── Cron pin button ─────────────────────────────────────────────── */
+
+.cron-pin-btn {
+  padding: 0 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.3;
+  line-height: 1;
+  transition: opacity 0.15s;
+}
+
+.cron-pin-btn:hover {
+  opacity: 0.8;
+}
+
+.cron-pin-btn.is-pinned {
+  opacity: 1;
+}
+
+/* ── Pinned card accent border ───────────────────────────────────── */
+
+.agent-card.cron-pinned {
+  border-left: 3px solid var(--accent, #6366f1);
 }
 </style>
