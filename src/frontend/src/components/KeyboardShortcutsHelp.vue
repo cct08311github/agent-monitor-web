@@ -24,6 +24,7 @@ import { useThemeScheduleSetting } from '@/composables/useThemeScheduleSetting'
 import { useDesktopNotify } from '@/composables/useDesktopNotify'
 import { useSettingsBackupMenu } from '@/composables/useSettingsBackupMenu'
 import { useDensity } from '@/composables/useDensity'
+import { useTitleFlash } from '@/composables/useTitleFlash'
 import EmptyState from '@/components/EmptyState.vue'
 
 const { isOpen, close } = useKeyboardShortcutsHelp()
@@ -39,6 +40,7 @@ const { openList: openCaptureList, captures: quickCaptures } = useQuickCapture()
 const { open: openThemeSchedule } = useThemeScheduleSetting()
 const { open: openSettingsBackup } = useSettingsBackupMenu()
 const { isCompact, toggleDensity } = useDensity()
+const { enabled: flashEnabled, toggle: toggleFlash } = useTitleFlash()
 const {
   enabled: desktopEnabled,
   permission: desktopPermission,
@@ -89,6 +91,11 @@ function handleOpenSettingsBackup(): void {
 function handleToggleDensity(): void {
   toggleDensity()
   toast.info(`已切換密度: ${isCompact() ? '緊湊' : '寬鬆'}`)
+}
+
+function handleToggleFlash(): void {
+  toggleFlash()
+  toast.info(flashEnabled.value ? 'Title 閃爍已啟用' : 'Title 閃爍已關閉')
 }
 
 const tzLabel = computed(() => (tzMode.value === 'utc' ? 'UTC' : '本地時間'))
@@ -287,6 +294,9 @@ onUnmounted(() => {
             </button>
             <button class="ksh-density-btn" @click="handleToggleDensity">
               🗜 密度 {{ isCompact() ? '緊湊' : '寬鬆' }}
+            </button>
+            <button class="ksh-title-flash-btn" @click="handleToggleFlash">
+              ⚡ Title 閃爍 {{ flashEnabled ? '已啟用' : '已關閉' }}
             </button>
           </div>
         </div>
@@ -689,6 +699,23 @@ onUnmounted(() => {
 }
 
 .ksh-density-btn:hover {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-text, #cdd6f4);
+}
+
+.ksh-title-flash-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.375rem;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.5;
+}
+
+.ksh-title-flash-btn:hover {
   color: var(--color-text, #cdd6f4);
   border-color: var(--color-text, #cdd6f4);
 }
