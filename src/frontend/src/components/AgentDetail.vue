@@ -221,12 +221,19 @@ import AgentStatsCard from '@/components/AgentStatsCard.vue'
 import { computeAgentStats, type AgentStats } from '@/utils/agentStats'
 import { loadNote } from '@/utils/agentNotes'
 import { useQuickCapture } from '@/composables/useQuickCapture'
+import SessionsInsights from '@/components/SessionsInsights.vue'
+import { computeSessionsInsights } from '@/utils/sessionsInsights'
 
 const bookmarks = ref<string[]>([])
+const showSessionsInsights = ref(false)
 
 function refreshBookmarks() {
   bookmarks.value = loadBookmarks(props.agentId)
 }
+
+const sessionsInsights = computed(() =>
+  computeSessionsInsights(sessions.value, bookmarks.value),
+)
 
 function onToggleBookmark(sessionId: string) {
   bookmarks.value = toggleBookmark(props.agentId, sessionId)
@@ -445,6 +452,14 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
       <div class="detail-card">
         <div class="sessions-card-header">
           <div class="detail-card-title">Sessions</div>
+          <button
+            v-if="sessions.length > 0"
+            type="button"
+            class="ctrl-btn si-toggle-btn"
+            :aria-expanded="showSessionsInsights"
+            :title="showSessionsInsights ? '隱藏統計' : '顯示統計'"
+            @click="showSessionsInsights = !showSessionsInsights"
+          >📊 統計</button>
           <input
             v-if="sessions.length > 0"
             v-model="sessionSearchQuery"
@@ -453,6 +468,8 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
             class="session-search-input"
           >
         </div>
+        <!-- Sessions Insights Panel -->
+        <SessionsInsights v-if="showSessionsInsights" :insights="sessionsInsights" />
         <div v-if="sessionsLoading" style="padding:4px 0">
           <Skeleton :rows="4" height="22px" />
         </div>
@@ -593,6 +610,12 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
 
 .sessions-card-header .detail-card-title {
   margin-bottom: 0;
+}
+
+.si-toggle-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  flex-shrink: 0;
 }
 
 .session-search-input {
