@@ -63,6 +63,16 @@ export function deleteCapture(id: string): void {
   saveAll(next)
 }
 
+export function updateCapture(id: string, body: string): Capture | null {
+  const all = loadCaptures()
+  const idx = all.findIndex((c) => c.id === id)
+  if (idx < 0) return null
+  const updated: Capture = { ...all[idx]!, body }
+  const next = [...all.slice(0, idx), updated, ...all.slice(idx + 1)]
+  saveAll(next)
+  return updated
+}
+
 export function clearCaptures(): void {
   try {
     localStorage.removeItem(KEY)
