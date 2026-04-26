@@ -4,14 +4,35 @@
  *
  * Opens from the KeyboardShortcutsHelp footer button.
  * Supports per-item delete (with confirm) and "clear all" (with confirm).
+ * Tag chips bar above list allows filtering by #hashtag.
  * Esc or backdrop click closes the modal.
  */
-import { watch, nextTick, onUnmounted, ref } from 'vue'
+import { watch, nextTick, onUnmounted, ref, computed } from 'vue'
 import { useQuickCapture } from '@/composables/useQuickCapture'
 import { createFocusTrap } from '@/lib/focusTrap'
+import { tagCounts, captureHasTag } from '@/utils/quickCaptureTags'
 import type { Capture } from '@/utils/quickCapture'
 
 const { isListOpen, captures, closeList, remove, clear } = useQuickCapture()
+
+// Tag filtering
+const selectedTag = ref<string | null>(null)
+
+const tags = computed(() => tagCounts(captures.value))
+
+const displayed = computed(() =>
+  selectedTag.value
+    ? captures.value.filter((c) => captureHasTag(c, selectedTag.value!))
+    : captures.value,
+)
+
+function toggleTag(tag: string): void {
+  selectedTag.value = selectedTag.value === tag ? null : tag
+}
+
+function clearTagFilter(): void {
+  selectedTag.value = null
+}
 
 const dialogRef = ref<HTMLDivElement | null>(null)
 const trap = createFocusTrap()
@@ -82,17 +103,39 @@ function formatTime(ts: number): string {
           >✕</button>
         </div>
 
+        <!-- Tag chips bar (only shown when tags exist) -->
+        <div v-if="tags.length > 0" class="qcl-tag-bar" role="group" aria-label="Tag 篩選">
+          <button
+            v-if="selectedTag !== null"
+            class="tag-chip tag-chip--reset"
+            @click="clearTagFilter"
+          >全部</button>
+          <button
+            v-for="t in tags"
+            :key="t.tag"
+            class="tag-chip"
+            :class="{ 'is-active': selectedTag === t.tag }"
+            :aria-pressed="selectedTag === t.tag"
+            @click="toggleTag(t.tag)"
+          >#{{ t.tag }} <span class="tag-chip__count">{{ t.count }}</span></button>
+        </div>
+
         <!-- Body -->
         <div class="qcl-body">
-          <!-- Empty state -->
+          <!-- Empty state — no captures at all -->
           <p v-if="captures.length === 0" class="qcl-empty">
             尚未有 quick capture
+          </p>
+
+          <!-- Empty state — tag filter with no results -->
+          <p v-else-if="displayed.length === 0" class="qcl-empty">
+            此 tag 下無 capture
           </p>
 
           <!-- Capture list -->
           <ul v-else class="qcl-list" role="list">
             <li
-              v-for="capture in captures"
+              v-for="capture in displayed"
               :key="capture.id"
               class="qcl-item"
             >
@@ -272,6 +315,60 @@ function formatTime(ts: number): string {
   border-color: var(--red, #ef5f5f);
 }
 
+/* ── Tag chips bar ──────────────────────────────────────────────────────── */
+
+.qcl-tag-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  padding: 0.625rem 1.25rem 0;
+  flex-shrink: 0;
+}
+
+.tag-chip {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 0.1875rem 0.5rem;
+  border-radius: 999px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  line-height: 1.5;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.tag-chip:hover {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-accent, #89b4fa);
+}
+
+.tag-chip.is-active {
+  background: var(--color-accent, #89b4fa);
+  border-color: var(--color-accent, #89b4fa);
+  color: var(--color-surface, #1e1e2e);
+}
+
+.tag-chip.is-active:hover {
+  color: var(--color-surface, #1e1e2e);
+}
+
+.tag-chip--reset {
+  border-style: dashed;
+}
+
+.tag-chip--reset:hover {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-muted, #6c7086);
+}
+
+.tag-chip__count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
 /* ── Footer ─────────────────────────────────────────────────────────────── */
 
 .qcl-footer {
@@ -304,7 +401,8 @@ function formatTime(ts: number): string {
   .qcl-dialog,
   .qcl-close-btn,
   .qcl-delete-btn,
-  .qcl-clear-btn {
+  .qcl-clear-btn,
+  .tag-chip {
     transition: none;
     animation: none;
   }
