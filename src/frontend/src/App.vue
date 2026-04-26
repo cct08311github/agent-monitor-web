@@ -63,6 +63,8 @@ import {
 } from '@/composables/useRecentAgents'
 import NotifyPromptBanner from '@/components/NotifyPromptBanner.vue'
 import SettingsBackupMenu from '@/components/SettingsBackupMenu.vue'
+import CaptureReviewBanner from '@/components/CaptureReviewBanner.vue'
+import { maybeOpenWeeklyReminder } from '@/composables/useCaptureReview'
 
 const route = useRoute()
 const router = useRouter()
@@ -330,6 +332,8 @@ onMounted(() => {
   installWhatsNewAutoOpen()
   installQuickCaptureHotkey()
   installRecentAgentsHotkey()
+  // Weekly Capture review reminder — fires 1.5 s after mount to let dashboard settle
+  setTimeout(() => maybeOpenWeeklyReminder(), 1500)
 })
 
 onUnmounted(() => {
@@ -560,6 +564,7 @@ registerShortcut({
     <router-view />
 
     <!-- Global UI overlays -->
+    <CaptureReviewBanner />
     <NotifyPromptBanner />
     <ToastContainer />
     <ConfirmDialog />
