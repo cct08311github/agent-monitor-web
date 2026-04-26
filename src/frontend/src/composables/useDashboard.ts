@@ -13,12 +13,15 @@ import type { Agent } from '@/types/api'
 import { computeFreshness } from '@/lib/freshness'
 import { recordMessage } from '@/composables/useMessageRate'
 import { useSoundEffect } from '@/composables/useSoundEffect'
+import { useAgentAliases } from '@/composables/useAgentAliases'
+import { filterAgentsByQuery } from '@/utils/agentSearchFilter'
 
 export type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting'
 export type CostRange = 'today' | 'week' | 'month' | 'all'
 
 export function useDashboard() {
   const router = useRouter()
+  const { displayName } = useAgentAliases()
   const dashboard = computed(() => appState.latestDashboard)
   const connectionStatus = ref<ConnectionStatus>('disconnected')
   const fetchError = ref<string | null>(null)
@@ -50,16 +53,11 @@ export function useDashboard() {
     )
   })
 
-  const filteredAgents = computed<Agent[]>(() => {
-    const q = appState.agentSearchQuery.toLowerCase()
-    if (!q) return agents.value
-    return agents.value.filter(
-      (a) =>
-        a.id.toLowerCase().includes(q) ||
-        (a.model ?? '').toLowerCase().includes(q) ||
-        (a.status ?? '').toLowerCase().includes(q),
-    )
-  })
+  const filteredAgents = computed<Agent[]>(() =>
+    filterAgentsByQuery(agents.value, appState.agentSearchQuery, (a) =>
+      displayName(a.id, a.name),
+    ),
+  )
 
   const activeAgents = computed<Agent[]>(() =>
     filteredAgents.value.filter(
