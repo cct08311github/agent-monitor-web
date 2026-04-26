@@ -17,7 +17,11 @@ import { useToast } from '@/composables/useToast'
 import { fuzzyScore } from '@/utils/fuzzyScore'
 import type { Capture } from '@/utils/quickCapture'
 
-const { isListOpen, captures, closeList, remove, clear } = useQuickCapture()
+const { isListOpen, captures, closeList, remove, clear, update } = useQuickCapture()
+
+// Inline edit state
+const editingId = ref<string | null>(null)
+const editingText = ref<string>('')
 
 // Tag filtering
 const selectedTag = ref<string | null>(null)
@@ -82,6 +86,32 @@ function handleClearAll(): void {
   if (window.confirm(`確認清空所有 ${captures.value.length} 筆 quick capture？`)) {
     clear()
   }
+}
+
+function startEdit(c: Capture): void {
+  editingId.value = c.id
+  editingText.value = c.body
+}
+
+function cancelEdit(): void {
+  editingId.value = null
+  editingText.value = ''
+}
+
+function commitEdit(id: string): void {
+  const trimmed = editingText.value.trim()
+  if (!trimmed) {
+    if (window.confirm('內容為空，是否刪除這筆 capture？')) {
+      remove(id)
+      useToast().info('已刪除空 capture')
+    }
+    cancelEdit()
+    return
+  }
+  update(id, trimmed)
+  editingId.value = null
+  editingText.value = ''
+  useToast().success('已儲存')
 }
 
 function formatTime(ts: number): string {
@@ -195,17 +225,47 @@ function onDownload(): void {
               v-for="capture in displayed"
               :key="capture.id"
               class="qcl-item"
+              :class="{ 'qcl-item--editing': editingId === capture.id }"
             >
               <div class="qcl-item-meta">
                 <span class="qcl-item-context">{{ capture.context }}</span>
                 <span class="qcl-item-time">{{ formatTime(capture.createdAt) }}</span>
               </div>
-              <p class="qcl-item-body">{{ capture.body }}</p>
-              <button
-                class="qcl-delete-btn"
-                :aria-label="`刪除：${capture.body.slice(0, 30)}`"
-                @click="handleDelete(capture)"
-              >✕ 刪除</button>
+
+              <!-- Edit mode -->
+              <div v-if="editingId === capture.id" class="qcl-edit">
+                <textarea
+                  v-model="editingText"
+                  class="qcl-edit-textarea"
+                  rows="3"
+                  autofocus
+                  :aria-label="`編輯：${capture.body.slice(0, 30)}`"
+                  @keydown.esc.stop="cancelEdit"
+                  @keydown.enter.exact.meta="commitEdit(capture.id)"
+                  @keydown.enter.exact.ctrl="commitEdit(capture.id)"
+                />
+                <div class="qcl-edit-actions">
+                  <button class="qcl-save-btn" @click="commitEdit(capture.id)">儲存 (⌘+Enter)</button>
+                  <button class="qcl-cancel-btn" @click="cancelEdit">取消 (Esc)</button>
+                </div>
+              </div>
+
+              <!-- Display mode -->
+              <template v-else>
+                <p class="qcl-item-body">{{ capture.body }}</p>
+                <div class="qcl-item-actions">
+                  <button
+                    class="qcl-edit-btn"
+                    :aria-label="`編輯：${capture.body.slice(0, 30)}`"
+                    @click="startEdit(capture)"
+                  >✏️ 編輯</button>
+                  <button
+                    class="qcl-delete-btn"
+                    :aria-label="`刪除：${capture.body.slice(0, 30)}`"
+                    @click="handleDelete(capture)"
+                  >✕ 刪除</button>
+                </div>
+              </template>
             </li>
           </ul>
         </div>
@@ -401,6 +461,106 @@ function onDownload(): void {
   border-color: var(--red, #ef5f5f);
 }
 
+/* ── Item actions row ───────────────────────────────────────────────────── */
+
+.qcl-item-actions {
+  display: flex;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+}
+
+/* ── Edit button ────────────────────────────────────────────────────────── */
+
+.qcl-edit-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.25rem;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.5;
+}
+
+.qcl-edit-btn:hover {
+  color: var(--color-accent, #89b4fa);
+  border-color: var(--color-accent, #89b4fa);
+}
+
+/* ── Editing state ──────────────────────────────────────────────────────── */
+
+.qcl-item--editing {
+  border-color: var(--color-accent, #89b4fa);
+  background: var(--color-surface, #1e1e2e);
+}
+
+.qcl-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-top: 0.25rem;
+}
+
+.qcl-edit-textarea {
+  background: var(--color-surface-raised, #181825);
+  border: 1px solid var(--color-accent, #89b4fa);
+  border-radius: 0.375rem;
+  color: var(--color-text, #cdd6f4);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  padding: 0.375rem 0.5rem;
+  outline: none;
+  resize: vertical;
+  width: 100%;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.qcl-edit-textarea:focus {
+  border-color: var(--color-accent, #89b4fa);
+  box-shadow: 0 0 0 2px rgba(137, 180, 250, 0.2);
+}
+
+.qcl-edit-actions {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.qcl-save-btn {
+  background: var(--color-accent, #89b4fa);
+  border: 1px solid var(--color-accent, #89b4fa);
+  color: var(--color-surface, #1e1e2e);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 0.2rem 0.625rem;
+  border-radius: 0.25rem;
+  transition: opacity 0.15s;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.qcl-save-btn:hover {
+  opacity: 0.85;
+}
+
+.qcl-cancel-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 0.2rem 0.625rem;
+  border-radius: 0.25rem;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.5;
+}
+
+.qcl-cancel-btn:hover {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-muted, #6c7086);
+}
+
 /* ── Search bar ─────────────────────────────────────────────────────────── */
 
 .qcl-search-bar {
@@ -527,6 +687,10 @@ function onDownload(): void {
   .qcl-close-btn,
   .qcl-download-btn,
   .qcl-delete-btn,
+  .qcl-edit-btn,
+  .qcl-save-btn,
+  .qcl-cancel-btn,
+  .qcl-edit-textarea,
   .qcl-clear-btn,
   .tag-chip,
   .qc-search {

@@ -15,6 +15,7 @@ import {
   addCapture as addUtil,
   deleteCapture as delUtil,
   clearCaptures as clearUtil,
+  updateCapture as updateCaptureUtil,
   type Capture,
 } from '@/utils/quickCapture'
 
@@ -67,6 +68,13 @@ export function useQuickCapture() {
     remove: (id: string): void => {
       delUtil(id)
       captures.value = captures.value.filter((c) => c.id !== id)
+    },
+    update: (id: string, body: string): Capture | null => {
+      const updated = updateCaptureUtil(id, body)
+      if (updated) {
+        captures.value = captures.value.map((c) => (c.id === id ? updated : c))
+      }
+      return updated
     },
     clear: (): void => {
       clearUtil()

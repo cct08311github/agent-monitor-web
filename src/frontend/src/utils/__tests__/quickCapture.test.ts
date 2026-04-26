@@ -5,6 +5,7 @@ import {
   deleteCapture,
   clearCaptures,
   generateId,
+  updateCapture,
   type Capture,
 } from '../quickCapture'
 
@@ -142,5 +143,54 @@ describe('generateId', () => {
   it('distinct calls produce different ids', () => {
     const ids = new Set(Array.from({ length: 50 }, (_, i) => generateId(i)))
     expect(ids.size).toBe(50)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// updateCapture
+// ---------------------------------------------------------------------------
+
+describe('updateCapture', () => {
+  it('returns null when id does not exist', () => {
+    addCapture('existing', 'ctx', 1000)
+    expect(updateCapture('non-existent-id', 'new body')).toBeNull()
+  })
+
+  it('returns the updated Capture with the new body', () => {
+    const c = addCapture('original body', 'ctx', 1000)
+    const updated = updateCapture(c.id, 'new body')
+    expect(updated).not.toBeNull()
+    expect(updated?.body).toBe('new body')
+    expect(updated?.id).toBe(c.id)
+    expect(updated?.context).toBe(c.context)
+    expect(updated?.createdAt).toBe(c.createdAt)
+  })
+
+  it('writes the updated body back to storage', () => {
+    const c = addCapture('original', 'ctx', 1000)
+    updateCapture(c.id, 'updated')
+    const all = loadCaptures()
+    const found = all.find((x) => x.id === c.id)
+    expect(found?.body).toBe('updated')
+  })
+
+  it('round-trip: save → update → load reflects change', () => {
+    const c = addCapture('draft', 'TaskHub', 5000)
+    updateCapture(c.id, 'final version')
+    const loaded = loadCaptures()
+    const match = loaded.find((x) => x.id === c.id)
+    expect(match?.body).toBe('final version')
+  })
+
+  it('does not affect other captures', () => {
+    const a = addCapture('alpha', 'ctx', 1)
+    const b = addCapture('beta', 'ctx', 2)
+    const cc = addCapture('gamma', 'ctx', 3)
+    updateCapture(b.id, 'beta updated')
+    const all = loadCaptures()
+    const aFound = all.find((x) => x.id === a.id)
+    const cFound = all.find((x) => x.id === cc.id)
+    expect(aFound?.body).toBe('alpha')
+    expect(cFound?.body).toBe('gamma')
   })
 })
