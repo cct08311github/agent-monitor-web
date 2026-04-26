@@ -53,6 +53,32 @@
     --header-height: 56px;
     --glass-bg: #19191b;
     --glass-border: #2a2a2e;
+    /* Spacing scale — comfortable (default) */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 12px;
+    --space-lg: 16px;
+    --space-xl: 24px;
+    /* Card / section padding */
+    --card-padding: 16px;
+    --section-gap: 16px;
+    /* Row / table row height */
+    --row-padding-y: 6px;
+}
+
+/* ── Density: compact override ────────────────────────────────────────── */
+/* Reduces spacing by ~20-25% for high-density displays / small screens.  */
+:root[data-density="compact"] {
+    --space-xs: 2px;
+    --space-sm: 6px;
+    --space-md: 8px;
+    --space-lg: 12px;
+    --space-xl: 16px;
+    --card-padding: 10px;
+    --section-gap: 10px;
+    --row-padding-y: 3px;
+    --nav-height: 56px;
+    --header-height: 44px;
 }
 
 [data-theme="dark"] {
