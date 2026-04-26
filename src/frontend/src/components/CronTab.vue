@@ -35,6 +35,9 @@ import {
 } from '@/utils/cronArchive'
 import { CRON_FILTER_DEFAULTS, hasActiveCronFilters } from '@/utils/cronFilterDefaults'
 import { buildCronCsv } from '@/utils/cronCsvExport'
+import { computeUpcomingFires } from '@/utils/cronUpcoming'
+import type { UpcomingFire } from '@/utils/cronUpcoming'
+import CronUpcomingTimeline from '@/components/CronUpcomingTimeline.vue'
 
 // ---------------------------------------------------------------------------
 // State
@@ -196,6 +199,19 @@ const stats = computed(() =>
     archivedIds: archivedIds.value,
     pinnedIds: pinnedIds.value,
     tagsMap: cronTagsMap.value,
+  }),
+)
+
+// Upcoming 24h timeline toggle
+const showUpcoming = ref(false)
+
+const upcomingFires = computed<UpcomingFire[]>(() =>
+  computeUpcomingFires({
+    jobs: jobs.value,
+    getId: (j) => j.id,
+    getName: (j) => displayCronName(j.id, j.name),
+    getEnabled: (j) => j.enabled,
+    getExpr: (j) => j.schedule?.expr ?? '',
   }),
 )
 
@@ -559,11 +575,29 @@ function getNextRunCountdown(job: CronJob): string {
         >
           📈 統計
         </button>
+
+        <button
+          :class="['cron-upcoming-btn', { active: showUpcoming }]"
+          :title="showUpcoming ? '隱藏時間軸' : '顯示未來 24h 時間軸'"
+          :aria-pressed="showUpcoming"
+          @click="showUpcoming = !showUpcoming"
+        >
+          ⏰ 未來 24h
+        </button>
       </div>
 
       <!-- Insights panel -->
       <div v-if="showCronInsights" class="cron-insights-panel">
         <CronInsightsPanel :insights="cronInsights" />
+      </div>
+
+      <!-- Upcoming 24h timeline panel -->
+      <div v-if="showUpcoming" class="cron-upcoming-panel">
+        <div class="cron-upcoming-panel-header">
+          <span class="cron-upcoming-panel-title">⏰ 未來 24h 觸發時間軸</span>
+          <span class="cron-timeline-badge">{{ upcomingFires.length }}</span>
+        </div>
+        <CronUpcomingTimeline :fires="upcomingFires" />
       </div>
 
       <!-- Tag chip bar -->
@@ -1325,5 +1359,57 @@ function getNextRunCountdown(job: CronJob): string {
   background: var(--surface2, rgba(255, 255, 255, 0.05));
   border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
   border-radius: 8px;
+}
+
+/* ── Upcoming 24h button ─────────────────────────────────────────── */
+
+.cron-upcoming-btn {
+  padding: 5px 11px;
+  font-size: 12px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.cron-upcoming-btn:hover {
+  background: var(--surface2, rgba(255, 255, 255, 0.07));
+  color: var(--text, #e2e8f0);
+  border-color: var(--accent, #6366f1);
+}
+
+.cron-upcoming-btn.active {
+  background: var(--accent, #6366f1);
+  border-color: var(--accent, #6366f1);
+  color: #fff;
+}
+
+/* ── Upcoming 24h panel ──────────────────────────────────────────── */
+
+.cron-upcoming-panel {
+  margin-bottom: 14px;
+  padding: 12px 16px;
+  background: var(--surface2, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 8px;
+}
+
+.cron-upcoming-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.cron-upcoming-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text, #e2e8f0);
 }
 </style>
