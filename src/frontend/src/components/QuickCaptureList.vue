@@ -30,6 +30,7 @@ import type { DateRange } from '@/utils/captureDateFilter'
 import type { Capture } from '@/utils/quickCapture'
 import { loadSortOrder, saveSortOrder } from '@/utils/captureSortPref'
 import type { SortOrder } from '@/utils/captureSortPref'
+import { FILTER_DEFAULTS, hasActiveFilters } from '@/utils/captureFilterDefaults'
 import { groupByDay } from '@/utils/captureTimeline'
 import { loadViewMode, saveViewMode } from '@/utils/captureViewMode'
 import type { ViewMode } from '@/utils/captureViewMode'
@@ -82,6 +83,24 @@ const sortLabel = computed(() =>
 function toggleSort(): void {
   sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
   saveSortOrder(sortOrder.value)
+}
+
+const filtersActive = computed(() =>
+  hasActiveFilters({
+    searchQuery: searchQuery.value,
+    selectedTag: selectedTag.value,
+    dateRange: dateRange.value,
+    sortOrder: sortOrder.value,
+  }),
+)
+
+function clearAllFilters(): void {
+  searchQuery.value = FILTER_DEFAULTS.searchQuery
+  selectedTag.value = FILTER_DEFAULTS.selectedTag
+  dateRange.value = FILTER_DEFAULTS.dateRange
+  sortOrder.value = FILTER_DEFAULTS.sortOrder
+  saveSortOrder(FILTER_DEFAULTS.sortOrder)
+  useToast().info('已清除所有篩選')
 }
 
 const tags = computed(() => tagCounts(captures.value))
@@ -606,6 +625,13 @@ function onImport(e: Event): void {
             :aria-pressed="viewMode === 'timeline'"
             @click="toggleViewMode"
           >{{ viewMode === 'flat' ? '📅 Timeline' : '☰ Flat' }}</button>
+          <button
+            v-if="filtersActive"
+            class="qc-clear-all"
+            title="清除所有篩選"
+            aria-label="清除所有篩選"
+            @click="clearAllFilters"
+          >清除全部篩選 ✕</button>
           <span v-if="searchQuery || selectedTag || dateRange !== 'all'" class="qcl-filter-count">
             篩選: {{ displayed.length }} / {{ activeCaptures.length }}
           </span>
@@ -1725,6 +1751,28 @@ function onImport(e: Event): void {
   background: rgba(137, 180, 250, 0.08);
 }
 
+/* ── Clear-all-filters button ────────────────────────────────────────────── */
+
+.qc-clear-all {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  padding: 0.3125rem 0.625rem;
+  border-radius: 0.375rem;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.qc-clear-all:hover {
+  color: var(--red, #ef5f5f);
+  border-color: var(--red, #ef5f5f);
+  background: rgba(239, 95, 95, 0.06);
+}
+
 /* ── Timeline group headers ─────────────────────────────────────────────── */
 
 .qcl-timeline-group {
@@ -1897,7 +1945,8 @@ function onImport(e: Event): void {
   .qcl-row-checkbox,
   .qcl-bulk-select-all,
   .tag-chip-menu-btn,
-  .tag-chip-menu-item {
+  .tag-chip-menu-item,
+  .qc-clear-all {
     transition: none;
     animation: none;
   }
