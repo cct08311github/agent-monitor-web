@@ -1,6 +1,13 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { buildGrid, intensityBucket } from '@/utils/activityHeatmap'
+import {
+  type HeatmapRange,
+  loadRange,
+  saveRange,
+  weeksToInt,
+  cellSizeFor,
+} from '@/utils/heatmapRange'
 import { useTimezone } from '@/composables/useTimezone'
 
 // ---------------------------------------------------------------------------
@@ -13,11 +20,22 @@ const props = defineProps<{
 }>()
 
 // ---------------------------------------------------------------------------
+// Range picker state
+// ---------------------------------------------------------------------------
+
+const range = ref<HeatmapRange>(loadRange())
+const weeks = computed(() => weeksToInt(range.value))
+const cellSize = computed(() => cellSizeFor(range.value))
+
+function setRange(r: HeatmapRange): void {
+  range.value = r
+  saveRange(r)
+}
+
+// ---------------------------------------------------------------------------
 // Grid constants
 // ---------------------------------------------------------------------------
 
-const WEEKS = 7
-const CELL_SIZE = 14
 const CELL_GAP = 2
 const DAY_LABEL_WIDTH = 28
 // Row labels: only show Sun, Mon, Wed, Fri (GitHub's pattern)
@@ -34,29 +52,31 @@ const DAY_LABELS: Array<{ row: number; label: string }> = [
 
 const today = computed(() => new Date())
 
-const grid = computed(() => buildGrid(today.value, WEEKS))
+const grid = computed(() => buildGrid(today.value, weeks.value))
 
 const { format: tzFormat } = useTimezone()
 
 /** Today's date label, respecting the user's timezone preference. */
 const todayLabel = computed(() => tzFormat(today.value, { style: 'date' }))
 
-const totalCells = WEEKS * 7
-
 const svgWidth = computed(
-  () => DAY_LABEL_WIDTH + WEEKS * CELL_SIZE + (WEEKS - 1) * CELL_GAP + 4,
+  () =>
+    DAY_LABEL_WIDTH +
+    weeks.value * cellSize.value +
+    (weeks.value - 1) * CELL_GAP +
+    4,
 )
 
 const svgHeight = computed(
-  () => 7 * CELL_SIZE + 6 * CELL_GAP + 6, // slight padding at bottom
+  () => 7 * cellSize.value + 6 * CELL_GAP + 6, // slight padding at bottom
 )
 
 function cellX(colIndex: number): number {
-  return DAY_LABEL_WIDTH + colIndex * (CELL_SIZE + CELL_GAP)
+  return DAY_LABEL_WIDTH + colIndex * (cellSize.value + CELL_GAP)
 }
 
 function cellY(rowIndex: number): number {
-  return rowIndex * (CELL_SIZE + CELL_GAP)
+  return rowIndex * (cellSize.value + CELL_GAP)
 }
 
 function cellClass(key: string, inRange: boolean): string {
@@ -80,14 +100,22 @@ const isEmpty = computed(() => {
   }
   return true
 })
-
-void totalCells
 </script>
 
 <template>
   <div class="activity-heatmap">
     <div class="heatmap-header">
-      <span class="heatmap-title">過去 7 週活躍度</span>
+      <span class="heatmap-title">過去 {{ weeks }} 週活躍度</span>
+      <div class="range-picker" role="tablist" aria-label="顯示範圍">
+        <button
+          v-for="opt in (['7', '12', '24'] as HeatmapRange[])"
+          :key="opt"
+          role="tab"
+          :aria-selected="range === opt"
+          :class="['range-btn', { 'is-active': range === opt }]"
+          @click="setRange(opt)"
+        >{{ opt }} 週</button>
+      </div>
       <span class="heatmap-legend" aria-hidden="true">
         <svg width="80" height="14" viewBox="0 0 80 14" class="legend-svg">
           <rect x="0"  y="0" width="12" height="12" rx="3" class="cell-l0" />
@@ -101,7 +129,11 @@ void totalCells
       </span>
     </div>
 
-    <div class="heatmap-body" role="img" aria-label="過去 7 週 session 活動熱圖">
+    <div
+      class="heatmap-body"
+      role="img"
+      :aria-label="`過去 ${weeks} 週 session 活動熱圖`"
+    >
       <svg
         :width="svgWidth"
         :height="svgHeight"
@@ -115,7 +147,7 @@ void totalCells
             v-for="{ row, label } in DAY_LABELS"
             :key="label"
             :x="0"
-            :y="cellY(row) + CELL_SIZE - 2"
+            :y="cellY(row) + cellSize - 2"
             class="day-label-text"
           >{{ label }}</text>
         </g>
@@ -129,8 +161,8 @@ void totalCells
             <rect
               :x="cellX(colIndex)"
               :y="cellY(cell.dayOfWeek)"
-              :width="CELL_SIZE"
-              :height="CELL_SIZE"
+              :width="cellSize"
+              :height="cellSize"
               rx="3"
               :class="cellClass(cell.key, cell.inRange)"
             ><title>{{ cellTitle(cell.key, cell.inRange, cell.dayOfWeek) }}</title></rect>
@@ -175,6 +207,49 @@ void totalCells
   font-weight: 600;
   color: var(--text-primary);
   letter-spacing: 0.01em;
+}
+
+/* ── Range picker (segmented control) ── */
+
+.range-picker {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-surface, var(--bg-card));
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.range-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.6;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.range-btn:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.range-btn.is-active {
+  color: var(--text-primary);
+  background: var(--bg-card);
+  box-shadow: 0 1px 2px color-mix(in srgb, #000 12%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .range-btn {
+    transition: none;
+  }
 }
 
 .heatmap-legend {
