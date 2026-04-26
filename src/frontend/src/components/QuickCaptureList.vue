@@ -14,6 +14,7 @@ import { createFocusTrap } from '@/lib/focusTrap'
 import { tagCounts, captureHasTag } from '@/utils/quickCaptureTags'
 import { buildExport } from '@/utils/quickCaptureExport'
 import { useToast } from '@/composables/useToast'
+import { fuzzyScore } from '@/utils/fuzzyScore'
 import type { Capture } from '@/utils/quickCapture'
 
 const { isListOpen, captures, closeList, remove, clear } = useQuickCapture()
@@ -21,13 +22,24 @@ const { isListOpen, captures, closeList, remove, clear } = useQuickCapture()
 // Tag filtering
 const selectedTag = ref<string | null>(null)
 
+// Search
+const searchQuery = ref('')
+
 const tags = computed(() => tagCounts(captures.value))
 
-const displayed = computed(() =>
-  selectedTag.value
-    ? captures.value.filter((c) => captureHasTag(c, selectedTag.value!))
-    : captures.value,
-)
+const displayed = computed(() => {
+  let list = captures.value
+  if (selectedTag.value) list = list.filter((c) => captureHasTag(c, selectedTag.value!))
+  const q = searchQuery.value.trim()
+  if (q) {
+    list = list
+      .map((c) => ({ c, score: fuzzyScore(q, c.body) }))
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.c)
+  }
+  return list
+})
 
 function toggleTag(tag: string): void {
   selectedTag.value = selectedTag.value === tag ? null : tag
@@ -132,6 +144,20 @@ function onDownload(): void {
           </div>
         </div>
 
+        <!-- Search input -->
+        <div class="qcl-search-bar">
+          <input
+            v-model="searchQuery"
+            type="text"
+            class="qc-search"
+            placeholder="搜尋 captures..."
+            aria-label="搜尋 captures"
+          />
+          <span v-if="searchQuery || selectedTag" class="qcl-filter-count">
+            篩選: {{ displayed.length }} / {{ captures.length }}
+          </span>
+        </div>
+
         <!-- Tag chips bar (only shown when tags exist) -->
         <div v-if="tags.length > 0" class="qcl-tag-bar" role="group" aria-label="Tag 篩選">
           <button
@@ -156,9 +182,11 @@ function onDownload(): void {
             尚未有 quick capture
           </p>
 
-          <!-- Empty state — tag filter with no results -->
+          <!-- Empty state — filter with no results -->
           <p v-else-if="displayed.length === 0" class="qcl-empty">
-            此 tag 下無 capture
+            <template v-if="searchQuery && selectedTag">此篩選下無 capture</template>
+            <template v-else-if="searchQuery">無符合搜尋的 capture</template>
+            <template v-else>此 tag 下無 capture</template>
           </p>
 
           <!-- Capture list -->
@@ -373,6 +401,45 @@ function onDownload(): void {
   border-color: var(--red, #ef5f5f);
 }
 
+/* ── Search bar ─────────────────────────────────────────────────────────── */
+
+.qcl-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem 0;
+  flex-shrink: 0;
+}
+
+.qc-search {
+  flex: 1;
+  background: var(--color-surface-raised, #181825);
+  border: 1px solid var(--color-border, #313244);
+  border-radius: 0.375rem;
+  color: var(--color-text, #cdd6f4);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  padding: 0.3125rem 0.625rem;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+
+.qc-search::placeholder {
+  color: var(--color-muted, #6c7086);
+}
+
+.qc-search:focus {
+  border-color: var(--color-accent, #89b4fa);
+}
+
+.qcl-filter-count {
+  font-size: 0.7rem;
+  color: var(--color-muted, #6c7086);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* ── Tag chips bar ──────────────────────────────────────────────────────── */
 
 .qcl-tag-bar {
@@ -461,7 +528,8 @@ function onDownload(): void {
   .qcl-download-btn,
   .qcl-delete-btn,
   .qcl-clear-btn,
-  .tag-chip {
+  .tag-chip,
+  .qc-search {
     transition: none;
     animation: none;
   }
