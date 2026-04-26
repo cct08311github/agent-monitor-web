@@ -30,6 +30,7 @@ import {
   archiveJob as doArchiveJob,
   unarchiveJob as doUnarchiveJob,
 } from '@/utils/cronArchive'
+import { CRON_FILTER_DEFAULTS, hasActiveCronFilters } from '@/utils/cronFilterDefaults'
 
 // ---------------------------------------------------------------------------
 // State
@@ -176,6 +177,15 @@ const isFiltered = computed(
 )
 const availableCronTags = computed(() => uniqueCronTags(cronTagsMap.value))
 
+const cronFiltersActive = computed(() =>
+  hasActiveCronFilters({
+    searchQuery: searchQuery.value,
+    selectedTag: selectedCronTag.value,
+    filterMode: filterMode.value,
+    showArchived: showArchived.value,
+  }),
+)
+
 const stats = computed(() =>
   computeCronStats({
     jobs: jobs.value,
@@ -303,6 +313,18 @@ async function runJob(id: string, name?: string): Promise<void> {
     showToast('❌ 執行失敗: ' + (e as Error).message, 'error')
     await fetchJobs()
   }
+}
+
+// ---------------------------------------------------------------------------
+// Clear all filters
+// ---------------------------------------------------------------------------
+
+function clearAllCronFilters(): void {
+  searchQuery.value = CRON_FILTER_DEFAULTS.searchQuery
+  selectedCronTag.value = CRON_FILTER_DEFAULTS.selectedTag
+  filterMode.value = CRON_FILTER_DEFAULTS.filterMode
+  showArchived.value = CRON_FILTER_DEFAULTS.showArchived
+  showToast('已清除所有篩選', 'info')
 }
 
 // ---------------------------------------------------------------------------
@@ -473,6 +495,14 @@ function getNextRunCountdown(job: CronJob): string {
           <option value="nextRun">下次執行</option>
           <option value="lastRun">上次執行</option>
         </select>
+
+        <button
+          v-if="cronFiltersActive"
+          class="cron-clear-all"
+          @click="clearAllCronFilters"
+        >
+          清除全部篩選 ✕
+        </button>
       </div>
 
       <!-- Tag chip bar -->
@@ -817,6 +847,25 @@ function getNextRunCountdown(job: CronJob): string {
 
 .cron-sort-select:focus {
   border-color: var(--accent, #6366f1);
+}
+
+.cron-clear-all {
+  padding: 5px 11px;
+  font-size: 12px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 5px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.cron-clear-all:hover {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.6);
 }
 
 .cron-countdown {
