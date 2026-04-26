@@ -31,6 +31,11 @@ import {
   installOnboardingAutoStart,
   teardownOnboardingAutoStart,
 } from '@/composables/useOnboardingTour'
+import {
+  installMessageRateTicker,
+  teardownMessageRateTicker,
+} from '@/composables/useMessageRate'
+import MessageRateSparkline from '@/components/MessageRateSparkline.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -239,6 +244,7 @@ watch(
 
 onMounted(() => {
   installNotificationBadge()
+  installMessageRateTicker()
   void fetchBadgeCounts()
   badgePollInterval = setInterval(() => {
     void fetchBadgeCounts()
@@ -249,6 +255,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   teardownNotificationBadge()
+  teardownMessageRateTicker()
   if (badgePollInterval !== null) {
     clearInterval(badgePollInterval)
     badgePollInterval = null
@@ -404,6 +411,7 @@ registerShortcut({
           :active-count="heartbeatStats.activeCount"
           :total-count="heartbeatStats.totalCount"
         />
+        <MessageRateSparkline v-if="!isLoginPage" />
         <ConnectionStatus
           v-if="!isLoginPage"
           :on-reconnect="requestSSEReconnect"
