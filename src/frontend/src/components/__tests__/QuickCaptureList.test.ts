@@ -32,7 +32,7 @@ Object.defineProperty(globalThis, 'localStorage', {
 // ---------------------------------------------------------------------------
 
 vi.mock('@/composables/useToast', () => ({
-  useToast: () => ({ success: vi.fn(), error: vi.fn() }),
+  useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }),
 }))
 
 // ---------------------------------------------------------------------------
@@ -63,11 +63,18 @@ vi.mock('@/composables/useQuickCapture', async () => {
   return {
     useQuickCapture: () => {
       const captures = vue.computed(() => mockCaptures())
+      // Active (non-archived) and archived — tests use no archived items by default
+      const activeCaptures = vue.computed(() => mockCaptures())
+      const archivedCaptures = vue.computed(() => [] as Capture[])
       return {
         isListOpen: vue.ref(true),
         captures,
+        activeCaptures,
+        archivedCaptures,
         closeList: vi.fn(),
         remove: vi.fn(),
+        archive: vi.fn(),
+        unarchive: vi.fn(),
         clear: vi.fn(),
       }
     },

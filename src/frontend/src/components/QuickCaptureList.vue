@@ -3,7 +3,9 @@
  * QuickCaptureList — lists all saved quick captures.
  *
  * Opens from the KeyboardShortcutsHelp footer button.
- * Supports per-item delete (with confirm) and "clear all" (with confirm).
+ * Supports per-item archive (📦 hides from main list, preserves data),
+ * per-item delete (with confirm), and "clear all" (with confirm).
+ * Archived items can be revealed via the toggle and restored with 還原.
  * Tag chips bar above list allows filtering by #hashtag.
  * Esc or backdrop click closes the modal.
  * 📥 Download button exports all captures as a grouped Markdown file.
@@ -18,7 +20,7 @@ import { fuzzyScore } from '@/utils/fuzzyScore'
 import type { Capture } from '@/utils/quickCapture'
 import CaptureHeatmap from './CaptureHeatmap.vue'
 
-const { isListOpen, captures, closeList, remove, clear, update } = useQuickCapture()
+const { isListOpen, captures, activeCaptures, archivedCaptures, closeList, remove, archive, unarchive, clear, update } = useQuickCapture()
 
 // Inline edit state
 const editingId = ref<string | null>(null)
@@ -30,10 +32,12 @@ const selectedTag = ref<string | null>(null)
 // Search
 const searchQuery = ref('')
 
+// Archive section visibility
+const showArchived = ref(false)
+
 const tags = computed(() => tagCounts(captures.value))
 
-const displayed = computed(() => {
-  let list = captures.value
+function applyFilters(list: Capture[]): Capture[] {
   if (selectedTag.value) list = list.filter((c) => captureHasTag(c, selectedTag.value!))
   const q = searchQuery.value.trim()
   if (q) {
@@ -44,7 +48,11 @@ const displayed = computed(() => {
       .map((x) => x.c)
   }
   return list
-})
+}
+
+const displayed = computed(() => applyFilters([...activeCaptures.value]))
+
+const displayedArchived = computed(() => applyFilters([...archivedCaptures.value]))
 
 function toggleTag(tag: string): void {
   selectedTag.value = selectedTag.value === tag ? null : tag
@@ -77,6 +85,16 @@ function handleClose(): void {
   closeList()
 }
 
+function handleArchive(c: Capture): void {
+  archive(c.id)
+  useToast().info('已封存')
+}
+
+function handleUnarchive(c: Capture): void {
+  unarchive(c.id)
+  useToast().info('已還原')
+}
+
 function handleDelete(c: Capture): void {
   if (window.confirm(`刪除此 capture？\n\n「${c.body.slice(0, 60)}${c.body.length > 60 ? '…' : ''}」`)) {
     remove(c.id)
@@ -84,8 +102,10 @@ function handleDelete(c: Capture): void {
 }
 
 function handleClearAll(): void {
-  if (window.confirm(`確認清空所有 ${captures.value.length} 筆 quick capture？`)) {
+  const total = captures.value.length
+  if (window.confirm(`確認清空所有 ${total} 筆 quick capture（含封存）？`)) {
     clear()
+    showArchived.value = false
   }
 }
 
@@ -158,7 +178,7 @@ function onDownload(): void {
         <div class="qcl-header">
           <h2 id="qcl-title" class="qcl-title">
             💡 已捕捉的想法
-            <span class="qcl-count">({{ captures.length }})</span>
+            <span class="qcl-count">({{ activeCaptures.length }})</span>
           </h2>
           <div class="qcl-header-actions">
             <button
@@ -180,6 +200,15 @@ function onDownload(): void {
           <CaptureHeatmap :captures="captures" />
         </div>
 
+        <!-- Archive toggle toolbar (only shown when archived items exist) -->
+        <div v-if="archivedCaptures.length > 0" class="qcl-archive-toolbar">
+          <button
+            class="qcl-archive-toggle-btn"
+            :aria-pressed="showArchived"
+            @click="showArchived = !showArchived"
+          >{{ showArchived ? '隱藏已封存' : `顯示已封存 (${archivedCaptures.length})` }}</button>
+        </div>
+
         <!-- Search input -->
         <div class="qcl-search-bar">
           <input
@@ -190,7 +219,7 @@ function onDownload(): void {
             aria-label="搜尋 captures"
           />
           <span v-if="searchQuery || selectedTag" class="qcl-filter-count">
-            篩選: {{ displayed.length }} / {{ captures.length }}
+            篩選: {{ displayed.length }} / {{ activeCaptures.length }}
           </span>
         </div>
 
@@ -214,66 +243,111 @@ function onDownload(): void {
         <!-- Body -->
         <div class="qcl-body">
           <!-- Empty state — no captures at all -->
-          <p v-if="captures.length === 0" class="qcl-empty">
+          <p v-if="activeCaptures.length === 0 && archivedCaptures.length === 0" class="qcl-empty">
             尚未有 quick capture
           </p>
 
-          <!-- Empty state — filter with no results -->
-          <p v-else-if="displayed.length === 0" class="qcl-empty">
-            <template v-if="searchQuery && selectedTag">此篩選下無 capture</template>
-            <template v-else-if="searchQuery">無符合搜尋的 capture</template>
-            <template v-else>此 tag 下無 capture</template>
-          </p>
+          <!-- Active captures section -->
+          <template v-if="activeCaptures.length > 0 || (searchQuery || selectedTag)">
+            <!-- Empty state — filter with no results (active list) -->
+            <p v-if="activeCaptures.length > 0 && displayed.length === 0" class="qcl-empty">
+              <template v-if="searchQuery && selectedTag">此篩選下無 capture</template>
+              <template v-else-if="searchQuery">無符合搜尋的 capture</template>
+              <template v-else>此 tag 下無 capture</template>
+            </p>
 
-          <!-- Capture list -->
-          <ul v-else class="qcl-list" role="list">
-            <li
-              v-for="capture in displayed"
-              :key="capture.id"
-              class="qcl-item"
-              :class="{ 'qcl-item--editing': editingId === capture.id }"
-            >
-              <div class="qcl-item-meta">
-                <span class="qcl-item-context">{{ capture.context }}</span>
-                <span class="qcl-item-time">{{ formatTime(capture.createdAt) }}</span>
-              </div>
-
-              <!-- Edit mode -->
-              <div v-if="editingId === capture.id" class="qcl-edit">
-                <textarea
-                  v-model="editingText"
-                  class="qcl-edit-textarea"
-                  rows="3"
-                  autofocus
-                  :aria-label="`編輯：${capture.body.slice(0, 30)}`"
-                  @keydown.esc.stop="cancelEdit"
-                  @keydown.enter.exact.meta="commitEdit(capture.id)"
-                  @keydown.enter.exact.ctrl="commitEdit(capture.id)"
-                />
-                <div class="qcl-edit-actions">
-                  <button class="qcl-save-btn" @click="commitEdit(capture.id)">儲存 (⌘+Enter)</button>
-                  <button class="qcl-cancel-btn" @click="cancelEdit">取消 (Esc)</button>
+            <!-- Active capture list -->
+            <ul v-if="displayed.length > 0" class="qcl-list" role="list">
+              <li
+                v-for="capture in displayed"
+                :key="capture.id"
+                class="qcl-item"
+                :class="{ 'qcl-item--editing': editingId === capture.id }"
+              >
+                <div class="qcl-item-meta">
+                  <span class="qcl-item-context">{{ capture.context }}</span>
+                  <span class="qcl-item-time">{{ formatTime(capture.createdAt) }}</span>
                 </div>
-              </div>
 
-              <!-- Display mode -->
-              <template v-else>
-                <p class="qcl-item-body">{{ capture.body }}</p>
-                <div class="qcl-item-actions">
-                  <button
-                    class="qcl-edit-btn"
+                <!-- Edit mode -->
+                <div v-if="editingId === capture.id" class="qcl-edit">
+                  <textarea
+                    v-model="editingText"
+                    class="qcl-edit-textarea"
+                    rows="3"
+                    autofocus
                     :aria-label="`編輯：${capture.body.slice(0, 30)}`"
-                    @click="startEdit(capture)"
-                  >✏️ 編輯</button>
-                  <button
-                    class="qcl-delete-btn"
-                    :aria-label="`刪除：${capture.body.slice(0, 30)}`"
-                    @click="handleDelete(capture)"
-                  >✕ 刪除</button>
+                    @keydown.esc.stop="cancelEdit"
+                    @keydown.enter.exact.meta="commitEdit(capture.id)"
+                    @keydown.enter.exact.ctrl="commitEdit(capture.id)"
+                  />
+                  <div class="qcl-edit-actions">
+                    <button class="qcl-save-btn" @click="commitEdit(capture.id)">儲存 (⌘+Enter)</button>
+                    <button class="qcl-cancel-btn" @click="cancelEdit">取消 (Esc)</button>
+                  </div>
                 </div>
-              </template>
-            </li>
-          </ul>
+
+                <!-- Display mode -->
+                <template v-else>
+                  <p class="qcl-item-body">{{ capture.body }}</p>
+                  <div class="qcl-item-actions">
+                    <button
+                      class="qcl-edit-btn"
+                      :aria-label="`編輯：${capture.body.slice(0, 30)}`"
+                      @click="startEdit(capture)"
+                    >✏️ 編輯</button>
+                    <button
+                      class="qcl-archive-btn"
+                      :aria-label="`封存：${capture.body.slice(0, 30)}`"
+                      @click="handleArchive(capture)"
+                    >📦 封存</button>
+                    <button
+                      class="qcl-delete-btn"
+                      :aria-label="`刪除：${capture.body.slice(0, 30)}`"
+                      @click="handleDelete(capture)"
+                    >✕ 刪除</button>
+                  </div>
+                </template>
+              </li>
+            </ul>
+          </template>
+
+          <!-- Archived section (shown when toggle is on) -->
+          <template v-if="showArchived && archivedCaptures.length > 0">
+            <div class="qcl-archived-section">
+              <p class="qcl-section-label">📦 已封存</p>
+              <p v-if="displayedArchived.length === 0" class="qcl-empty">
+                <template v-if="searchQuery && selectedTag">此篩選下無封存 capture</template>
+                <template v-else-if="searchQuery">無符合搜尋的封存 capture</template>
+                <template v-else>此 tag 下無封存 capture</template>
+              </p>
+              <ul v-else class="qcl-list" role="list">
+                <li
+                  v-for="capture in displayedArchived"
+                  :key="capture.id"
+                  class="qcl-item qcl-item--archived"
+                >
+                  <div class="qcl-item-meta">
+                    <span class="qcl-item-context">{{ capture.context }}</span>
+                    <span class="qcl-item-time">{{ formatTime(capture.createdAt) }}</span>
+                  </div>
+                  <p class="qcl-item-body">{{ capture.body }}</p>
+                  <div class="qcl-item-actions">
+                    <button
+                      class="qcl-unarchive-btn"
+                      :aria-label="`還原：${capture.body.slice(0, 30)}`"
+                      @click="handleUnarchive(capture)"
+                    >還原</button>
+                    <button
+                      class="qcl-delete-btn"
+                      :aria-label="`刪除：${capture.body.slice(0, 30)}`"
+                      @click="handleDelete(capture)"
+                    >✕ 刪除</button>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </template>
         </div>
 
         <!-- Footer -->
@@ -282,6 +356,7 @@ function onDownload(): void {
             🗑 清空全部
           </button>
         </div>
+
       </div>
     </div>
   </Teleport>
@@ -695,6 +770,92 @@ function onDownload(): void {
   border-color: var(--red, #ef5f5f);
 }
 
+/* ── Archive toolbar ────────────────────────────────────────────────────── */
+
+.qcl-archive-toolbar {
+  display: flex;
+  align-items: center;
+  padding: 0.375rem 1.25rem 0;
+  flex-shrink: 0;
+}
+
+.qcl-archive-toggle-btn {
+  background: none;
+  border: 1px dashed var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.625rem;
+  border-radius: 0.375rem;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.5;
+}
+
+.qcl-archive-toggle-btn:hover {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-muted, #6c7086);
+}
+
+/* ── Archive button ─────────────────────────────────────────────────────── */
+
+.qcl-archive-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.25rem;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.5;
+}
+
+.qcl-archive-btn:hover {
+  color: var(--color-accent, #89b4fa);
+  border-color: var(--color-accent, #89b4fa);
+}
+
+/* ── Archived section ───────────────────────────────────────────────────── */
+
+.qcl-archived-section {
+  margin-top: 0.75rem;
+  border-top: 1px dashed var(--color-border, #313244);
+  padding-top: 0.625rem;
+}
+
+.qcl-section-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-muted, #6c7086);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 0.5rem;
+}
+
+/* Archived items are visually de-emphasized */
+.qcl-item--archived {
+  opacity: 0.7;
+}
+
+/* ── Unarchive (restore) button ─────────────────────────────────────────── */
+
+.qcl-unarchive-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.25rem;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.5;
+}
+
+.qcl-unarchive-btn:hover {
+  color: var(--green, #a6e3a1);
+  border-color: var(--green, #a6e3a1);
+}
+
 /* ── Reduced motion ─────────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
@@ -704,6 +865,9 @@ function onDownload(): void {
   .qcl-download-btn,
   .qcl-delete-btn,
   .qcl-edit-btn,
+  .qcl-archive-btn,
+  .qcl-archive-toggle-btn,
+  .qcl-unarchive-btn,
   .qcl-save-btn,
   .qcl-cancel-btn,
   .qcl-edit-textarea,

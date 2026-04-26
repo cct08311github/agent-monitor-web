@@ -9,7 +9,7 @@
  * global Cmd+Shift+N / Ctrl+Shift+N listener.
  */
 
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import {
   loadCaptures,
   addCapture as addUtil,
@@ -18,6 +18,11 @@ import {
   updateCapture as updateCaptureUtil,
   type Capture,
 } from '@/utils/quickCapture'
+import {
+  loadArchived,
+  archiveCapture as archiveUtil,
+  unarchiveCapture as unarchiveUtil,
+} from '@/utils/captureArchive'
 
 // ---------------------------------------------------------------------------
 // Module-scoped shared state
@@ -26,6 +31,7 @@ import {
 const isOpen = ref(false)
 const isListOpen = ref(false)
 const captures = ref<Capture[]>(loadCaptures())
+const archivedIds = ref<Set<string>>(loadArchived())
 
 let installed = false
 let keydownHandler: ((e: KeyboardEvent) => void) | null = null
@@ -42,11 +48,24 @@ function refreshFromStorage(): void {
 // Public composable
 // ---------------------------------------------------------------------------
 
+/** Active (non-archived) captures. */
+const activeCaptures = computed(() =>
+  captures.value.filter((c) => !archivedIds.value.has(c.id)),
+)
+
+/** Archived captures (preserved but hidden from main list). */
+const archivedCaptures = computed(() =>
+  captures.value.filter((c) => archivedIds.value.has(c.id)),
+)
+
 export function useQuickCapture() {
   return {
     isOpen,
     isListOpen,
     captures,
+    archivedIds,
+    activeCaptures,
+    archivedCaptures,
     open: () => {
       isOpen.value = true
     },
@@ -68,6 +87,18 @@ export function useQuickCapture() {
     remove: (id: string): void => {
       delUtil(id)
       captures.value = captures.value.filter((c) => c.id !== id)
+      // Also clean up archived state so orphan ids don't accumulate
+      if (archivedIds.value.has(id)) {
+        const next = new Set(archivedIds.value)
+        next.delete(id)
+        archivedIds.value = next
+      }
+    },
+    archive: (id: string): void => {
+      archivedIds.value = archiveUtil(id)
+    },
+    unarchive: (id: string): void => {
+      archivedIds.value = unarchiveUtil(id)
     },
     update: (id: string, body: string): Capture | null => {
       const updated = updateCaptureUtil(id, body)
