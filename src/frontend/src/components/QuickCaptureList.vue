@@ -26,7 +26,7 @@ import { applyTagRename, applyTagRemove } from '@/utils/captureTagRename'
 import { fuzzyScore } from '@/utils/fuzzyScore'
 import { partition } from '@/utils/capturePins'
 import { filterByDateRange, RANGE_LABELS } from '@/utils/captureDateFilter'
-import type { DateRange } from '@/utils/captureDateFilter'
+import type { DateRangeState } from '@/utils/captureDateFilter'
 import type { Capture } from '@/utils/quickCapture'
 import { loadSortOrder, saveSortOrder } from '@/utils/captureSortPref'
 import type { SortOrder } from '@/utils/captureSortPref'
@@ -53,7 +53,7 @@ const editingId = ref<string | null>(null)
 const editingText = ref<string>('')
 
 // Date range filtering
-const dateRange = ref<DateRange>('all')
+const dateRangeState = ref<DateRangeState>({ range: 'all' })
 
 // Tag filtering
 const selectedTag = ref<string | null>(null)
@@ -91,7 +91,7 @@ const filtersActive = computed(() =>
   hasActiveFilters({
     searchQuery: searchQuery.value,
     selectedTag: selectedTag.value,
-    dateRange: dateRange.value,
+    dateRangeState: dateRangeState.value,
     sortOrder: sortOrder.value,
   }),
 )
@@ -99,7 +99,7 @@ const filtersActive = computed(() =>
 function clearAllFilters(): void {
   searchQuery.value = FILTER_DEFAULTS.searchQuery
   selectedTag.value = FILTER_DEFAULTS.selectedTag
-  dateRange.value = FILTER_DEFAULTS.dateRange
+  dateRangeState.value = { range: 'all' }
   sortOrder.value = FILTER_DEFAULTS.sortOrder
   saveSortOrder(FILTER_DEFAULTS.sortOrder)
   useToast().info('已清除所有篩選')
@@ -113,7 +113,7 @@ const trend = computed(() => computeWeeklyTrend(captures.value))
 
 function applyFilters(list: Capture[]): Capture[] {
   // Date range is applied first (broadest filter)
-  list = filterByDateRange(list, dateRange.value)
+  list = filterByDateRange(list, dateRangeState.value)
   if (selectedTag.value) list = list.filter((c) => captureHasTag(c, selectedTag.value!))
   const q = searchQuery.value.trim()
   if (q) {
@@ -249,7 +249,7 @@ function onJumpToDate(e: Event): void {
 async function onHeatmapSelect(dateKey: string): Promise<void> {
   viewMode.value = 'timeline'
   saveViewMode('timeline')
-  dateRange.value = 'all'
+  dateRangeState.value = { range: 'all' }
   await nextTick()
   const el = document.getElementById(`day-section-${dateKey}`)
   if (!el) {
@@ -657,12 +657,29 @@ function onImport(e: Event): void {
             aria-label="搜尋 captures"
           />
           <select
-            v-model="dateRange"
+            v-model="dateRangeState.range"
             class="qc-date-range"
             aria-label="日期範圍篩選"
           >
             <option v-for="(label, key) in RANGE_LABELS" :key="key" :value="key">{{ label }}</option>
           </select>
+          <template v-if="dateRangeState.range === 'custom'">
+            <input
+              v-model="dateRangeState.customFrom"
+              type="date"
+              class="qc-custom-date"
+              aria-label="自訂日期範圍：從"
+              title="從"
+            />
+            <span class="qc-custom-date-sep" aria-hidden="true">—</span>
+            <input
+              v-model="dateRangeState.customTo"
+              type="date"
+              class="qc-custom-date"
+              aria-label="自訂日期範圍：到"
+              title="到"
+            />
+          </template>
           <button
             class="qc-sort-btn"
             :title="sortLabel"
@@ -694,7 +711,7 @@ function onImport(e: Event): void {
             aria-label="清除所有篩選"
             @click="clearAllFilters"
           >清除全部篩選 ✕</button>
-          <span v-if="searchQuery || selectedTag || dateRange !== 'all'" class="qcl-filter-count">
+          <span v-if="searchQuery || selectedTag || dateRangeState.range !== 'all'" class="qcl-filter-count">
             篩選: {{ displayed.length }} / {{ activeCaptures.length }}
           </span>
         </div>
@@ -785,7 +802,7 @@ function onImport(e: Event): void {
           <template v-if="activeCaptures.length > 0 || (searchQuery || selectedTag)">
             <!-- Empty state — filter with no results (active list) -->
             <p v-if="activeCaptures.length > 0 && displayed.length === 0" class="qcl-empty">
-              <template v-if="dateRange !== 'all' && !searchQuery && !selectedTag">此日期範圍無 capture</template>
+              <template v-if="dateRangeState.range !== 'all' && !searchQuery && !selectedTag">此日期範圍無 capture</template>
               <template v-else-if="searchQuery && selectedTag">此篩選下無 capture</template>
               <template v-else-if="searchQuery">無符合搜尋的 capture</template>
               <template v-else>此 tag 下無 capture</template>
@@ -1434,6 +1451,31 @@ function onImport(e: Event): void {
   border-color: var(--color-accent, #89b4fa);
 }
 
+.qc-custom-date {
+  appearance: none;
+  background: var(--color-surface-raised, #181825);
+  border: 1px solid var(--color-border, #313244);
+  border-radius: 0.375rem;
+  color: var(--color-text, #cdd6f4);
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  outline: none;
+  padding: 0.3125rem 0.5rem;
+  transition: border-color 0.15s;
+}
+
+.qc-custom-date:focus {
+  border-color: var(--color-accent, #89b4fa);
+}
+
+.qc-custom-date-sep {
+  color: var(--color-muted, #6c7086);
+  flex-shrink: 0;
+  font-size: 0.8125rem;
+}
+
 .qcl-filter-count {
   font-size: 0.7rem;
   color: var(--color-muted, #6c7086);
@@ -2030,6 +2072,7 @@ function onImport(e: Event): void {
   .tag-chip,
   .qc-search,
   .qc-date-range,
+  .qc-custom-date,
   .qc-sort-btn,
   .qc-view-mode-btn,
   .qc-jump-date,

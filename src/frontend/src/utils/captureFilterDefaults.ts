@@ -3,20 +3,20 @@
 // for QuickCaptureList.
 // ---------------------------------------------------------------------------
 
-import type { DateRange } from './captureDateFilter'
+import type { DateRangeState } from './captureDateFilter'
 import type { SortOrder } from './captureSortPref'
 
 export const FILTER_DEFAULTS = {
   searchQuery: '',
   selectedTag: null as string | null,
-  dateRange: 'all' as DateRange,
+  dateRangeState: { range: 'all' } as DateRangeState,
   sortOrder: 'desc' as SortOrder,
 } as const
 
 export interface FilterState {
   searchQuery: string
   selectedTag: string | null
-  dateRange: DateRange
+  dateRangeState: DateRangeState
   sortOrder: SortOrder
 }
 
@@ -28,7 +28,7 @@ export function hasActiveFilters(state: FilterState): boolean {
   return (
     state.searchQuery.trim() !== FILTER_DEFAULTS.searchQuery
     || state.selectedTag !== FILTER_DEFAULTS.selectedTag
-    || state.dateRange !== FILTER_DEFAULTS.dateRange
+    || state.dateRangeState.range !== 'all'
     || state.sortOrder !== FILTER_DEFAULTS.sortOrder
   )
 }

@@ -5,7 +5,7 @@ import type { FilterState } from '../captureFilterDefaults'
 const defaults: FilterState = {
   searchQuery: FILTER_DEFAULTS.searchQuery,
   selectedTag: FILTER_DEFAULTS.selectedTag,
-  dateRange: FILTER_DEFAULTS.dateRange,
+  dateRangeState: { ...FILTER_DEFAULTS.dateRangeState },
   sortOrder: FILTER_DEFAULTS.sortOrder,
 }
 
@@ -13,7 +13,7 @@ describe('FILTER_DEFAULTS', () => {
   it('has all 4 expected keys', () => {
     expect(FILTER_DEFAULTS).toHaveProperty('searchQuery')
     expect(FILTER_DEFAULTS).toHaveProperty('selectedTag')
-    expect(FILTER_DEFAULTS).toHaveProperty('dateRange')
+    expect(FILTER_DEFAULTS).toHaveProperty('dateRangeState')
     expect(FILTER_DEFAULTS).toHaveProperty('sortOrder')
   })
 
@@ -25,8 +25,8 @@ describe('FILTER_DEFAULTS', () => {
     expect(FILTER_DEFAULTS.selectedTag).toBeNull()
   })
 
-  it('dateRange default is "all"', () => {
-    expect(FILTER_DEFAULTS.dateRange).toBe('all')
+  it('dateRangeState default range is "all"', () => {
+    expect(FILTER_DEFAULTS.dateRangeState.range).toBe('all')
   })
 
   it('sortOrder default is "desc"', () => {
@@ -51,11 +51,12 @@ describe('hasActiveFilters', () => {
     expect(hasActiveFilters({ ...defaults, selectedTag: 'work' })).toBe(true)
   })
 
-  it('returns true when dateRange is not "all"', () => {
-    expect(hasActiveFilters({ ...defaults, dateRange: 'today' })).toBe(true)
-    expect(hasActiveFilters({ ...defaults, dateRange: 'last7d' })).toBe(true)
-    expect(hasActiveFilters({ ...defaults, dateRange: 'last30d' })).toBe(true)
-    expect(hasActiveFilters({ ...defaults, dateRange: 'yesterday' })).toBe(true)
+  it('returns true when dateRangeState.range is not "all"', () => {
+    expect(hasActiveFilters({ ...defaults, dateRangeState: { range: 'today' } })).toBe(true)
+    expect(hasActiveFilters({ ...defaults, dateRangeState: { range: 'last7d' } })).toBe(true)
+    expect(hasActiveFilters({ ...defaults, dateRangeState: { range: 'last30d' } })).toBe(true)
+    expect(hasActiveFilters({ ...defaults, dateRangeState: { range: 'yesterday' } })).toBe(true)
+    expect(hasActiveFilters({ ...defaults, dateRangeState: { range: 'custom' } })).toBe(true)
   })
 
   it('returns true when sortOrder is not "desc"', () => {
@@ -64,7 +65,12 @@ describe('hasActiveFilters', () => {
 
   it('returns true when multiple filters deviate from defaults', () => {
     expect(
-      hasActiveFilters({ searchQuery: 'test', selectedTag: 'vue', dateRange: 'today', sortOrder: 'asc' }),
+      hasActiveFilters({
+        searchQuery: 'test',
+        selectedTag: 'vue',
+        dateRangeState: { range: 'today' },
+        sortOrder: 'asc',
+      }),
     ).toBe(true)
   })
 })
