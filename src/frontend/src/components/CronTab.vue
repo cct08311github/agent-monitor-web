@@ -13,6 +13,13 @@ import type { TimelineMarker } from '@/utils/cronTimeline'
 import { humanizeCron } from '@/utils/cronHumanizer'
 import CronNextFires from '@/components/CronNextFires.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import {
+  loadAllCronTags,
+  addCronTag,
+  removeCronTag,
+  uniqueCronTags,
+  filterJobsByTag,
+} from '@/utils/cronTags'
 
 // ---------------------------------------------------------------------------
 // State
@@ -28,6 +35,12 @@ const searchInputRef = ref<HTMLInputElement | null>(null)
 const searchQuery = ref('')
 const filterMode = ref<'all' | 'enabled' | 'disabled'>('all')
 const sortBy = ref<'name' | 'nextRun' | 'lastRun'>('name')
+
+// ---------------------------------------------------------------------------
+// Cron tags
+// ---------------------------------------------------------------------------
+const cronTagsMap = ref<Map<string, string[]>>(loadAllCronTags())
+const selectedCronTag = ref<string | null>(null)
 
 // ---------------------------------------------------------------------------
 // Computed
@@ -52,7 +65,10 @@ const filteredJobs = computed<CronJob[]>(() => {
     result = result.filter((j) => !j.enabled)
   }
 
-  // 3. Sort
+  // 3. Filter by selected tag
+  result = filterJobsByTag(result, cronTagsMap.value, selectedCronTag.value)
+
+  // 4. Sort
   result = [...result].sort((a, b) => {
     if (sortBy.value === 'name') {
       return a.name.localeCompare(b.name)
@@ -80,8 +96,9 @@ const filteredJobs = computed<CronJob[]>(() => {
 const hasJobs = computed(() => jobs.value.length > 0)
 const hasResults = computed(() => filteredJobs.value.length > 0)
 const isFiltered = computed(
-  () => searchQuery.value.trim() !== '' || filterMode.value !== 'all',
+  () => searchQuery.value.trim() !== '' || filterMode.value !== 'all' || selectedCronTag.value !== null,
 )
+const availableCronTags = computed(() => uniqueCronTags(cronTagsMap.value))
 
 // Up Next timeline: map CronJob state.nextRunAtMs → TimelineJob.nextRun
 const markers = computed<TimelineMarker[]>(() => {
@@ -201,6 +218,32 @@ async function runJob(id: string, name?: string): Promise<void> {
     showToast('❌ 執行失敗: ' + (e as Error).message, 'error')
     await fetchJobs()
   }
+}
+
+// ---------------------------------------------------------------------------
+// Tag handlers
+// ---------------------------------------------------------------------------
+
+function toggleSelectedCronTag(tag: string): void {
+  selectedCronTag.value = selectedCronTag.value === tag ? null : tag
+}
+
+function onAddTag(jobId: string): void {
+  const input = window.prompt('輸入 tag (不含 #):')
+  if (!input) return
+  const updated = addCronTag(jobId, input)
+  const next = new Map(cronTagsMap.value)
+  if (updated.length) next.set(jobId, updated)
+  else next.delete(jobId)
+  cronTagsMap.value = next
+}
+
+function onRemoveJobTag(jobId: string, tag: string): void {
+  const updated = removeCronTag(jobId, tag)
+  const next = new Map(cronTagsMap.value)
+  if (updated.length) next.set(jobId, updated)
+  else next.delete(jobId)
+  cronTagsMap.value = next
 }
 
 // ---------------------------------------------------------------------------
@@ -347,6 +390,19 @@ function getNextRunCountdown(job: CronJob): string {
         </select>
       </div>
 
+      <!-- Tag chip bar -->
+      <div v-if="availableCronTags.length" class="cron-tag-chips">
+        <button
+          v-for="t in availableCronTags"
+          :key="t.tag"
+          :class="['tag-chip', { 'is-active': selectedCronTag === t.tag }]"
+          @click="toggleSelectedCronTag(t.tag)"
+        >
+          #{{ t.tag }}
+          <span class="tag-chip-count">{{ t.count }}</span>
+        </button>
+      </div>
+
       <!-- Empty state: jobs exist but none match filters -->
       <EmptyState
         v-if="!hasResults"
@@ -468,6 +524,22 @@ function getNextRunCountdown(job: CronJob): string {
             <div class="agent-info-row">
               <span class="agent-info-label">Agent ID</span>
               <span class="agent-info-value">{{ job.agentId ?? 'N/A' }}</span>
+            </div>
+
+            <!-- Tags row -->
+            <div class="cron-tags-row">
+              <span
+                v-for="t in (cronTagsMap.get(job.id) ?? [])"
+                :key="t"
+                class="job-tag-pill"
+                role="button"
+                tabindex="0"
+                :title="`移除 #${t}`"
+                @click="onRemoveJobTag(job.id, t)"
+                @keydown.enter.prevent="onRemoveJobTag(job.id, t)"
+                @keydown.space.prevent="onRemoveJobTag(job.id, t)"
+              >#{{ t }} ✕</span>
+              <button class="add-tag-btn" title="新增 tag" @click="onAddTag(job.id)">+ tag</button>
             </div>
           </div>
 
@@ -621,5 +693,95 @@ function getNextRunCountdown(job: CronJob): string {
   color: var(--text-muted, #94a3b8);
   font-size: 0.85em;
   font-weight: 400;
+}
+
+/* ── Tag chip bar ──────────────────────────────────────────────────── */
+
+.cron-tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 0 12px;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  font-size: 12px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+}
+
+.tag-chip:hover {
+  background: var(--surface2, rgba(255, 255, 255, 0.07));
+  color: var(--text, #e2e8f0);
+}
+
+.tag-chip.is-active {
+  background: var(--accent, #6366f1);
+  border-color: var(--accent, #6366f1);
+  color: #fff;
+}
+
+.tag-chip-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* ── Per-job tag pills ─────────────────────────────────────────────── */
+
+.cron-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.job-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  font-size: 11px;
+  border-radius: 10px;
+  background: var(--surface2, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+}
+
+.job-tag-pill:hover {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.add-tag-btn {
+  padding: 2px 7px;
+  font-size: 11px;
+  border: 1px dashed var(--border, rgba(255, 255, 255, 0.18));
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+}
+
+.add-tag-btn:hover {
+  border-color: var(--accent, #6366f1);
+  color: var(--accent, #6366f1);
 }
 </style>
