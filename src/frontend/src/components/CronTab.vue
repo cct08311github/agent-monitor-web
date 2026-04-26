@@ -20,6 +20,7 @@ import {
   uniqueCronTags,
   filterJobsByTag,
 } from '@/utils/cronTags'
+import { useCronAliases } from '@/composables/useCronAliases'
 
 // ---------------------------------------------------------------------------
 // State
@@ -35,6 +36,39 @@ const searchInputRef = ref<HTMLInputElement | null>(null)
 const searchQuery = ref('')
 const filterMode = ref<'all' | 'enabled' | 'disabled'>('all')
 const sortBy = ref<'name' | 'nextRun' | 'lastRun'>('name')
+
+// ---------------------------------------------------------------------------
+// Cron aliases
+// ---------------------------------------------------------------------------
+const { displayName: displayCronName, setAlias, clearAlias } = useCronAliases()
+
+// Inline rename state
+const renamingJobId = ref<string | null>(null)
+const editingAlias = ref('')
+
+function startRename(job: CronJob): void {
+  renamingJobId.value = job.id
+  editingAlias.value = displayCronName(job.id, job.name)
+}
+
+function commitRename(jobId: string, fallbackName: string): void {
+  if (renamingJobId.value !== jobId) return
+  const trimmed = editingAlias.value.trim()
+  if (trimmed === '' || trimmed === fallbackName) {
+    clearAlias(jobId)
+    showToast('已清除別名', 'info')
+  } else {
+    setAlias(jobId, trimmed)
+    showToast(`已更名為: ${trimmed}`, 'success')
+  }
+  renamingJobId.value = null
+  editingAlias.value = ''
+}
+
+function cancelRename(): void {
+  renamingJobId.value = null
+  editingAlias.value = ''
+}
 
 // ---------------------------------------------------------------------------
 // Cron tags
@@ -425,7 +459,28 @@ function getNextRunCountdown(job: CronJob): string {
             <div class="agent-card-name">
               <div class="agent-avatar">⏰</div>
               <div>
-                <div class="agent-name">{{ job.name }}</div>
+                <!-- Inline rename input -->
+                <div v-if="renamingJobId === job.id" class="cron-rename-row">
+                  <input
+                    v-model="editingAlias"
+                    class="cron-rename-input"
+                    type="text"
+                    autofocus
+                    @keydown.enter.prevent="commitRename(job.id, job.name)"
+                    @keydown.esc.prevent="cancelRename"
+                    @blur="commitRename(job.id, job.name)"
+                  />
+                </div>
+                <!-- Display name with rename button -->
+                <div v-else class="cron-name-row">
+                  <span class="agent-name" :title="job.id">{{ displayCronName(job.id, job.name) }}</span>
+                  <button
+                    class="cron-rename-btn"
+                    title="重新命名"
+                    @click.stop="startRename(job)"
+                  >✏️</button>
+                </div>
+                <small v-if="displayCronName(job.id, job.name) !== job.name && renamingJobId !== job.id" class="cron-original-id" :title="job.id">{{ job.name }}</small>
                 <div class="agent-hostname">
                   {{ job.schedule?.expr ?? 'Once' }}
                   <small v-if="job.schedule?.expr" class="cron-human">· {{ humanizeCron(job.schedule.expr) }}</small>
@@ -783,5 +838,53 @@ function getNextRunCountdown(job: CronJob): string {
 .add-tag-btn:hover {
   border-color: var(--accent, #6366f1);
   color: var(--accent, #6366f1);
+}
+
+/* ── Cron alias rename ─────────────────────────────────────────────── */
+
+.cron-name-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cron-rename-btn {
+  padding: 0 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0.45;
+  line-height: 1;
+  transition: opacity 0.15s;
+}
+
+.cron-rename-btn:hover {
+  opacity: 1;
+}
+
+.cron-rename-row {
+  display: flex;
+  align-items: center;
+}
+
+.cron-rename-input {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border: 1px solid var(--accent, #6366f1);
+  border-radius: 4px;
+  background: var(--surface2, rgba(255, 255, 255, 0.05));
+  color: var(--text, #e2e8f0);
+  outline: none;
+  width: 100%;
+  max-width: 200px;
+}
+
+.cron-original-id {
+  display: block;
+  font-size: 10px;
+  color: var(--text-muted, #94a3b8);
+  margin-top: 1px;
 }
 </style>
