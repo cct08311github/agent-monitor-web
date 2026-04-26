@@ -60,6 +60,7 @@ import {
   installRecentAgentsHotkey,
   teardownRecentAgentsHotkey,
 } from '@/composables/useRecentAgents'
+import NotifyPromptBanner from '@/components/NotifyPromptBanner.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -556,6 +557,7 @@ registerShortcut({
     <router-view />
 
     <!-- Global UI overlays -->
+    <NotifyPromptBanner />
     <ToastContainer />
     <ConfirmDialog />
     <KeyboardShortcutsHelp />
