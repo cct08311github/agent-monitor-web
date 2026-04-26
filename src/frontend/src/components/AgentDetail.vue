@@ -222,6 +222,7 @@ const filteredSessions = computed(() =>
 import { loadBookmarks, toggleBookmark, partition } from '@/utils/sessionBookmarks'
 import { buildSessionsCsv } from '@/utils/sessionsCsvExport'
 import { buildSessionsJson } from '@/utils/sessionsJsonExport'
+import { buildSessionsMarkdown } from '@/utils/sessionsMarkdownExport'
 import AgentNotes from '@/components/AgentNotes.vue'
 import AgentStatsCard from '@/components/AgentStatsCard.vue'
 import { computeAgentStats, type AgentStats } from '@/utils/agentStats'
@@ -275,6 +276,23 @@ function exportSessionsJson(): void {
   a.click()
   URL.revokeObjectURL(url)
   showToast(`已匯出 ${sessions.value.length} 筆 session (JSON)`, 'success')
+}
+
+function exportSessionsMarkdown(): void {
+  const { filename, content } = buildSessionsMarkdown(
+    props.agentId,
+    currentDisplayName.value,
+    sessions.value,
+    bookmarks.value,
+  )
+  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+  showToast(`已匯出 ${sessions.value.length} 筆 session (Markdown)`, 'success')
 }
 
 const partitionedSessions = computed(() => partition(filteredSessions.value, bookmarks.value))
@@ -512,6 +530,13 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
             title="匯出 Sessions JSON"
             @click="exportSessionsJson"
           >📥 匯出 JSON</button>
+          <button
+            v-if="sessions.length > 0"
+            type="button"
+            class="ctrl-btn si-toggle-btn"
+            title="匯出 Sessions Markdown"
+            @click="exportSessionsMarkdown"
+          >📝 匯出 Markdown</button>
           <input
             v-if="sessions.length > 0"
             v-model="sessionSearchQuery"
