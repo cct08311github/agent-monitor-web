@@ -34,6 +34,7 @@ import { FILTER_DEFAULTS, hasActiveFilters } from '@/utils/captureFilterDefaults
 import { groupByDay } from '@/utils/captureTimeline'
 import { loadViewMode, saveViewMode } from '@/utils/captureViewMode'
 import type { ViewMode } from '@/utils/captureViewMode'
+import { hasCaptureOnDate, captureDateRange } from '@/utils/captureDateNav'
 import CaptureHeatmap from './CaptureHeatmap.vue'
 import CaptureBulkActionBar from './CaptureBulkActionBar.vue'
 import HighlightedText from './HighlightedText.vue'
@@ -216,6 +217,28 @@ const restDisplayed = computed(() => {
 })
 
 const groupedDisplay = computed(() => groupByDay(restDisplayed.value))
+
+// ---------------------------------------------------------------------------
+// Timeline jump-to-date
+// ---------------------------------------------------------------------------
+
+const jumpDateRange = computed(() => captureDateRange(activeCaptures.value))
+
+function onJumpToDate(e: Event): void {
+  const target = (e.target as HTMLInputElement).value // YYYY-MM-DD
+  if (!target) return
+  if (!hasCaptureOnDate(activeCaptures.value, target)) {
+    useToast().info(`${target} 無 capture`)
+    return
+  }
+  const el = document.getElementById(`day-section-${target}`)
+  if (!el) {
+    useToast().info(`${target} 無 capture`)
+    return
+  }
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' })
+}
 
 function toggleTag(tag: string): void {
   selectedTag.value = selectedTag.value === tag ? null : tag
@@ -625,6 +648,16 @@ function onImport(e: Event): void {
             :aria-pressed="viewMode === 'timeline'"
             @click="toggleViewMode"
           >{{ viewMode === 'flat' ? '📅 Timeline' : '☰ Flat' }}</button>
+          <input
+            v-if="viewMode === 'timeline'"
+            type="date"
+            class="qc-jump-date"
+            :min="jumpDateRange.min ?? undefined"
+            :max="jumpDateRange.max ?? undefined"
+            aria-label="跳到指定日期"
+            title="跳到指定日期"
+            @change="onJumpToDate"
+          />
           <button
             v-if="filtersActive"
             class="qc-clear-all"
@@ -888,6 +921,7 @@ function onImport(e: Event): void {
               <section
                 v-for="group in groupedDisplay"
                 :key="group.dateKey"
+                :id="`day-section-${group.dateKey}`"
                 class="qcl-timeline-group"
                 :aria-label="`日期：${group.label}`"
               >
@@ -1751,6 +1785,29 @@ function onImport(e: Event): void {
   background: rgba(137, 180, 250, 0.08);
 }
 
+/* ── Timeline jump-to-date picker ──────────────────────────────────────── */
+
+.qc-jump-date {
+  appearance: none;
+  background: var(--color-surface, #1e1e2e);
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  padding: 0.3125rem 0.5rem;
+  border-radius: 0.375rem;
+  transition: color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.qc-jump-date:focus {
+  outline: 2px solid var(--color-accent, #89b4fa);
+  outline-offset: 1px;
+  border-color: var(--color-accent, #89b4fa);
+  color: var(--color-text, #cdd6f4);
+}
+
 /* ── Clear-all-filters button ────────────────────────────────────────────── */
 
 .qc-clear-all {
@@ -1942,6 +1999,7 @@ function onImport(e: Event): void {
   .qc-date-range,
   .qc-sort-btn,
   .qc-view-mode-btn,
+  .qc-jump-date,
   .qcl-row-checkbox,
   .qcl-bulk-select-all,
   .tag-chip-menu-btn,
