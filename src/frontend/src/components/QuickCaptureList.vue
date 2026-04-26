@@ -37,10 +37,12 @@ import { groupByDay } from '@/utils/captureTimeline'
 import { loadViewMode, saveViewMode } from '@/utils/captureViewMode'
 import type { ViewMode } from '@/utils/captureViewMode'
 import { hasCaptureOnDate, captureDateRange } from '@/utils/captureDateNav'
+import { computeInsights } from '@/utils/captureInsights'
 import CaptureHeatmap from './CaptureHeatmap.vue'
 import CaptureBulkActionBar from './CaptureBulkActionBar.vue'
 import HighlightedText from './HighlightedText.vue'
 import MarkdownText from './MarkdownText.vue'
+import CaptureInsights from './CaptureInsights.vue'
 
 const { isListOpen, captures, archivedIds, activeCaptures, archivedCaptures, pinnedIds, closeList, remove, archive, unarchive, clear, update, togglePin, isPinned, openWithPrefill, pendingJumpDate } = useQuickCapture()
 
@@ -74,6 +76,11 @@ const searchQuery = ref('')
 
 // Archive section visibility
 const showArchived = ref(false)
+
+// Insights panel visibility
+const showInsights = ref(false)
+
+const insights = computed(() => computeInsights(captures.value))
 
 // View mode: 'flat' = plain list (default), 'timeline' = grouped by day
 const viewMode = ref<ViewMode>(loadViewMode())
@@ -661,6 +668,14 @@ function onImport(e: Event): void {
               @change="onImport"
             />
             <button
+              class="qcl-download-btn qcl-insights-btn"
+              :class="{ 'qcl-insights-btn--active': showInsights }"
+              :disabled="!captures.length"
+              :aria-pressed="showInsights"
+              aria-label="切換 Capture 行為分析面板"
+              @click="showInsights = !showInsights"
+            >📊 統計</button>
+            <button
               class="qcl-close-btn"
               aria-label="關閉 quick capture 列表"
               @click="handleClose"
@@ -671,6 +686,11 @@ function onImport(e: Event): void {
         <!-- Capture frequency heatmap (30 days) -->
         <div v-if="captures.length > 0" class="qcl-heatmap-row">
           <CaptureHeatmap :captures="captures" @select="onHeatmapSelect" />
+        </div>
+
+        <!-- Insights panel (toggle via 📊 button) -->
+        <div v-if="showInsights && captures.length > 0" class="qcl-insights-panel">
+          <CaptureInsights :insights="insights" />
         </div>
 
         <!-- Archive toggle toolbar (only shown when archived items exist) -->
@@ -2109,6 +2129,22 @@ function onImport(e: Event): void {
 .trend-flat {
   color: var(--color-muted, #6c7086);
   background: transparent;
+}
+
+/* ── Insights button ────────────────────────────────────────────────────── */
+
+.qcl-insights-btn--active {
+  color: var(--color-accent, #89b4fa);
+  border-color: var(--color-accent, #89b4fa);
+  background: rgba(137, 180, 250, 0.1);
+}
+
+/* ── Insights panel ─────────────────────────────────────────────────────── */
+
+.qcl-insights-panel {
+  border-top: 1px solid var(--color-border, #313244);
+  padding: 0.5rem 1.25rem 0;
+  flex-shrink: 0;
 }
 
 /* ── Reduced motion ─────────────────────────────────────────────────────── */
