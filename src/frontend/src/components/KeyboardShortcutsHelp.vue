@@ -25,7 +25,10 @@ import { useDesktopNotify } from '@/composables/useDesktopNotify'
 import { useSettingsBackupMenu } from '@/composables/useSettingsBackupMenu'
 import { useDensity } from '@/composables/useDensity'
 import { useTitleFlash } from '@/composables/useTitleFlash'
+import { useNotifySnooze } from '@/composables/useNotifySnooze'
+import { formatRemainingMs } from '@/utils/notifySnooze'
 import EmptyState from '@/components/EmptyState.vue'
+import NotifySnoozeMenu from '@/components/NotifySnoozeMenu.vue'
 
 const { isOpen, close } = useKeyboardShortcutsHelp()
 const { restart: restartTour } = useOnboardingTour()
@@ -47,6 +50,30 @@ const {
   isUnsupported: desktopUnsupported,
   toggle: toggleDesktopNotify,
 } = useDesktopNotify()
+const { isSnoozed, remainingMs, snooze: activateSnooze, cancel: cancelSnooze } = useNotifySnooze()
+
+// Snooze menu open state
+const snoozeMenuOpen = ref(false)
+
+const snoozeLabel = computed(() => {
+  if (!isSnoozed.value) return '通知'
+  return `${formatRemainingMs(remainingMs.value)} 後恢復`
+})
+
+function handleOpenSnoozeMenu(): void {
+  snoozeMenuOpen.value = true
+}
+
+function handleSnooze(ms: number): void {
+  activateSnooze(ms)
+  const label = formatRemainingMs(ms)
+  toast.info(`已暫停通知 ${label}`)
+}
+
+function handleCancelSnooze(): void {
+  cancelSnooze()
+  toast.info('已恢復通知')
+}
 
 const desktopLabel = computed(() => {
   if (desktopUnsupported.value) return '不支援'
@@ -298,6 +325,22 @@ onUnmounted(() => {
             <button class="ksh-title-flash-btn" @click="handleToggleFlash">
               ⚡ Title 閃爍 {{ flashEnabled ? '已啟用' : '已關閉' }}
             </button>
+            <div class="ksh-snooze-wrap">
+              <button
+                class="ksh-snooze-btn"
+                :class="{ 'ksh-snooze-btn--active': isSnoozed }"
+                @click="handleOpenSnoozeMenu"
+              >
+                🔕 {{ isSnoozed ? snoozeLabel : '暫停通知' }}
+              </button>
+              <NotifySnoozeMenu
+                :open="snoozeMenuOpen"
+                :is-snoozed="isSnoozed"
+                @close="snoozeMenuOpen = false"
+                @snooze="handleSnooze"
+                @cancel="handleCancelSnooze"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -718,6 +761,37 @@ onUnmounted(() => {
 .ksh-title-flash-btn:hover {
   color: var(--color-text, #cdd6f4);
   border-color: var(--color-text, #cdd6f4);
+}
+
+/* ── Snooze ─────────────────────────────────────────────────────────────── */
+
+.ksh-snooze-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ksh-snooze-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.375rem;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.ksh-snooze-btn:hover {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-text, #cdd6f4);
+}
+
+.ksh-snooze-btn--active {
+  color: var(--color-accent, #89b4fa);
+  border-color: var(--color-accent, #89b4fa);
 }
 
 /* ── Reduced motion ─────────────────────────────────────────────────────── */

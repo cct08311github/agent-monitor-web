@@ -20,6 +20,8 @@
 //   _resetFlashState()    — for unit tests only
 // ---------------------------------------------------------------------------
 
+import { isSnoozedNow as isNotifySnoozed } from '@/utils/notifySnooze'
+
 const KEY = 'oc_title_flash_enabled'
 const FLASH_TEXT = '🔴 新 ALERT'
 
@@ -105,6 +107,9 @@ export function startFlash(
   intervalMs: number = 1_200,
 ): () => void {
   if (typeof document === 'undefined') return () => {}
+
+  // Guard: ad-hoc snooze (#584)
+  if (isNotifySnoozed()) return () => {}
 
   // Respect prefers-reduced-motion
   if (
