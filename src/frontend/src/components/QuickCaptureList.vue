@@ -10,7 +10,7 @@
  * Esc or backdrop click closes the modal.
  * 📥 Download button exports all captures as a grouped Markdown file.
  */
-import { watch, nextTick, onUnmounted, ref, computed } from 'vue'
+import { watch, nextTick, onMounted, onUnmounted, ref, computed } from 'vue'
 import { useQuickCapture } from '@/composables/useQuickCapture'
 import { useBulkSelect } from '@/composables/useBulkSelect'
 import { createFocusTrap } from '@/lib/focusTrap'
@@ -209,6 +209,7 @@ watch(isListOpen, async (visible) => {
 
 onUnmounted(() => {
   trap.deactivate()
+  window.removeEventListener('keydown', onKeydown)
 })
 
 function handleClose(): void {
@@ -288,6 +289,79 @@ function commitEdit(id: string): void {
 function formatTime(ts: number): string {
   return new Date(ts).toLocaleString()
 }
+
+// ---------------------------------------------------------------------------
+// Keyboard navigation
+// ---------------------------------------------------------------------------
+
+/**
+ * Keyboard navigation is only active in flat mode.
+ * In timeline mode navigation is disabled to avoid ambiguity with grouped items.
+ */
+const highlightedIdx = ref<number>(-1)
+
+// Reset highlight when displayed list changes (e.g. filter applied) or modal opens
+watch(displayed, () => {
+  highlightedIdx.value = -1
+})
+
+watch(isListOpen, (open) => {
+  if (!open) highlightedIdx.value = -1
+})
+
+function onKeydown(e: KeyboardEvent): void {
+  if (!isListOpen.value) return
+  // Skip nav when an input/textarea/contenteditable has focus
+  const t = e.target as HTMLElement | null
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+  // Skip nav in timeline mode — list is split into grouped sections
+  if (viewMode.value === 'timeline') return
+
+  const list = displayed.value
+  const len = list.length
+  if (len === 0) return
+
+  switch (e.key) {
+    case 'ArrowDown':
+      e.preventDefault()
+      highlightedIdx.value = Math.min(len - 1, highlightedIdx.value + 1)
+      break
+    case 'ArrowUp':
+      e.preventDefault()
+      highlightedIdx.value = Math.max(0, highlightedIdx.value < 0 ? 0 : highlightedIdx.value - 1)
+      break
+    case 'Enter':
+      if (highlightedIdx.value >= 0 && highlightedIdx.value < len) {
+        e.preventDefault()
+        startEdit(list[highlightedIdx.value])
+      }
+      break
+    case 'Delete':
+    case 'Backspace':
+      if (highlightedIdx.value >= 0 && highlightedIdx.value < len) {
+        e.preventDefault()
+        handleDelete(list[highlightedIdx.value])
+      }
+      break
+    case ' ':
+      if (highlightedIdx.value >= 0 && highlightedIdx.value < len) {
+        e.preventDefault()
+        bulk.toggle(list[highlightedIdx.value].id)
+      }
+      break
+    case 'a':
+    case 'A':
+      if (e.metaKey || e.ctrlKey) {
+        e.preventDefault()
+        bulk.selectAll()
+      }
+      break
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+})
 
 function onDownload(): void {
   const { filename, content } = buildExport(captures.value)
@@ -462,13 +536,14 @@ function onDownload(): void {
             <!-- ── Flat mode (default) ──────────────────────────────── -->
             <ul v-if="displayed.length > 0 && viewMode === 'flat'" class="qcl-list" role="list">
               <li
-                v-for="capture in displayed"
+                v-for="(capture, idx) in displayed"
                 :key="capture.id"
                 class="qcl-item"
                 :class="{
                   'qcl-item--editing': editingId === capture.id,
                   'qcl-item--pinned': isPinned(capture.id),
                   'qcl-item--selected': bulk.isSelected(capture.id),
+                  'qcl-item--keynav-highlight': highlightedIdx === idx,
                 }"
               >
                 <!-- Row checkbox -->
@@ -1430,6 +1505,14 @@ function onDownload(): void {
 .qcl-item--selected {
   border-color: var(--color-accent, #89b4fa);
   background: rgba(137, 180, 250, 0.06);
+}
+
+/* ── Keyboard navigation highlight ─────────────────────────────────────── */
+
+/* Static outline only — no animation (respects prefers-reduced-motion) */
+.qcl-item--keynav-highlight {
+  outline: 2px solid var(--color-accent, #89b4fa);
+  outline-offset: -2px;
 }
 
 /* ── Reduced motion ─────────────────────────────────────────────────────── */
