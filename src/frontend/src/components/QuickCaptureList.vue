@@ -31,6 +31,7 @@ import { loadViewMode, saveViewMode } from '@/utils/captureViewMode'
 import type { ViewMode } from '@/utils/captureViewMode'
 import CaptureHeatmap from './CaptureHeatmap.vue'
 import CaptureBulkActionBar from './CaptureBulkActionBar.vue'
+import HighlightedText from './HighlightedText.vue'
 
 const { isListOpen, captures, activeCaptures, archivedCaptures, pinnedIds, closeList, remove, archive, unarchive, clear, update, togglePin, isPinned, openWithPrefill } = useQuickCapture()
 
@@ -592,7 +593,9 @@ function onDownload(): void {
 
                 <!-- Display mode -->
                 <template v-else>
-                  <p class="qcl-item-body">{{ capture.body }}</p>
+                  <p class="qcl-item-body">
+                    <HighlightedText :text="capture.body" :query="searchQuery" />
+                  </p>
                   <div class="qcl-item-actions">
                     <button
                       class="qcl-pin-btn"
@@ -678,7 +681,9 @@ function onDownload(): void {
                       </div>
                     </div>
                     <template v-else>
-                      <p class="qcl-item-body">{{ capture.body }}</p>
+                      <p class="qcl-item-body">
+                        <HighlightedText :text="capture.body" :query="searchQuery" />
+                      </p>
                       <div class="qcl-item-actions">
                         <button
                           class="qcl-pin-btn qcl-pin-btn--active"
@@ -747,7 +752,9 @@ function onDownload(): void {
                       </div>
                     </div>
                     <template v-else>
-                      <p class="qcl-item-body">{{ capture.body }}</p>
+                      <p class="qcl-item-body">
+                        <HighlightedText :text="capture.body" :query="searchQuery" />
+                      </p>
                       <div class="qcl-item-actions">
                         <button
                           class="qcl-pin-btn"
@@ -787,7 +794,9 @@ function onDownload(): void {
                     <span class="qcl-item-context">{{ capture.context }}</span>
                     <span class="qcl-item-time">{{ formatTime(capture.createdAt) }}</span>
                   </div>
-                  <p class="qcl-item-body">{{ capture.body }}</p>
+                  <p class="qcl-item-body">
+                    <HighlightedText :text="capture.body" :query="searchQuery" />
+                  </p>
                   <div class="qcl-item-actions">
                     <button
                       class="qcl-unarchive-btn"
