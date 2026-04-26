@@ -23,6 +23,9 @@ import type { DateRange } from '@/utils/captureDateFilter'
 import type { Capture } from '@/utils/quickCapture'
 import { loadSortOrder, saveSortOrder } from '@/utils/captureSortPref'
 import type { SortOrder } from '@/utils/captureSortPref'
+import { groupByDay } from '@/utils/captureTimeline'
+import { loadViewMode, saveViewMode } from '@/utils/captureViewMode'
+import type { ViewMode } from '@/utils/captureViewMode'
 import CaptureHeatmap from './CaptureHeatmap.vue'
 
 const { isListOpen, captures, activeCaptures, archivedCaptures, pinnedIds, closeList, remove, archive, unarchive, clear, update, togglePin, isPinned, openWithPrefill } = useQuickCapture()
@@ -42,6 +45,14 @@ const searchQuery = ref('')
 
 // Archive section visibility
 const showArchived = ref(false)
+
+// View mode: 'flat' = plain list (default), 'timeline' = grouped by day
+const viewMode = ref<ViewMode>(loadViewMode())
+
+function toggleViewMode(): void {
+  viewMode.value = viewMode.value === 'flat' ? 'timeline' : 'flat'
+  saveViewMode(viewMode.value)
+}
 
 // Sort order: 'desc' = newest first (default), 'asc' = oldest first
 const sortOrder = ref<SortOrder>(loadSortOrder())
@@ -89,6 +100,21 @@ const displayed = computed(() => {
 })
 
 const displayedArchived = computed(() => applyFilters([...archivedCaptures.value]))
+
+// In timeline mode: pinned items stay as a flat block at the top;
+// the rest section is grouped by day.  Partition is based on displayed.value
+// which already floats pinned to the front.
+const pinnedDisplayed = computed(() => {
+  const { pinned } = partition(displayed.value, pinnedIds.value)
+  return pinned
+})
+
+const restDisplayed = computed(() => {
+  const { rest } = partition(displayed.value, pinnedIds.value)
+  return rest
+})
+
+const groupedDisplay = computed(() => groupByDay(restDisplayed.value))
 
 function toggleTag(tag: string): void {
   selectedTag.value = selectedTag.value === tag ? null : tag
@@ -278,6 +304,14 @@ function onDownload(): void {
             :aria-label="sortLabel"
             @click="toggleSort"
           >{{ sortOrder === 'desc' ? '↓ 新→舊' : '↑ 舊→新' }}</button>
+          <button
+            class="qc-view-mode-btn"
+            :class="{ 'qc-view-mode-btn--active': viewMode === 'timeline' }"
+            :title="viewMode === 'flat' ? '切換為 Timeline（日期分組）' : '切換為 Flat（一般列表）'"
+            :aria-label="viewMode === 'flat' ? '切換為 Timeline 日期分組模式' : '切換為 Flat 一般列表模式'"
+            :aria-pressed="viewMode === 'timeline'"
+            @click="toggleViewMode"
+          >{{ viewMode === 'flat' ? '📅 Timeline' : '☰ Flat' }}</button>
           <span v-if="searchQuery || selectedTag || dateRange !== 'all'" class="qcl-filter-count">
             篩選: {{ displayed.length }} / {{ activeCaptures.length }}
           </span>
@@ -317,8 +351,8 @@ function onDownload(): void {
               <template v-else>此 tag 下無 capture</template>
             </p>
 
-            <!-- Active capture list -->
-            <ul v-if="displayed.length > 0" class="qcl-list" role="list">
+            <!-- ── Flat mode (default) ──────────────────────────────── -->
+            <ul v-if="displayed.length > 0 && viewMode === 'flat'" class="qcl-list" role="list">
               <li
                 v-for="capture in displayed"
                 :key="capture.id"
@@ -387,6 +421,115 @@ function onDownload(): void {
                 </template>
               </li>
             </ul>
+
+            <!-- ── Timeline mode ────────────────────────────────────────── -->
+            <template v-if="displayed.length > 0 && viewMode === 'timeline'">
+              <!-- Pinned items — single flat block at top (no date grouping) -->
+              <div v-if="pinnedDisplayed.length > 0" class="qcl-timeline-pinned-block">
+                <h3 class="qcl-timeline-group-header">📌 釘選 ({{ pinnedDisplayed.length }})</h3>
+                <ul class="qcl-list" role="list">
+                  <li
+                    v-for="capture in pinnedDisplayed"
+                    :key="capture.id"
+                    class="qcl-item qcl-item--pinned"
+                    :class="{ 'qcl-item--editing': editingId === capture.id }"
+                  >
+                    <div class="qcl-item-meta">
+                      <span class="qcl-item-context">{{ capture.context }}</span>
+                      <span class="qcl-item-time">{{ formatTime(capture.createdAt) }}</span>
+                    </div>
+                    <div v-if="editingId === capture.id" class="qcl-edit">
+                      <textarea
+                        v-model="editingText"
+                        class="qcl-edit-textarea"
+                        rows="3"
+                        autofocus
+                        :aria-label="`編輯：${capture.body.slice(0, 30)}`"
+                        @keydown.esc.stop="cancelEdit"
+                        @keydown.enter.exact.meta="commitEdit(capture.id)"
+                        @keydown.enter.exact.ctrl="commitEdit(capture.id)"
+                      />
+                      <div class="qcl-edit-actions">
+                        <button class="qcl-save-btn" @click="commitEdit(capture.id)">儲存 (⌘+Enter)</button>
+                        <button class="qcl-cancel-btn" @click="cancelEdit">取消 (Esc)</button>
+                      </div>
+                    </div>
+                    <template v-else>
+                      <p class="qcl-item-body">{{ capture.body }}</p>
+                      <div class="qcl-item-actions">
+                        <button
+                          class="qcl-pin-btn qcl-pin-btn--active"
+                          :aria-label="`取消釘選：${capture.body.slice(0, 30)}`"
+                          title="取消釘選"
+                          @click="handlePin(capture)"
+                        >📌</button>
+                        <button class="qcl-clone-btn" :aria-label="`複製為新 capture：${capture.body.slice(0, 30)}`" title="複製為新 capture" @click="handleClone(capture)">📋</button>
+                        <button class="qcl-edit-btn" :aria-label="`編輯：${capture.body.slice(0, 30)}`" @click="startEdit(capture)">✏️ 編輯</button>
+                        <button class="qcl-archive-btn" :aria-label="`封存：${capture.body.slice(0, 30)}`" @click="handleArchive(capture)">📦 封存</button>
+                        <button class="qcl-delete-btn" :aria-label="`刪除：${capture.body.slice(0, 30)}`" @click="handleDelete(capture)">✕ 刪除</button>
+                      </div>
+                    </template>
+                  </li>
+                </ul>
+              </div>
+
+              <!-- Day-grouped sections for non-pinned captures -->
+              <section
+                v-for="group in groupedDisplay"
+                :key="group.dateKey"
+                class="qcl-timeline-group"
+                :aria-label="`日期：${group.label}`"
+              >
+                <h3 class="qcl-timeline-group-header">
+                  {{ group.label }}
+                  <span class="qcl-timeline-group-count">({{ group.captures.length }})</span>
+                </h3>
+                <ul class="qcl-list" role="list">
+                  <li
+                    v-for="capture in group.captures"
+                    :key="capture.id"
+                    class="qcl-item"
+                    :class="{ 'qcl-item--editing': editingId === capture.id }"
+                  >
+                    <div class="qcl-item-meta">
+                      <span class="qcl-item-context">{{ capture.context }}</span>
+                      <span class="qcl-item-time">{{ formatTime(capture.createdAt) }}</span>
+                    </div>
+                    <div v-if="editingId === capture.id" class="qcl-edit">
+                      <textarea
+                        v-model="editingText"
+                        class="qcl-edit-textarea"
+                        rows="3"
+                        autofocus
+                        :aria-label="`編輯：${capture.body.slice(0, 30)}`"
+                        @keydown.esc.stop="cancelEdit"
+                        @keydown.enter.exact.meta="commitEdit(capture.id)"
+                        @keydown.enter.exact.ctrl="commitEdit(capture.id)"
+                      />
+                      <div class="qcl-edit-actions">
+                        <button class="qcl-save-btn" @click="commitEdit(capture.id)">儲存 (⌘+Enter)</button>
+                        <button class="qcl-cancel-btn" @click="cancelEdit">取消 (Esc)</button>
+                      </div>
+                    </div>
+                    <template v-else>
+                      <p class="qcl-item-body">{{ capture.body }}</p>
+                      <div class="qcl-item-actions">
+                        <button
+                          class="qcl-pin-btn"
+                          :aria-label="`釘選：${capture.body.slice(0, 30)}`"
+                          title="釘選"
+                          @click="handlePin(capture)"
+                        >📌</button>
+                        <button class="qcl-clone-btn" :aria-label="`複製為新 capture：${capture.body.slice(0, 30)}`" title="複製為新 capture" @click="handleClone(capture)">📋</button>
+                        <button class="qcl-edit-btn" :aria-label="`編輯：${capture.body.slice(0, 30)}`" @click="startEdit(capture)">✏️ 編輯</button>
+                        <button class="qcl-archive-btn" :aria-label="`封存：${capture.body.slice(0, 30)}`" @click="handleArchive(capture)">📦 封存</button>
+                        <button class="qcl-delete-btn" :aria-label="`刪除：${capture.body.slice(0, 30)}`" @click="handleDelete(capture)">✕ 刪除</button>
+                      </div>
+                    </template>
+                  </li>
+                </ul>
+              </section>
+            </template>
           </template>
 
           <!-- Archived section (shown when toggle is on) -->
@@ -1022,6 +1165,67 @@ function onDownload(): void {
   border-color: var(--color-accent, #89b4fa);
 }
 
+/* ── View mode toggle button ────────────────────────────────────────────── */
+
+.qc-view-mode-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  padding: 0.3125rem 0.625rem;
+  border-radius: 0.375rem;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.qc-view-mode-btn:hover {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-accent, #89b4fa);
+}
+
+.qc-view-mode-btn--active {
+  color: var(--color-accent, #89b4fa);
+  border-color: var(--color-accent, #89b4fa);
+  background: rgba(137, 180, 250, 0.08);
+}
+
+/* ── Timeline group headers ─────────────────────────────────────────────── */
+
+.qcl-timeline-group {
+  margin-top: 0.75rem;
+}
+
+.qcl-timeline-group:first-of-type {
+  margin-top: 0;
+}
+
+.qcl-timeline-group-header {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-muted, #6c7086);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 0.5rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.qcl-timeline-group-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+.qcl-timeline-pinned-block {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.625rem;
+  border-bottom: 1px dashed var(--color-border, #313244);
+}
+
 /* ── Reduced motion ─────────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
@@ -1043,7 +1247,8 @@ function onDownload(): void {
   .tag-chip,
   .qc-search,
   .qc-date-range,
-  .qc-sort-btn {
+  .qc-sort-btn,
+  .qc-view-mode-btn {
     transition: none;
     animation: none;
   }
