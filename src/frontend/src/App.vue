@@ -44,6 +44,7 @@ import {
   installWhatsNewAutoOpen,
   teardownWhatsNewAutoOpen,
 } from '@/composables/useWhatsNew'
+import WorkspaceProfileMenu from '@/components/WorkspaceProfileMenu.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -498,6 +499,7 @@ registerShortcut({
     <OnboardingTour />
     <QuietHoursSetting />
     <WhatsNew />
+    <WorkspaceProfileMenu />
 
     <!-- Konami Code Easter Egg -->
     <div v-if="celebrating" class="konami-celebrate" aria-hidden="true">
