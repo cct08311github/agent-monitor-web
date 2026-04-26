@@ -12,6 +12,7 @@ import { appState } from '@/stores/appState'
 import type { Agent } from '@/types/api'
 import { computeFreshness } from '@/lib/freshness'
 import { recordMessage } from '@/composables/useMessageRate'
+import { useSoundEffect } from '@/composables/useSoundEffect'
 
 export type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting'
 export type CostRange = 'today' | 'week' | 'month' | 'all'
@@ -126,6 +127,7 @@ export function useDashboard() {
   // ── SSE connection ────────────────────────────────────────────────────────
 
   const { connect, close, isConnected, isFailed, manualReconnect } = useSSE()
+  const { play: playSound } = useSoundEffect()
 
   // Notify the user when SSE has exhausted all reconnect attempts
   watch(isFailed, (failed) => {
@@ -164,6 +166,7 @@ export function useDashboard() {
         // Toast only on recovery — not on initial connect
         if (wasReconnecting) {
           showToast('連線已恢復', 'success')
+          playSound('success')
         }
       },
       onMessage(event) {

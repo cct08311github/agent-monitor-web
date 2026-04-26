@@ -15,6 +15,7 @@ import { useQuietHoursSetting } from '@/composables/useQuietHoursSetting'
 import { useColorPalette } from '@/composables/useColorPalette'
 import { useToast } from '@/composables/useToast'
 import { useWhatsNew } from '@/composables/useWhatsNew'
+import { useSoundEffect } from '@/composables/useSoundEffect'
 
 const { isOpen, close } = useKeyboardShortcutsHelp()
 const { restart: restartTour } = useOnboardingTour()
@@ -22,6 +23,7 @@ const { open: openQuietHours } = useQuietHoursSetting()
 const { isCbSafe, togglePalette } = useColorPalette()
 const toast = useToast()
 const { open: openWhatsNew } = useWhatsNew()
+const { isEnabled: soundEnabled, toggle: toggleSound } = useSoundEffect()
 
 function handleRestartTour(): void {
   close()
@@ -36,6 +38,11 @@ function handleOpenQuietHours(): void {
 function handleToggleCbPalette(): void {
   togglePalette()
   toast.success(isCbSafe() ? '已切換為色盲友善色盤' : '已恢復預設色盤')
+}
+
+function handleToggleSound(): void {
+  toggleSound()
+  toast.success(soundEnabled.value ? '音效已啟用' : '音效已關閉')
 }
 
 function handleOpenWhatsNew(): void {
@@ -147,6 +154,9 @@ onUnmounted(() => {
             </button>
             <button class="ksh-whats-new-btn" @click="handleOpenWhatsNew">
               ✨ 最近更新
+            </button>
+            <button class="ksh-sound-btn" @click="handleToggleSound">
+              🔔 音效 {{ soundEnabled ? '已啟用' : '關閉' }}
             </button>
           </div>
         </div>
@@ -380,6 +390,23 @@ onUnmounted(() => {
 }
 
 .ksh-whats-new-btn:hover {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-text, #cdd6f4);
+}
+
+.ksh-sound-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.375rem;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.5;
+}
+
+.ksh-sound-btn:hover {
   color: var(--color-text, #cdd6f4);
   border-color: var(--color-text, #cdd6f4);
 }

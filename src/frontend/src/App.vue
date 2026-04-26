@@ -19,6 +19,7 @@ import {
   installNotificationBadge,
   teardownNotificationBadge,
 } from '@/composables/useNotificationBadge'
+import { useSoundEffect } from '@/composables/useSoundEffect'
 import ToastContainer from '@/components/ToastContainer.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AlertBadge from '@/components/AlertBadge.vue'
@@ -221,6 +222,7 @@ let _uninstallShortcutsHelp: (() => void) | null = null
 // ── Background tab notification badge ───────────────────────────────────────
 
 const { increment: incrementBadge } = useNotificationBadge()
+const { play: playSound } = useSoundEffect()
 
 /**
  * Track which alert IDs we have already counted so repeated SSE frames or
@@ -243,6 +245,8 @@ watch(
         _seenAlertIds.add(id)
         // increment only counts when document.hidden (handled inside composable)
         incrementBadge()
+        // Audible alert — plays only if sound is enabled and not in quiet hours
+        playSound('error')
       }
     }
   },
