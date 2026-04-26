@@ -12,6 +12,7 @@ import {
   deleteSearch,
   type SavedSearch,
 } from '@/utils/savedSearches'
+import { buildLogsJson } from '@/utils/logsJsonExport'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -432,6 +433,41 @@ function exportLogs(): void {
   showToast(`已匯出 ${lines.length} 行日誌`, 'success')
 }
 
+function exportLogsJson(): void {
+  if (visibleLines.value.length === 0) {
+    showToast('沒有可匯出的日誌', 'info')
+    return
+  }
+  if (paused.value && pauseQueue.value.length > 0) {
+    showToast(`暫停中有 ${pauseQueue.value.length} 行尚未納入匯出`, 'info')
+  }
+
+  const level = errorOnly.value ? 'error' : warnOnly.value ? 'warn' : undefined
+  const { filename, content } = buildLogsJson({
+    entries: visibleLines.value.map((entry) => ({
+      ts: entry.ts,
+      level: entry.level,
+      message: entry.line,
+    })),
+    filter: {
+      query: filterText.value || undefined,
+      level,
+      regex: regexMode.value || undefined,
+    },
+  })
+
+  const blob = new Blob([content], { type: 'application/json;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  // Firefox processes blob URL asynchronously after click; defer revoke
+  // so the download doesn't race with URL invalidation.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  showToast(`已匯出 ${visibleLines.value.length} 筆 log`, 'success')
+}
+
 function clearLog(): void {
   logBuffer.value = [{ id: ++_entrySeq, line: '日誌已清除', level: 'info', cls: 'info', ts: Date.now() }]
   resetPauseQueue()
@@ -683,6 +719,7 @@ defineExpose({
         </button>
         <button class="ctrl-btn" @click="clearLog">🗑 清除</button>
         <button class="ctrl-btn" @click="exportLogs">💾 匯出</button>
+        <button class="ctrl-btn" @click="exportLogsJson">📥 匯出 JSON</button>
         <button
           :class="['ctrl-btn', { 'ctrl-btn-active': showTimestamp }]"
           @click="showTimestamp = !showTimestamp"
