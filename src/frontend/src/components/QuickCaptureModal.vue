@@ -12,6 +12,11 @@ import { useQuickCapture } from '@/composables/useQuickCapture'
 import { useToast } from '@/composables/useToast'
 import { readClipboardText, isClipboardReadSupported } from '@/utils/clipboardRead'
 import { loadDraft, saveDraft, clearDraft } from '@/utils/captureDraft'
+import {
+  isSpeechRecognitionSupported,
+  createSpeechRecognition,
+  type SpeechRecognitionWrapper,
+} from '@/utils/speechRecognition'
 
 const props = defineProps<{
   currentContext: string
@@ -22,6 +27,10 @@ const toast = useToast()
 
 const text = ref('')
 const taRef = ref<HTMLTextAreaElement | null>(null)
+
+// ── Voice input state ─────────────────────────────────────────────────────
+const recording = ref(false)
+const recognition = ref<SpeechRecognitionWrapper | null>(null)
 
 // Debounce timer handle for draft autosave.
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -79,7 +88,42 @@ function handleSave(): void {
 }
 
 function handleClose(): void {
+  // Stop any active recording before dismissing.
+  if (recording.value) {
+    recognition.value?.stop()
+    recording.value = false
+  }
   close()
+}
+
+function toggleMic(): void {
+  if (recording.value) {
+    recognition.value?.stop()
+    recording.value = false
+    return
+  }
+
+  const wrapper = createSpeechRecognition('zh-TW')
+  if (!wrapper) {
+    toast.warning('此瀏覽器不支援語音輸入')
+    return
+  }
+
+  wrapper.onResult = (txt: string) => {
+    if (!txt) return
+    text.value = text.value ? `${text.value}\n${txt}` : txt
+  }
+  wrapper.onError = (msg: string) => {
+    toast.warning(`語音識別錯誤: ${msg}`)
+    recording.value = false
+  }
+  wrapper.onEnd = () => {
+    recording.value = false
+  }
+
+  recognition.value = wrapper
+  wrapper.start()
+  recording.value = true
 }
 
 async function onPaste(): Promise<void> {
@@ -138,6 +182,18 @@ function handleKeydown(e: KeyboardEvent): void {
               @click="onPaste"
             >
               📋 貼上
+            </button>
+            <button
+              class="qcm-mic"
+              :class="{ 'is-recording': recording }"
+              :disabled="!isSpeechRecognitionSupported()"
+              :title="isSpeechRecognitionSupported() ? (recording ? '停止語音輸入' : '開始語音輸入') : '此瀏覽器不支援語音輸入'"
+              type="button"
+              :aria-pressed="recording"
+              aria-label="語音輸入"
+              @click="toggleMic"
+            >
+              🎤 {{ recording ? '錄音中...' : '語音' }}
             </button>
           </div>
           <textarea
@@ -354,6 +410,52 @@ function handleKeydown(e: KeyboardEvent): void {
   cursor: not-allowed;
 }
 
+/* ── Mic button ─────────────────────────────────────────────────────────── */
+
+.qcm-mic {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  border-radius: 0.375rem;
+  color: var(--color-muted, #6c7086);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.25rem 0.5rem;
+  line-height: 1.5;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.qcm-mic:hover:not(:disabled) {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-accent, #89b4fa);
+  background: rgba(137, 180, 250, 0.08);
+}
+
+.qcm-mic:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.qcm-mic.is-recording {
+  color: #f38ba8;
+  border-color: #f38ba8;
+  background: rgba(243, 139, 168, 0.1);
+  animation: mic-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes mic-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
 /* ── Char counter ───────────────────────────────────────────────────────── */
 
 .qcm-char-count {
@@ -377,9 +479,15 @@ function handleKeydown(e: KeyboardEvent): void {
   .qc-btn,
   .qc-textarea,
   .qcm-paste,
+  .qcm-mic,
   .qcm-char-count {
     transition: none;
     animation: none;
+  }
+
+  /* Keep red border as the only recording indicator when motion is reduced */
+  .qcm-mic.is-recording {
+    opacity: 1;
   }
 }
 </style>
