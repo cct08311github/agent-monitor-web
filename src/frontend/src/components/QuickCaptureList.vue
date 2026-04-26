@@ -21,6 +21,7 @@ import { buildCaptureBackup, parseCaptureBackup, restoreCaptureBackup } from '@/
 import { isClipboardWriteSupported, writeClipboardText } from '@/utils/clipboardWrite'
 import { formatCaptureForClipboard } from '@/utils/captureFormat'
 import { useToast } from '@/composables/useToast'
+import { applyTagRename, applyTagRemove } from '@/utils/captureTagRename'
 import { fuzzyScore } from '@/utils/fuzzyScore'
 import { partition } from '@/utils/capturePins'
 import { filterByDateRange, RANGE_LABELS } from '@/utils/captureDateFilter'
@@ -52,6 +53,9 @@ const dateRange = ref<DateRange>('all')
 
 // Tag filtering
 const selectedTag = ref<string | null>(null)
+
+// Tag context menu: stores the tag name whose menu is open, or null
+const tagMenuOpen = ref<string | null>(null)
 
 // Search
 const searchQuery = ref('')
@@ -199,6 +203,41 @@ function clearTagFilter(): void {
   selectedTag.value = null
 }
 
+function handleTagRename(oldTag: string): void {
+  const newTag = window.prompt(`重新命名 #${oldTag} 為:`, oldTag)
+  if (!newTag || newTag.trim() === '' || newTag.trim() === oldTag) return
+  const trimmed = newTag.trim()
+  const results = applyTagRename(captures.value, oldTag, trimmed)
+  if (!results.length) {
+    useToast().info('沒有需要更新的 capture')
+    return
+  }
+  if (!window.confirm(`將更新 ${results.length} 筆 capture，是否繼續？`)) return
+  for (const r of results) {
+    update(r.id, r.newBody)
+  }
+  useToast().success(`已將 #${oldTag} 重命名為 #${trimmed} (${results.length} 筆)`)
+  if (selectedTag.value?.toLowerCase() === oldTag.toLowerCase()) {
+    selectedTag.value = trimmed.toLowerCase()
+  }
+}
+
+function handleTagRemove(tag: string): void {
+  const results = applyTagRemove(captures.value, tag)
+  if (!results.length) {
+    useToast().info('沒有需要更新的 capture')
+    return
+  }
+  if (!window.confirm(`將從 ${results.length} 筆 capture 中移除 #${tag}，是否繼續？`)) return
+  for (const r of results) {
+    update(r.id, r.newBody)
+  }
+  useToast().success(`已從 ${results.length} 筆 capture 中移除 #${tag}`)
+  if (selectedTag.value?.toLowerCase() === tag.toLowerCase()) {
+    selectedTag.value = null
+  }
+}
+
 const dialogRef = ref<HTMLDivElement | null>(null)
 const trap = createFocusTrap()
 
@@ -214,9 +253,14 @@ watch(isListOpen, async (visible) => {
   }
 })
 
+function closeTagMenu(): void {
+  tagMenuOpen.value = null
+}
+
 onUnmounted(() => {
   trap.deactivate()
   window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('click', closeTagMenu)
 })
 
 function handleClose(): void {
@@ -379,6 +423,7 @@ function onKeydown(e: KeyboardEvent): void {
 
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
+  window.addEventListener('click', closeTagMenu)
 })
 
 function onDownload(): void {
@@ -570,14 +615,41 @@ function onImport(e: Event): void {
             class="tag-chip tag-chip--reset"
             @click="clearTagFilter"
           >全部</button>
-          <button
+          <span
             v-for="t in tags"
             :key="t.tag"
-            class="tag-chip"
-            :class="{ 'is-active': selectedTag === t.tag }"
-            :aria-pressed="selectedTag === t.tag"
-            @click="toggleTag(t.tag)"
-          >#{{ t.tag }} <span class="tag-chip__count">{{ t.count }}</span></button>
+            class="tag-chip-wrapper"
+          >
+            <button
+              class="tag-chip"
+              :class="{ 'is-active': selectedTag === t.tag }"
+              :aria-pressed="selectedTag === t.tag"
+              @click="toggleTag(t.tag)"
+            >#{{ t.tag }} <span class="tag-chip__count">{{ t.count }}</span></button>
+            <button
+              class="tag-chip-menu-btn"
+              :aria-label="`#${t.tag} 的操作選單`"
+              :title="`#${t.tag} 操作`"
+              @click.stop="tagMenuOpen = tagMenuOpen === t.tag ? null : t.tag"
+            >⋮</button>
+            <div
+              v-if="tagMenuOpen === t.tag"
+              class="tag-chip-menu"
+              role="menu"
+              :aria-label="`#${t.tag} 操作`"
+            >
+              <button
+                class="tag-chip-menu-item"
+                role="menuitem"
+                @click.stop="tagMenuOpen = null; handleTagRename(t.tag)"
+              >重新命名 #{{ t.tag }}</button>
+              <button
+                class="tag-chip-menu-item tag-chip-menu-item--danger"
+                role="menuitem"
+                @click.stop="tagMenuOpen = null; handleTagRemove(t.tag)"
+              >從 captures 中移除 #{{ t.tag }}</button>
+            </div>
+          </span>
         </div>
 
         <!-- Bulk select header row (shown when list has items) -->
@@ -1318,6 +1390,72 @@ function onImport(e: Event): void {
   opacity: 0.75;
 }
 
+/* ── Tag chip context menu ──────────────────────────────────────────────── */
+
+.tag-chip-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tag-chip-menu-btn {
+  background: none;
+  border: none;
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.7rem;
+  line-height: 1;
+  padding: 0.1875rem 0.25rem;
+  border-radius: 0 999px 999px 0;
+  margin-left: 1px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.tag-chip-menu-btn:hover {
+  color: var(--color-text, #cdd6f4);
+  background: var(--color-surface-hover, #313244);
+}
+
+.tag-chip-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 1500;
+  background: var(--color-surface, #1e1e2e);
+  border: 1px solid var(--color-border, #313244);
+  border-radius: 0.375rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem 0;
+}
+
+.tag-chip-menu-item {
+  background: none;
+  border: none;
+  color: var(--color-text, #cdd6f4);
+  cursor: pointer;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  padding: 0.375rem 0.875rem;
+  text-align: left;
+  transition: background 0.12s;
+  white-space: nowrap;
+}
+
+.tag-chip-menu-item:hover {
+  background: var(--color-surface-hover, #313244);
+}
+
+.tag-chip-menu-item--danger {
+  color: var(--red, #ef5f5f);
+}
+
+.tag-chip-menu-item--danger:hover {
+  background: rgba(239, 95, 95, 0.1);
+}
+
 /* ── Footer ─────────────────────────────────────────────────────────────── */
 
 .qcl-footer {
@@ -1709,7 +1847,9 @@ function onImport(e: Event): void {
   .qc-sort-btn,
   .qc-view-mode-btn,
   .qcl-row-checkbox,
-  .qcl-bulk-select-all {
+  .qcl-bulk-select-all,
+  .tag-chip-menu-btn,
+  .tag-chip-menu-item {
     transition: none;
     animation: none;
   }
