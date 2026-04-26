@@ -11,6 +11,7 @@ import { ref, watch, nextTick } from 'vue'
 import { useQuickCapture } from '@/composables/useQuickCapture'
 import { useToast } from '@/composables/useToast'
 import { readClipboardText, isClipboardReadSupported } from '@/utils/clipboardRead'
+import { loadDraft, saveDraft, clearDraft } from '@/utils/captureDraft'
 
 const props = defineProps<{
   currentContext: string
@@ -22,14 +23,44 @@ const toast = useToast()
 const text = ref('')
 const taRef = ref<HTMLTextAreaElement | null>(null)
 
+// Debounce timer handle for draft autosave.
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * Autosave draft with a 500 ms debounce.
+ * The timer is cleared and flushed synchronously on modal close so no
+ * pending write fires after the user has already saved/dismissed.
+ */
+watch(text, (newText) => {
+  if (debounceTimer !== null) clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => {
+    saveDraft(newText)
+    debounceTimer = null
+  }, 500)
+})
+
 // Autofocus textarea when modal opens.
-// If prefillBody is set (clone flow), populate textarea with it;
-// otherwise start with an empty textarea (normal open).
+// Clone flow (prefillBody non-empty) takes precedence over any saved draft.
+// Normal open (no prefillBody) restores the draft from localStorage.
 watch(isOpen, async (visible) => {
   if (visible) {
-    text.value = prefillBody.value
+    if (prefillBody.value) {
+      // Clone path — ignore draft; use the prefilled body.
+      text.value = prefillBody.value
+    } else {
+      // Normal open — restore draft (or start empty if no draft).
+      text.value = loadDraft()
+    }
     await nextTick()
     taRef.value?.focus()
+  } else {
+    // Modal closing without save — flush pending debounce immediately so the
+    // latest keystrokes are not lost, then cancel the timer.
+    if (debounceTimer !== null) {
+      clearTimeout(debounceTimer)
+      debounceTimer = null
+    }
+    saveDraft(text.value)
   }
 })
 
@@ -37,6 +68,12 @@ function handleSave(): void {
   const trimmed = text.value.trim()
   if (!trimmed) return
   add(trimmed, props.currentContext)
+  // Clear draft on successful save so it does not reappear next open.
+  if (debounceTimer !== null) {
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+  }
+  clearDraft()
   toast.success('💡 已捕捉')
   close()
 }
