@@ -11,6 +11,7 @@ export interface DigestData {
   errors24h: number
   activeAlerts: number
   enabledCronJobs: number
+  captureCountToday: number
 }
 
 function pad(n: number): string {
@@ -29,6 +30,7 @@ export function formatDigestForClipboard(data: DigestData): string {
     `⚠️ Errors (last 24h): ${data.errors24h}`,
     `☕ Active alerts: ${data.activeAlerts}`,
     `🕒 Cron jobs enabled: ${data.enabledCronJobs}`,
+    `📝 Captures (today): ${data.captureCountToday}`,
   ]
   return lines.join('\n')
 }
