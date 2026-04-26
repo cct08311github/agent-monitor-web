@@ -21,6 +21,10 @@ import { useActivityAccumulator } from '@/composables/useActivityAccumulator'
 import { useQuickCapture } from '@/composables/useQuickCapture'
 import type { CompareAgentLike } from '@/utils/agentCompare'
 import type { SubAgentLayout } from '@/utils/constellation'
+import AgentsInsights from '@/components/AgentsInsights.vue'
+import { useAgentAliases } from '@/composables/useAgentAliases'
+import { computeAgentsInsights } from '@/utils/agentsInsights'
+import type { AgentsInsights as AgentsInsightsType } from '@/utils/agentsInsights'
 
 const emit = defineEmits<{
   (e: 'agent-click', agentId: string): void
@@ -171,6 +175,16 @@ function closeCompare() {
   compareIds.value = null
 }
 
+// ── Agents Insights ───────────────────────────────────────────────────────
+
+const showAgentsInsights = ref(false)
+
+const { aliases: agentAliasesMap } = useAgentAliases()
+
+const agentsInsights = computed<AgentsInsightsType>(() =>
+  computeAgentsInsights(dashboard.value?.agents ?? [], agentAliasesMap.value),
+)
+
 // ── Activity Heatmap ──────────────────────────────────────────────────────────
 
 // The dashboard payload does not include historical per-day session counts,
@@ -300,7 +314,7 @@ function onActivitySelect(dateKey: string): void {
         @select="showAgentDetail"
       />
 
-      <!-- Search input -->
+      <!-- Search input + insights toggle -->
       <div class="agent-search-wrap">
         <input
           v-model="searchQuery"
@@ -309,6 +323,19 @@ function onActivitySelect(dateKey: string): void {
           placeholder="搜尋 Agent..."
           aria-label="搜尋 Agent"
         />
+        <button
+          :class="['agents-insights-btn', { active: showAgentsInsights }]"
+          :title="showAgentsInsights ? '隱藏統計' : '顯示統計'"
+          :aria-pressed="showAgentsInsights"
+          @click="showAgentsInsights = !showAgentsInsights"
+        >
+          📊 統計
+        </button>
+      </div>
+
+      <!-- Agents insights panel -->
+      <div v-if="showAgentsInsights" class="agents-insights-panel">
+        <AgentsInsights :insights="agentsInsights" />
       </div>
 
       <!-- Focus: active agents (sorted by user-defined order) -->
@@ -384,5 +411,53 @@ function onActivitySelect(dateKey: string): void {
 <style scoped>
 .heatmap-row {
   padding: 12px 0 4px;
+}
+
+/* ── Agent search wrap: flex row ─────────────────────────────────────────── */
+
+.agent-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Insights toggle button ──────────────────────────────────────────────── */
+
+.agents-insights-btn {
+  flex-shrink: 0;
+  padding: 5px 11px;
+  font-size: 12px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.agents-insights-btn:hover {
+  background: var(--surface2, rgba(255, 255, 255, 0.07));
+  color: var(--text, #e2e8f0);
+  border-color: var(--accent, #6366f1);
+}
+
+.agents-insights-btn.active {
+  background: var(--accent, #6366f1);
+  border-color: var(--accent, #6366f1);
+  color: #fff;
+}
+
+/* ── Insights panel ──────────────────────────────────────────────────────── */
+
+.agents-insights-panel {
+  margin-bottom: 14px;
+  padding: 12px 16px;
+  background: var(--surface2, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 8px;
 }
 </style>
