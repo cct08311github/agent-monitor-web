@@ -10,6 +10,7 @@ import { useToast } from '@/composables/useToast'
 import { useAlertSnooze } from '@/composables/useAlertSnooze'
 import { useBulkSelect } from '@/composables/useBulkSelect'
 import { partitionAlerts, snoozeRemainingLabel, durationLabel } from '@/utils/alertSnooze'
+import { filterAlertsByQuery } from '@/utils/alertSearchFilter'
 import { formatTs, formatExportTimestamp } from '@/lib/time'
 import { useTimezone } from '@/composables/useTimezone'
 
@@ -160,6 +161,9 @@ const alerts = ref<AlertRecord[]>([])
 const alertsLoading = ref(false)
 const alertsError = ref<string | null>(null)
 
+// Alert search
+const alertSearchQuery = ref('')
+
 // Snooze
 const { snoozes, now: snoozeNow, snooze, unsnooze } = useAlertSnooze()
 const toast = useToast()
@@ -268,9 +272,10 @@ const lastUpdatedLabel = computed(() => {
 
 // Alerts with derived id field (rule+ts) for snooze partitioning
 type AlertWithId = AlertRecord & { id: string }
-const alertsWithId = computed<AlertWithId[]>(() =>
-  alerts.value.map((a) => ({ ...a, id: `${a.rule}:${a.ts}` })),
-)
+const alertsWithId = computed<AlertWithId[]>(() => {
+  const filtered = filterAlertsByQuery(alerts.value, alertSearchQuery.value)
+  return filtered.map((a) => ({ ...a, id: `${a.rule}:${a.ts}` }))
+})
 
 const partitionedAlerts = computed(() =>
   partitionAlerts(alertsWithId.value, snoozes.value, snoozeNow.value),
@@ -953,7 +958,17 @@ onUnmounted(() => {
 
     <!-- ── Active Alerts ─────────────────────────────────────────────────── -->
     <section class="obs-section">
-      <h2 class="obs-section-title">Active Alerts</h2>
+      <div class="obs-alerts-header">
+        <h2 class="obs-section-title">Active Alerts</h2>
+        <input
+          v-model="alertSearchQuery"
+          type="search"
+          placeholder="搜尋 alert…"
+          class="alert-search"
+          data-testid="alert-search-input"
+          aria-label="搜尋 alert"
+        />
+      </div>
 
       <!-- Error state -->
       <div v-if="alertsError" class="obs-error-state">
@@ -1991,5 +2006,38 @@ onUnmounted(() => {
 
 .obs-tr--selected:hover {
   background: var(--color-accent-subtle-hover, rgba(59, 130, 246, 0.13));
+}
+
+/* ── Alerts header (title + search row) ──────────────────────────────────── */
+
+.obs-alerts-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.alert-search {
+  flex: 1;
+  min-width: 160px;
+  max-width: 280px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border, #444);
+  background: var(--color-surface-2, #2a2a2a);
+  color: var(--color-text, #e0e0e0);
+  font-size: 13px;
+  height: 30px;
+  transition: border-color 0.15s;
+}
+
+.alert-search:focus {
+  outline: 2px solid var(--color-accent, #3b82f6);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+.alert-search::placeholder {
+  color: var(--color-text-muted, #888);
 }
 </style>
