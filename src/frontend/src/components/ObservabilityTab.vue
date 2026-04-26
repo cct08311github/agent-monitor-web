@@ -2,11 +2,13 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import Skeleton from './Skeleton.vue'
 import SnoozeMenu from './SnoozeMenu.vue'
+import BulkActionBar from './BulkActionBar.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { api } from '@/composables/useApi'
 import { showToast } from '@/composables/useToast'
 import { useToast } from '@/composables/useToast'
 import { useAlertSnooze } from '@/composables/useAlertSnooze'
+import { useBulkSelect } from '@/composables/useBulkSelect'
 import { partitionAlerts, snoozeRemainingLabel, durationLabel } from '@/utils/alertSnooze'
 import { formatTs, formatExportTimestamp } from '@/lib/time'
 import { useTimezone } from '@/composables/useTimezone'
@@ -163,6 +165,9 @@ const { snoozes, now: snoozeNow, snooze, unsnooze } = useAlertSnooze()
 const toast = useToast()
 const snoozedExpanded = ref(false)
 
+// Bulk select
+const bulk = useBulkSelect()
+
 // Alert config / thresholds state
 const alertConfig = ref<AlertConfig | null>(null)
 const configLoading = ref(false)
@@ -269,6 +274,21 @@ const alertsWithId = computed<AlertWithId[]>(() =>
 
 const partitionedAlerts = computed(() =>
   partitionAlerts(alertsWithId.value, snoozes.value, snoozeNow.value),
+)
+
+// Keep bulk allIds in sync with the current active alert list
+watch(
+  () => partitionedAlerts.value.active.map((a) => a.id),
+  (ids) => {
+    bulk.setAllIds(ids)
+    // Remove any selected ids that are no longer in the active list
+    const idSet = new Set(ids)
+    const pruned = new Set([...bulk.selected.value].filter((id) => idSet.has(id)))
+    if (pruned.size !== bulk.selected.value.size) {
+      bulk.selected.value = pruned
+    }
+  },
+  { immediate: true },
 )
 
 // ---------------------------------------------------------------------------
@@ -439,6 +459,38 @@ async function saveConfig(): Promise<void> {
 function resetConfig(): void {
   if (!alertConfig.value) return
   editedConfig.value = JSON.parse(JSON.stringify(alertConfig.value)) as AlertConfig
+}
+
+// ---------------------------------------------------------------------------
+// Bulk snooze handler
+// ---------------------------------------------------------------------------
+
+function onBulkSnooze(durationMs: number): void {
+  const ids = [...bulk.selected.value]
+  for (const id of ids) {
+    snooze(id, durationMs)
+  }
+  const label = durationLabel(durationMs)
+  toast.success(`已 snooze ${ids.length} 個 alert (${label})`)
+  bulk.clear()
+}
+
+function onRowCheckboxClick(e: MouseEvent, id: string): void {
+  bulk.toggle(id, { shift: e.shiftKey })
+}
+
+function onHeaderCheckboxClick(): void {
+  if (bulk.allSelected.value) {
+    bulk.clear()
+  } else {
+    bulk.selectAll()
+  }
+}
+
+function onEscKey(e: KeyboardEvent): void {
+  if (e.key === 'Escape' && bulk.count.value > 0) {
+    bulk.clear()
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -657,15 +709,24 @@ onMounted(() => {
   }
   void refresh()
   if (autoRefresh.value) startAutoRefresh()
+  document.addEventListener('keydown', onEscKey)
 })
 
 onUnmounted(() => {
   stopAutoRefresh()
+  document.removeEventListener('keydown', onEscKey)
 })
 </script>
 
 <template>
   <div class="obs-tab">
+    <!-- Bulk action bar (teleported to body) -->
+    <BulkActionBar
+      :count="bulk.count.value"
+      @snooze="onBulkSnooze"
+      @clear="bulk.clear"
+    />
+
     <!-- Header -->
     <div class="obs-header">
       <span class="obs-updated">
@@ -924,6 +985,16 @@ onUnmounted(() => {
         <table class="obs-table">
           <thead>
             <tr>
+              <th class="obs-th obs-th--checkbox">
+                <input
+                  type="checkbox"
+                  class="obs-checkbox"
+                  :checked="bulk.allSelected.value"
+                  :indeterminate.prop="bulk.someSelected.value"
+                  aria-label="選取全部 alert"
+                  @click="onHeaderCheckboxClick"
+                />
+              </th>
               <th class="obs-th">Time</th>
               <th class="obs-th">Rule</th>
               <th class="obs-th">Severity</th>
@@ -932,7 +1003,21 @@ onUnmounted(() => {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="a in partitionedAlerts.active" :key="a.id" class="obs-tr">
+            <tr
+              v-for="a in partitionedAlerts.active"
+              :key="a.id"
+              class="obs-tr"
+              :class="{ 'obs-tr--selected': bulk.isSelected(a.id) }"
+            >
+              <td class="obs-td obs-td--checkbox">
+                <input
+                  type="checkbox"
+                  class="obs-checkbox"
+                  :checked="bulk.isSelected(a.id)"
+                  :aria-label="`選取 ${a.rule}`"
+                  @click="onRowCheckboxClick($event, a.id)"
+                />
+              </td>
               <td class="obs-td obs-td--mono">{{ fmtTime(a.ts) }}</td>
               <td class="obs-td obs-td--mono obs-td--rule">{{ a.rule }}</td>
               <td class="obs-td">
@@ -1195,7 +1280,7 @@ onUnmounted(() => {
                   <input
                     type="checkbox"
                     :checked="rule.enabled"
-                    class="obs-checkbox"
+                    class="obs-checkbox obs-checkbox--threshold"
                     :aria-label="`Toggle ${key}`"
                     @change="rule.enabled = ($event.target as HTMLInputElement).checked"
                   />
@@ -1887,5 +1972,24 @@ onUnmounted(() => {
   font-size: 12px;
   color: var(--color-text-muted, #888);
   white-space: nowrap;
+}
+
+/* ── Bulk select — checkbox column ───────────────────────────────────────── */
+
+.obs-th--checkbox,
+.obs-td--checkbox {
+  width: 32px;
+  min-width: 32px;
+  padding: 8px 6px 8px 12px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.obs-tr--selected {
+  background: var(--color-accent-subtle, rgba(59, 130, 246, 0.08));
+}
+
+.obs-tr--selected:hover {
+  background: var(--color-accent-subtle-hover, rgba(59, 130, 246, 0.13));
 }
 </style>
