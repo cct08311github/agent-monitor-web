@@ -32,6 +32,7 @@ import {
   installOnboardingAutoStart,
   teardownOnboardingAutoStart,
 } from '@/composables/useOnboardingTour'
+import { bootstrapPalette } from '@/composables/useColorPalette'
 import {
   installMessageRateTicker,
   teardownMessageRateTicker,
@@ -244,6 +245,7 @@ watch(
 )
 
 onMounted(() => {
+  bootstrapPalette()
   installNotificationBadge()
   installMessageRateTicker()
   void fetchBadgeCounts()
