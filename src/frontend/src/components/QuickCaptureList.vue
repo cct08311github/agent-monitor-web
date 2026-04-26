@@ -16,6 +16,7 @@ import { useBulkSelect } from '@/composables/useBulkSelect'
 import { createFocusTrap } from '@/lib/focusTrap'
 import { tagCounts, captureHasTag } from '@/utils/quickCaptureTags'
 import { buildExport } from '@/utils/quickCaptureExport'
+import { buildCaptureBackup, parseCaptureBackup, restoreCaptureBackup } from '@/utils/captureExportJson'
 import { isClipboardWriteSupported, writeClipboardText } from '@/utils/clipboardWrite'
 import { formatCaptureForClipboard } from '@/utils/captureFormat'
 import { useToast } from '@/composables/useToast'
@@ -394,6 +395,64 @@ function onDownload(): void {
   }
   useToast().success(`已匯出 ${captures.value.length} 筆 captures`)
 }
+
+// ---------------------------------------------------------------------------
+// JSON backup export/import
+// ---------------------------------------------------------------------------
+
+const importFileRef = ref<HTMLInputElement | null>(null)
+
+function onExportJson(): void {
+  const { filename, content } = buildCaptureBackup({
+    captures: captures.value,
+    archivedIds: archivedCaptures.value.map((c) => c.id),
+    pinnedIds: pinnedIds.value,
+  })
+  const blob = new Blob([content], { type: 'application/json;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  try {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.style.display = 'none'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+  useToast().success('已匯出 capture 備份')
+}
+
+function onImportJsonClick(): void {
+  importFileRef.value?.click()
+}
+
+function onImport(e: Event): void {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  // Reset so the same file can be re-selected after a failed import
+  input.value = ''
+  const reader = new FileReader()
+  reader.onload = (ev) => {
+    const text = ev.target?.result
+    if (typeof text !== 'string') {
+      useToast().error('無法讀取檔案')
+      return
+    }
+    const backup = parseCaptureBackup(text)
+    if (!backup) {
+      useToast().error('檔案格式錯誤')
+      return
+    }
+    if (!window.confirm(`將覆蓋目前所有 captures，繼續？\n\n備份包含 ${backup.captures.length} 筆 captures`)) return
+    restoreCaptureBackup(backup)
+    useToast().info(`已還原 ${backup.captures.length} 筆 capture，重新整理頁面...`)
+    setTimeout(() => { window.location.reload() }, 800)
+  }
+  reader.readAsText(file)
+}
 </script>
 
 <template>
@@ -425,6 +484,25 @@ function onDownload(): void {
               aria-label="匯出所有 captures 為 Markdown 檔案"
               @click="onDownload"
             >📥 匯出 .md</button>
+            <button
+              class="qcl-download-btn"
+              :disabled="!captures.length"
+              aria-label="匯出 captures 為 JSON 備份檔"
+              @click="onExportJson"
+            >📥 匯出 JSON</button>
+            <button
+              class="qcl-download-btn"
+              aria-label="從 JSON 備份檔匯入 captures"
+              @click="onImportJsonClick"
+            >📤 匯入 JSON</button>
+            <input
+              ref="importFileRef"
+              type="file"
+              accept=".json,application/json"
+              style="display:none"
+              aria-hidden="true"
+              @change="onImport"
+            />
             <button
               class="qcl-close-btn"
               aria-label="關閉 quick capture 列表"
