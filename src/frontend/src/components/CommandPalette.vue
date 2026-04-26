@@ -7,6 +7,7 @@ import { createFocusTrap } from '@/lib/focusTrap'
 import { useToast } from '@/composables/useToast'
 import { loadHistory, recordCommand, pickRecents } from '@/utils/commandHistory'
 import { fuzzyMatch } from '@/utils/fuzzyScore'
+import { groupByCategory } from '@/utils/commandGroups'
 
 const toast = useToast()
 
@@ -15,6 +16,12 @@ const toast = useToast()
 // ---------------------------------------------------------------------------
 
 const FAVORITES_KEY = 'oc_palette_favorites'
+
+/**
+ * Preferred category display order for non-search mode.
+ * Categories not listed here are appended at the end in insertion order.
+ */
+const CATEGORY_ORDER: ReadonlyArray<string> = ['Navigation', 'Actions', 'Shortcut']
 
 // ---------------------------------------------------------------------------
 // Props & emits
@@ -276,42 +283,40 @@ const filteredCommands = computed<Command[]>(() => {
   )
 })
 
-/** Group filtered commands by category, preserving insertion order.
+/** Group filtered commands by category.
  *  When query is empty: Favorites group first (if any), then Recent group (if any),
- *  then remaining category groups.
- *  When query is non-empty: category groups only, no Favorites/Recent groups. */
+ *  then category groups in CATEGORY_ORDER (remaining categories appended after).
+ *  When query is non-empty: flat fuzzy-sorted list — no Favorites/Recent/grouping. */
 const groupedCommands = computed<Array<{ category: string; commands: Command[] }>>(() => {
   const q = query.value.trim()
-  const groups = new Map<string, Command[]>()
 
-  if (!q) {
-    // Synthetic Favorites group first (when favorites exist)
-    if (favoriteCommands.value.length > 0) {
-      groups.set('Favorites', [...favoriteCommands.value])
-    }
-
-    // Synthetic Recent group next (when recents exist)
-    if (recentCommands.value.length > 0) {
-      groups.set('Recent', [...recentCommands.value])
-    }
+  if (q) {
+    // Search mode: return as a single flat group (no header needed — template handles flat list)
+    return filteredCommands.value.length > 0
+      ? [{ category: '', commands: filteredCommands.value }]
+      : []
   }
 
-  // Build remaining groups from filteredCommands (non-recent when query empty)
+  // Non-search mode: build ordered groups
+  const result: Array<{ category: string; commands: Command[] }> = []
+
+  // 1. Favorites group (synthetic, shown above everything else)
+  if (favoriteCommands.value.length > 0) {
+    result.push({ category: 'Favorites', commands: [...favoriteCommands.value] })
+  }
+
+  // 2. Recent group (synthetic, shown after Favorites)
+  if (recentCommands.value.length > 0) {
+    result.push({ category: 'Recent', commands: [...recentCommands.value] })
+  }
+
+  // 3. Remaining commands (excluding recents) grouped by category in CATEGORY_ORDER
   const recentIdSet = new Set(recentIds.value)
-  const commandsToGroup = !q
-    ? allCommands.value.filter((cmd) => !recentIdSet.has(cmd.id))
-    : filteredCommands.value
+  const nonRecent = allCommands.value.filter((cmd) => !recentIdSet.has(cmd.id))
+  const categoryGroups = groupByCategory(nonRecent, CATEGORY_ORDER)
+  result.push(...categoryGroups)
 
-  for (const cmd of commandsToGroup) {
-    const existing = groups.get(cmd.category)
-    if (existing) {
-      existing.push(cmd)
-    } else {
-      groups.set(cmd.category, [cmd])
-    }
-  }
-
-  return Array.from(groups.entries()).map(([category, commands]) => ({ category, commands }))
+  return result
 })
 
 // ---------------------------------------------------------------------------
@@ -450,7 +455,7 @@ function flatIndex(cmd: Command): number {
               :key="group.category"
               class="cp-group"
             >
-              <div class="cp-group-header">{{ group.category }}</div>
+              <div v-if="group.category" class="cp-group-header">{{ group.category }}</div>
               <button
                 v-for="cmd in group.commands"
                 :key="cmd.id"
