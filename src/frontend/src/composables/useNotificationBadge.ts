@@ -22,6 +22,7 @@
 import { ref, watch } from 'vue'
 import type { WatchStopHandle } from 'vue'
 import { isQuietNow } from '@/composables/useQuietHours'
+import { useDesktopNotify } from '@/composables/useDesktopNotify'
 
 // ---------------------------------------------------------------------------
 // Module-scoped state — shared across all useNotificationBadge() calls
@@ -44,7 +45,8 @@ let _originalFaviconHref: string | null = null
 export interface NotificationBadgeApi {
   unreadCount: typeof unreadCount
   baseTitle: typeof baseTitle
-  increment: (n?: number) => void
+  /** Increment the unread count and optionally send a desktop notification. */
+  increment: (n?: number, alertMessage?: string) => void
   clear: () => void
   setBaseTitle: (t: string) => void
 }
@@ -53,9 +55,14 @@ export function useNotificationBadge(): NotificationBadgeApi {
   return {
     unreadCount,
     baseTitle,
-    increment: (n = 1) => {
+    increment: (n = 1, alertMessage?: string) => {
       if (typeof document !== 'undefined' && document.hidden && !isQuietNow()) {
         unreadCount.value += n
+        // Also push an OS-level desktop notification when user has opted in
+        useDesktopNotify().send(
+          'Agent Monitor',
+          alertMessage ?? '新警示已觸發',
+        )
       }
     },
     clear: () => {

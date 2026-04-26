@@ -20,6 +20,7 @@ import { useTimezone } from '@/composables/useTimezone'
 import { useWorkspaceMenu } from '@/composables/useWorkspaceMenu'
 import { useQuickCapture } from '@/composables/useQuickCapture'
 import { useThemeScheduleSetting } from '@/composables/useThemeScheduleSetting'
+import { useDesktopNotify } from '@/composables/useDesktopNotify'
 
 const { isOpen, close } = useKeyboardShortcutsHelp()
 const { restart: restartTour } = useOnboardingTour()
@@ -32,6 +33,32 @@ const { mode: tzMode, toggle: toggleTz } = useTimezone()
 const { open: openWorkspaceMenu } = useWorkspaceMenu()
 const { openList: openCaptureList, captures: quickCaptures } = useQuickCapture()
 const { open: openThemeSchedule } = useThemeScheduleSetting()
+const {
+  enabled: desktopEnabled,
+  permission: desktopPermission,
+  isUnsupported: desktopUnsupported,
+  toggle: toggleDesktopNotify,
+} = useDesktopNotify()
+
+const desktopLabel = computed(() => {
+  if (desktopUnsupported.value) return '不支援'
+  if (desktopPermission.value === 'denied') return '已拒絕'
+  if (desktopEnabled.value) return '已啟用'
+  return '未啟用'
+})
+
+async function handleToggleDesktopNotify(): Promise<void> {
+  const { ok, reason } = await toggleDesktopNotify()
+  if (ok) {
+    toast.success(`桌面通知已${desktopEnabled.value ? '啟用' : '關閉'}`)
+  } else if (reason === 'denied') {
+    toast.warning('已被拒絕，請至 browser 設定中允許通知')
+  } else if (reason === 'unsupported') {
+    toast.info('此瀏覽器不支援桌面通知')
+  } else {
+    toast.info('已關閉通知請求')
+  }
+}
 
 function handleOpenWorkspaceMenu(): void {
   close()
@@ -199,6 +226,13 @@ onUnmounted(() => {
             </button>
             <button class="ksh-theme-schedule-btn" @click="handleOpenThemeSchedule">
               🕒 主題排程
+            </button>
+            <button
+              class="ksh-desktop-notify-btn"
+              :disabled="desktopUnsupported"
+              @click="handleToggleDesktopNotify"
+            >
+              🖥 桌面通知 {{ desktopLabel }}
             </button>
           </div>
         </div>
@@ -519,6 +553,28 @@ onUnmounted(() => {
 .ksh-theme-schedule-btn:hover {
   color: var(--color-text, #cdd6f4);
   border-color: var(--color-text, #cdd6f4);
+}
+
+.ksh-desktop-notify-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.375rem;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.5;
+}
+
+.ksh-desktop-notify-btn:hover:not(:disabled) {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-text, #cdd6f4);
+}
+
+.ksh-desktop-notify-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* ── Reduced motion ─────────────────────────────────────────────────────── */
