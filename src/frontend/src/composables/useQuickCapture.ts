@@ -39,6 +39,12 @@ const captures = ref<Capture[]>(loadCaptures())
 const archivedIds = ref<Set<string>>(loadArchived())
 const pinnedIds = ref<string[]>(loadPins())
 
+/**
+ * Body text to pre-fill the QuickCaptureModal when opened via clone.
+ * Empty string means no pre-fill (normal open).
+ */
+const prefillBody = ref<string>('')
+
 let installed = false
 let keydownHandler: ((e: KeyboardEvent) => void) | null = null
 
@@ -73,11 +79,18 @@ export function useQuickCapture() {
     pinnedIds,
     activeCaptures,
     archivedCaptures,
+    prefillBody,
     open: () => {
+      isOpen.value = true
+    },
+    /** Open the modal with a pre-filled body (for clone). */
+    openWithPrefill: (body: string): void => {
+      prefillBody.value = body
       isOpen.value = true
     },
     close: () => {
       isOpen.value = false
+      prefillBody.value = ''
     },
     openList: () => {
       refreshFromStorage()
