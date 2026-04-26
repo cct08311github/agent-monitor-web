@@ -9,6 +9,7 @@
 import { watch, nextTick, onUnmounted, ref, computed } from 'vue'
 import { useKeyboardShortcutsHelp } from '@/composables/useKeyboardShortcutsHelp'
 import { groupByCategory, SHORTCUTS } from '@/data/keyboardShortcuts'
+import { fuzzyScore } from '@/utils/fuzzyScore'
 import { createFocusTrap } from '@/lib/focusTrap'
 import { useOnboardingTour } from '@/composables/useOnboardingTour'
 import { useQuietHoursSetting } from '@/composables/useQuietHoursSetting'
@@ -21,6 +22,7 @@ import { useWorkspaceMenu } from '@/composables/useWorkspaceMenu'
 import { useQuickCapture } from '@/composables/useQuickCapture'
 import { useThemeScheduleSetting } from '@/composables/useThemeScheduleSetting'
 import { useDesktopNotify } from '@/composables/useDesktopNotify'
+import EmptyState from '@/components/EmptyState.vue'
 
 const { isOpen, close } = useKeyboardShortcutsHelp()
 const { restart: restartTour } = useOnboardingTour()
@@ -108,10 +110,23 @@ function handleOpenWhatsNew(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Grouped shortcut data (static — no filtering needed here; HelpModal handles search)
+// Search / fuzzy filter
 // ---------------------------------------------------------------------------
 
-const grouped = groupByCategory(SHORTCUTS)
+const query = ref('')
+const searchInput = ref<HTMLInputElement | null>(null)
+
+const filteredShortcuts = computed(() => {
+  const q = query.value.trim()
+  if (!q) return SHORTCUTS
+  return SHORTCUTS.filter((s) => {
+    const descScore = fuzzyScore(q, s.description)
+    const keysScore = fuzzyScore(q, s.keys.join(' '))
+    return Math.max(descScore, keysScore) > 0
+  })
+})
+
+const filteredGrouped = computed(() => groupByCategory(filteredShortcuts.value))
 
 // ---------------------------------------------------------------------------
 // Focus trap
@@ -122,11 +137,12 @@ const trap = createFocusTrap()
 
 watch(isOpen, async (visible) => {
   if (visible) {
+    query.value = ''
     await nextTick()
     if (dialogRef.value) {
       trap.activate(dialogRef.value, () => close())
     }
-    dialogRef.value?.focus()
+    searchInput.value?.focus()
   } else {
     trap.deactivate()
   }
@@ -151,7 +167,7 @@ onUnmounted(() => {
         aria-modal="true"
         aria-labelledby="ksh-title"
         tabindex="-1"
-        @keydown.esc.stop="close"
+        @keydown.esc.stop="query ? (query = '') : close()"
       >
         <!-- Header -->
         <div class="ksh-header">
@@ -163,10 +179,28 @@ onUnmounted(() => {
           >✕</button>
         </div>
 
+        <!-- Search -->
+        <div class="ksh-search-wrap">
+          <input
+            ref="searchInput"
+            v-model="query"
+            type="text"
+            placeholder="搜尋快捷鍵..."
+            class="ksh-search"
+            aria-label="搜尋快捷鍵"
+          />
+        </div>
+
         <!-- Body: category groups -->
         <div class="ksh-body">
+          <EmptyState
+            v-if="!filteredShortcuts.length"
+            variant="generic"
+            title="找不到符合的快捷鍵"
+            description="試試其他關鍵字或描述"
+          />
           <div
-            v-for="[category, entries] in grouped"
+            v-for="[category, entries] in filteredGrouped"
             :key="category"
             class="ksh-group"
           >
@@ -300,6 +334,34 @@ onUnmounted(() => {
 .ksh-close-btn:hover {
   color: var(--color-text, #cdd6f4);
   background: var(--color-surface-hover, #313244);
+}
+
+/* ── Search ─────────────────────────────────────────────────────────────── */
+
+.ksh-search-wrap {
+  padding: 0.625rem 1.25rem 0;
+  flex-shrink: 0;
+}
+
+.ksh-search {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--color-surface-raised, #181825);
+  border: 1px solid var(--color-border, #313244);
+  border-radius: 0.5rem;
+  color: var(--color-text, #cdd6f4);
+  font-size: 0.875rem;
+  padding: 0.4rem 0.75rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.ksh-search::placeholder {
+  color: var(--color-muted, #6c7086);
+}
+
+.ksh-search:focus {
+  border-color: var(--color-accent, #89b4fa);
 }
 
 /* ── Body / groups ──────────────────────────────────────────────────────── */
