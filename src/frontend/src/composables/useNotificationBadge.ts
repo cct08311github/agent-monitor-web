@@ -21,6 +21,7 @@
 
 import { ref, watch } from 'vue'
 import type { WatchStopHandle } from 'vue'
+import { isQuietNow } from '@/composables/useQuietHours'
 
 // ---------------------------------------------------------------------------
 // Module-scoped state — shared across all useNotificationBadge() calls
@@ -53,7 +54,7 @@ export function useNotificationBadge(): NotificationBadgeApi {
     unreadCount,
     baseTitle,
     increment: (n = 1) => {
-      if (typeof document !== 'undefined' && document.hidden) {
+      if (typeof document !== 'undefined' && document.hidden && !isQuietNow()) {
         unreadCount.value += n
       }
     },
