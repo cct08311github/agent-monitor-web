@@ -22,6 +22,7 @@ import { useWorkspaceMenu } from '@/composables/useWorkspaceMenu'
 import { useQuickCapture } from '@/composables/useQuickCapture'
 import { useThemeScheduleSetting } from '@/composables/useThemeScheduleSetting'
 import { useDesktopNotify } from '@/composables/useDesktopNotify'
+import { useSettingsBackupMenu } from '@/composables/useSettingsBackupMenu'
 import EmptyState from '@/components/EmptyState.vue'
 
 const { isOpen, close } = useKeyboardShortcutsHelp()
@@ -35,6 +36,7 @@ const { mode: tzMode, toggle: toggleTz } = useTimezone()
 const { open: openWorkspaceMenu } = useWorkspaceMenu()
 const { openList: openCaptureList, captures: quickCaptures } = useQuickCapture()
 const { open: openThemeSchedule } = useThemeScheduleSetting()
+const { open: openSettingsBackup } = useSettingsBackupMenu()
 const {
   enabled: desktopEnabled,
   permission: desktopPermission,
@@ -75,6 +77,11 @@ function handleOpenCaptureList(): void {
 function handleOpenThemeSchedule(): void {
   close()
   openThemeSchedule()
+}
+
+function handleOpenSettingsBackup(): void {
+  close()
+  openSettingsBackup()
 }
 
 const tzLabel = computed(() => (tzMode.value === 'utc' ? 'UTC' : '本地時間'))
@@ -267,6 +274,9 @@ onUnmounted(() => {
               @click="handleToggleDesktopNotify"
             >
               🖥 桌面通知 {{ desktopLabel }}
+            </button>
+            <button class="ksh-backup-btn" @click="handleOpenSettingsBackup">
+              💾 設定備份
             </button>
           </div>
         </div>
@@ -637,6 +647,23 @@ onUnmounted(() => {
 .ksh-desktop-notify-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.ksh-backup-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.375rem;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.5;
+}
+
+.ksh-backup-btn:hover {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-text, #cdd6f4);
 }
 
 /* ── Reduced motion ─────────────────────────────────────────────────────── */
