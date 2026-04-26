@@ -14,6 +14,8 @@ import {
 } from '@/utils/savedSearches'
 import { buildLogsJson } from '@/utils/logsJsonExport'
 import { buildLogsCsv } from '@/utils/logsCsvExport'
+import { computeLogsInsights } from '@/utils/logsInsights'
+import LogsInsights from '@/components/LogsInsights.vue'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -142,6 +144,20 @@ const {
 
 /** Whether to show HH:mm:ss timestamp prefix on each log line */
 const showTimestamp = ref(true)
+
+/** Whether the insights panel is visible */
+const showLogsInsights = ref(false)
+
+/** Analytical insights derived from currently visible log lines */
+const logsInsights = computed(() =>
+  computeLogsInsights(
+    visibleLines.value.map((entry) => ({
+      ts: entry.ts,
+      level: entry.level,
+      message: entry.line,
+    })),
+  ),
+)
 
 // ---------------------------------------------------------------------------
 // DOM refs
@@ -716,6 +732,9 @@ defineExpose({
   regexError,
   compiledRegex,
   visibleLines,
+  // insights seam
+  showLogsInsights,
+  logsInsights,
   // preset seam
   presets,
   selectedPresetId,
@@ -757,6 +776,14 @@ defineExpose({
           title="切換時間戳顯示"
         >
           🕐
+        </button>
+        <button
+          :class="['ctrl-btn', { 'ctrl-btn-active': showLogsInsights }]"
+          @click="showLogsInsights = !showLogsInsights"
+          title="顯示日誌統計分析"
+          :aria-pressed="showLogsInsights"
+        >
+          📊
         </button>
         <div class="log-search-wrap">
           <input
@@ -856,6 +883,9 @@ defineExpose({
         </button>
       </div>
     </div>
+
+    <!-- Logs insights panel -->
+    <LogsInsights v-if="showLogsInsights" :insights="logsInsights" />
 
     <!-- Status bar -->
     <div style="padding:4px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
