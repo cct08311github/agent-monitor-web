@@ -18,6 +18,7 @@ import {
   type SpeechRecognitionWrapper,
 } from '@/utils/speechRecognition'
 import { wrapSelection, prependLine } from '@/utils/markdownInsert'
+import { CAPTURE_TEMPLATES, type CaptureTemplate } from '@/data/captureTemplates'
 
 const props = defineProps<{
   currentContext: string
@@ -197,6 +198,10 @@ function insertList(): void {
 function handleKeydown(e: KeyboardEvent): void {
   if (e.key === 'Escape') {
     e.stopPropagation()
+    if (showTemplateMenu.value) {
+      showTemplateMenu.value = false
+      return
+    }
     handleClose()
     return
   }
@@ -205,6 +210,25 @@ function handleKeydown(e: KeyboardEvent): void {
     e.preventDefault()
     handleSave()
   }
+}
+
+// ── Template dropdown ─────────────────────────────────────────────────────
+
+const showTemplateMenu = ref(false)
+
+function toggleTemplateMenu(): void {
+  showTemplateMenu.value = !showTemplateMenu.value
+}
+
+function applyTemplate(t: CaptureTemplate): void {
+  if (text.value.trim() && !window.confirm('將覆蓋目前內容，繼續？')) {
+    showTemplateMenu.value = false
+    return
+  }
+  text.value = t.body
+  toast.info(`已套用模板: ${t.name}`)
+  showTemplateMenu.value = false
+  nextTick(() => taRef.value?.focus())
 }
 </script>
 
@@ -267,6 +291,36 @@ function handleKeydown(e: KeyboardEvent): void {
             <button class="qcm-md-btn qcm-md-btn--wide" type="button" title="清單 (List)" @click="insertList">
               - 清單
             </button>
+
+            <!-- Template dropdown -->
+            <div class="qcm-tpl-wrapper" aria-haspopup="true" :aria-expanded="showTemplateMenu">
+              <button
+                class="qcm-md-btn qcm-md-btn--wide qcm-tpl-trigger"
+                type="button"
+                title="套用模板"
+                :class="{ 'is-active': showTemplateMenu }"
+                @click="toggleTemplateMenu"
+              >
+                📋 模板
+              </button>
+              <ul
+                v-if="showTemplateMenu"
+                class="qcm-tpl-menu"
+                role="menu"
+                aria-label="預設模板"
+              >
+                <li
+                  v-for="tpl in CAPTURE_TEMPLATES"
+                  :key="tpl.id"
+                  role="menuitem"
+                  class="qcm-tpl-item"
+                  @click="applyTemplate(tpl)"
+                >
+                  <span class="qcm-tpl-emoji">{{ tpl.emoji }}</span>
+                  <span class="qcm-tpl-name">{{ tpl.name }}</span>
+                </li>
+              </ul>
+            </div>
           </div>
 
           <textarea
@@ -589,6 +643,59 @@ function handleKeydown(e: KeyboardEvent): void {
   outline-offset: 1px;
 }
 
+/* ── Template dropdown ──────────────────────────────────────────────────── */
+
+.qcm-tpl-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.qcm-tpl-trigger.is-active {
+  color: var(--color-accent, #89b4fa);
+  border-color: var(--color-accent, #89b4fa);
+  background: rgba(137, 180, 250, 0.1);
+}
+
+.qcm-tpl-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 10;
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+  min-width: 10rem;
+  background: var(--color-surface, #1e1e2e);
+  border: 1px solid var(--color-border, #313244);
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.qcm-tpl-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: var(--color-text, #cdd6f4);
+  white-space: nowrap;
+  transition: background 0.12s;
+}
+
+.qcm-tpl-item:hover {
+  background: rgba(137, 180, 250, 0.1);
+}
+
+.qcm-tpl-emoji {
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.qcm-tpl-name {
+  font-weight: 500;
+}
+
 /* ── Reduced motion ─────────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
@@ -599,7 +706,8 @@ function handleKeydown(e: KeyboardEvent): void {
   .qcm-paste,
   .qcm-mic,
   .qcm-char-count,
-  .qcm-md-btn {
+  .qcm-md-btn,
+  .qcm-tpl-item {
     transition: none;
     animation: none;
   }
