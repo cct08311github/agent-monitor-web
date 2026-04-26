@@ -74,3 +74,70 @@ describe('useQuickCapture', () => {
     expect(captures.value).toHaveLength(0)
   })
 })
+
+// ---------------------------------------------------------------------------
+// Clone / prefill tests (Issue #558)
+// ---------------------------------------------------------------------------
+
+describe('useQuickCapture — prefill / clone', () => {
+  it('prefillBody initialises to empty string', () => {
+    const { prefillBody, close } = useQuickCapture()
+    // Ensure any stale state is reset first
+    close()
+    expect(prefillBody.value).toBe('')
+  })
+
+  it('openWithPrefill sets prefillBody and opens the modal', () => {
+    const { openWithPrefill, prefillBody, isOpen, close } = useQuickCapture()
+    close() // ensure closed to start
+
+    openWithPrefill('hello world')
+
+    expect(prefillBody.value).toBe('hello world')
+    expect(isOpen.value).toBe(true)
+
+    // Cleanup
+    close()
+  })
+
+  it('close resets prefillBody to empty string', () => {
+    const { openWithPrefill, close, prefillBody } = useQuickCapture()
+
+    openWithPrefill('some template text')
+    expect(prefillBody.value).toBe('some template text')
+
+    close()
+
+    expect(prefillBody.value).toBe('')
+    expect(useQuickCapture().isOpen.value).toBe(false)
+  })
+
+  it('multiple openWithPrefill calls update prefillBody each time', () => {
+    const { openWithPrefill, prefillBody, close } = useQuickCapture()
+
+    openWithPrefill('first')
+    expect(prefillBody.value).toBe('first')
+    close()
+
+    openWithPrefill('second')
+    expect(prefillBody.value).toBe('second')
+    close()
+
+    openWithPrefill('third')
+    expect(prefillBody.value).toBe('third')
+    close()
+  })
+
+  it('open (without prefill) does not change prefillBody — composable works normally', () => {
+    const { open, prefillBody, isOpen, close } = useQuickCapture()
+    close() // ensure prefillBody is ''
+
+    open()
+
+    // open() does not touch prefillBody — stays ''
+    expect(prefillBody.value).toBe('')
+    expect(isOpen.value).toBe(true)
+
+    close()
+  })
+})

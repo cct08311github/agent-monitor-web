@@ -25,7 +25,7 @@ import { loadSortOrder, saveSortOrder } from '@/utils/captureSortPref'
 import type { SortOrder } from '@/utils/captureSortPref'
 import CaptureHeatmap from './CaptureHeatmap.vue'
 
-const { isListOpen, captures, activeCaptures, archivedCaptures, pinnedIds, closeList, remove, archive, unarchive, clear, update, togglePin, isPinned } = useQuickCapture()
+const { isListOpen, captures, activeCaptures, archivedCaptures, pinnedIds, closeList, remove, archive, unarchive, clear, update, togglePin, isPinned, openWithPrefill } = useQuickCapture()
 
 // Inline edit state
 const editingId = ref<string | null>(null)
@@ -149,6 +149,11 @@ function handleClearAll(): void {
     clear()
     showArchived.value = false
   }
+}
+
+function handleClone(c: Capture): void {
+  openWithPrefill(c.body)
+  useToast().info('已開啟新 capture，可編輯後儲存')
 }
 
 function startEdit(c: Capture): void {
@@ -357,6 +362,12 @@ function onDownload(): void {
                       :title="isPinned(capture.id) ? '取消釘選' : '釘選'"
                       @click="handlePin(capture)"
                     >📌</button>
+                    <button
+                      class="qcl-clone-btn"
+                      :aria-label="`複製為新 capture：${capture.body.slice(0, 30)}`"
+                      title="複製為新 capture"
+                      @click="handleClone(capture)"
+                    >📋</button>
                     <button
                       class="qcl-edit-btn"
                       :aria-label="`編輯：${capture.body.slice(0, 30)}`"
@@ -911,6 +922,25 @@ function onDownload(): void {
   border-left: 3px solid var(--color-accent, #89b4fa);
 }
 
+/* ── Clone button ───────────────────────────────────────────────────────── */
+
+.qcl-clone-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.25rem;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.5;
+}
+
+.qcl-clone-btn:hover {
+  color: var(--color-accent, #89b4fa);
+  border-color: var(--color-accent, #89b4fa);
+}
+
 /* ── Archive button ─────────────────────────────────────────────────────── */
 
 .qcl-archive-btn {
@@ -1001,6 +1031,7 @@ function onDownload(): void {
   .qcl-download-btn,
   .qcl-delete-btn,
   .qcl-edit-btn,
+  .qcl-clone-btn,
   .qcl-pin-btn,
   .qcl-archive-btn,
   .qcl-archive-toggle-btn,

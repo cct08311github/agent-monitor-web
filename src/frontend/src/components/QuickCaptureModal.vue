@@ -15,16 +15,18 @@ const props = defineProps<{
   currentContext: string
 }>()
 
-const { isOpen, close, add } = useQuickCapture()
+const { isOpen, close, add, prefillBody } = useQuickCapture()
 const toast = useToast()
 
 const text = ref('')
 const taRef = ref<HTMLTextAreaElement | null>(null)
 
-// Autofocus textarea when modal opens; clear text when it closes
+// Autofocus textarea when modal opens.
+// If prefillBody is set (clone flow), populate textarea with it;
+// otherwise start with an empty textarea (normal open).
 watch(isOpen, async (visible) => {
   if (visible) {
-    text.value = ''
+    text.value = prefillBody.value
     await nextTick()
     taRef.value?.focus()
   }
