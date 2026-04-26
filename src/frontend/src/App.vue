@@ -54,6 +54,12 @@ import {
 import { useAgentAliases } from '@/composables/useAgentAliases'
 import { useThemeSchedule } from '@/composables/useThemeSchedule'
 import ThemeScheduleSetting from '@/components/ThemeScheduleSetting.vue'
+import RecentAgentsPopover from '@/components/RecentAgentsPopover.vue'
+import {
+  useRecentAgents,
+  installRecentAgentsHotkey,
+  teardownRecentAgentsHotkey,
+} from '@/composables/useRecentAgents'
 
 const route = useRoute()
 const router = useRouter()
@@ -63,6 +69,16 @@ const { username, logout: doLogout } = useAuth()
 const { compact, toggleCompact } = useCompactMode()
 const { registerShortcut } = useKeyboardShortcuts()
 const { displayName: agentDisplayName } = useAgentAliases()
+
+// ── Recent Agents Quick-switcher ────────────────────────────────────────────
+
+const { visit: visitAgent, close: closeRecentAgents } = useRecentAgents()
+
+/** Navigate to the selected agent from the RecentAgentsPopover */
+function onSelectRecentAgent(agentId: string): void {
+  appState.currentDesktopTab = 'monitor'
+  appState.currentDetailAgentId = agentId
+}
 
 // Install the theme schedule ticker (auto-switches light/dark by time of day)
 useThemeSchedule()
@@ -289,6 +305,14 @@ watch(
   { deep: true },
 )
 
+// Record agent visits whenever currentDetailAgentId is set
+watch(
+  () => appState.currentDetailAgentId,
+  (newId) => {
+    if (newId) visitAgent(newId)
+  },
+)
+
 onMounted(() => {
   bootstrapPalette()
   installNotificationBadge()
@@ -301,6 +325,7 @@ onMounted(() => {
   installOnboardingAutoStart()
   installWhatsNewAutoOpen()
   installQuickCaptureHotkey()
+  installRecentAgentsHotkey()
 })
 
 onUnmounted(() => {
@@ -315,6 +340,7 @@ onUnmounted(() => {
   teardownOnboardingAutoStart()
   teardownWhatsNewAutoOpen()
   teardownQuickCaptureHotkey()
+  teardownRecentAgentsHotkey()
 })
 
 // ── Compact mode keyboard shortcut ─────────────────────────────────────────
@@ -540,6 +566,11 @@ registerShortcut({
     <QuickCaptureModal :current-context="captureContext" />
     <QuickCaptureList />
     <ThemeScheduleSetting />
+    <RecentAgentsPopover
+      :current-agent-id="appState.currentDetailAgentId || null"
+      @select="onSelectRecentAgent"
+      @close="closeRecentAgents"
+    />
 
     <!-- Konami Code Easter Egg -->
     <div v-if="celebrating" class="konami-celebrate" aria-hidden="true">

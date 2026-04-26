@@ -54,6 +54,16 @@ export const SHORTCUTS: ReadonlyArray<ShortcutEntry> = [
     category: '一般',
   },
   {
+    keys: ['⌘', 'J'],
+    description: '最近 agent 快速切換（macOS）',
+    category: '導航',
+  },
+  {
+    keys: ['Ctrl', 'J'],
+    description: '最近 agent 快速切換（Windows / Linux）',
+    category: '導航',
+  },
+  {
     keys: ['/'],
     description: '聚焦搜尋欄（Logs / TaskHub / Cron）',
     category: '一般',
