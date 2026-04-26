@@ -6,11 +6,14 @@
  * Supports per-item delete (with confirm) and "clear all" (with confirm).
  * Tag chips bar above list allows filtering by #hashtag.
  * Esc or backdrop click closes the modal.
+ * 📥 Download button exports all captures as a grouped Markdown file.
  */
 import { watch, nextTick, onUnmounted, ref, computed } from 'vue'
 import { useQuickCapture } from '@/composables/useQuickCapture'
 import { createFocusTrap } from '@/lib/focusTrap'
 import { tagCounts, captureHasTag } from '@/utils/quickCaptureTags'
+import { buildExport } from '@/utils/quickCaptureExport'
+import { useToast } from '@/composables/useToast'
 import type { Capture } from '@/utils/quickCapture'
 
 const { isListOpen, captures, closeList, remove, clear } = useQuickCapture()
@@ -72,6 +75,24 @@ function handleClearAll(): void {
 function formatTime(ts: number): string {
   return new Date(ts).toLocaleString()
 }
+
+function onDownload(): void {
+  const { filename, content } = buildExport(captures.value)
+  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  try {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.style.display = 'none'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+  useToast().success(`已匯出 ${captures.value.length} 筆 captures`)
+}
 </script>
 
 <template>
@@ -96,11 +117,19 @@ function formatTime(ts: number): string {
             💡 已捕捉的想法
             <span class="qcl-count">({{ captures.length }})</span>
           </h2>
-          <button
-            class="qcl-close-btn"
-            aria-label="關閉 quick capture 列表"
-            @click="handleClose"
-          >✕</button>
+          <div class="qcl-header-actions">
+            <button
+              class="qcl-download-btn"
+              :disabled="!captures.length"
+              aria-label="匯出所有 captures 為 Markdown 檔案"
+              @click="onDownload"
+            >📥 匯出 .md</button>
+            <button
+              class="qcl-close-btn"
+              aria-label="關閉 quick capture 列表"
+              @click="handleClose"
+            >✕</button>
+          </div>
         </div>
 
         <!-- Tag chips bar (only shown when tags exist) -->
@@ -215,6 +244,35 @@ function formatTime(ts: number): string {
   font-size: 0.8125rem;
   font-weight: 400;
   color: var(--color-muted, #6c7086);
+}
+
+.qcl-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.qcl-download-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  padding: 0.2rem 0.625rem;
+  border-radius: 0.375rem;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+
+.qcl-download-btn:hover:not(:disabled) {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-accent, #89b4fa);
+}
+
+.qcl-download-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .qcl-close-btn {
@@ -400,6 +458,7 @@ function formatTime(ts: number): string {
   .qcl-overlay,
   .qcl-dialog,
   .qcl-close-btn,
+  .qcl-download-btn,
   .qcl-delete-btn,
   .qcl-clear-btn,
   .tag-chip {
