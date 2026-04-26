@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { appState } from '@/stores/appState'
 import { useDashboard } from '@/composables/useDashboard'
 import { formatFreshnessLabel } from '@/lib/freshness'
+import { useAgentOrder } from '@/composables/useAgentOrder'
 import AgentMinimap from '@/components/AgentMinimap.vue'
 import AgentFocus from '@/components/AgentFocus.vue'
 import AgentPeriphery from '@/components/AgentPeriphery.vue'
@@ -78,6 +79,26 @@ const {
   dataAge,
   freshness,
 } = useDashboard()
+
+// ── Agent order (drag-to-reorder) ────────────────────────────────────────────
+
+const { sortedView, seedFromAgents } = useAgentOrder()
+
+// Seed on first agent arrival so initial server order is preserved
+watch(
+  () => (dashboard.value?.agents ?? []).length,
+  () => {
+    const allAgents = dashboard.value?.agents ?? []
+    if (allAgents.length > 0) {
+      seedFromAgents(allAgents)
+    }
+  },
+  { immediate: true },
+)
+
+// Sorted active / inactive views exposed to child components
+const sortedActiveAgents = computed(() => sortedView(activeAgents.value))
+const sortedInactiveAgents = computed(() => sortedView(inactiveAgents.value))
 
 // ── Search ───────────────────────────────────────────────────────────────────
 
@@ -268,9 +289,9 @@ const heatmapData = computed<Map<string, number> | null>(() => {
         />
       </div>
 
-      <!-- Focus: active agents -->
+      <!-- Focus: active agents (sorted by user-defined order) -->
       <AgentFocus
-        :agents="activeAgents"
+        :agents="sortedActiveAgents"
         :get-agent-cost="getAgentCost"
         @agent-click="showAgentDetail"
         @agent-chat="(id: string) => emit('agent-chat', id)"
@@ -278,9 +299,9 @@ const heatmapData = computed<Map<string, number> | null>(() => {
         @agent-compare="(idA: string, idB: string) => openCompare(idA, idB)"
       />
 
-      <!-- Periphery: idle/dormant agents -->
+      <!-- Periphery: idle/dormant agents (sorted by user-defined order) -->
       <AgentPeriphery
-        :agents="inactiveAgents"
+        :agents="sortedInactiveAgents"
         :get-agent-cost="getAgentCost"
         @agent-click="showAgentDetail"
       />
