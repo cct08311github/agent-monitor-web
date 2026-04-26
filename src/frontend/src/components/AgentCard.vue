@@ -7,6 +7,7 @@ import { appState } from '@/stores/appState'
 import { showToast } from '@/composables/useToast'
 import AgentQuickDiagnose from '@/components/AgentQuickDiagnose.vue'
 import { useAgentAliases } from '@/composables/useAgentAliases'
+import { hasAgentNotes, agentNotesLength } from '@/utils/agentNotesIndicator'
 
 const { displayName } = useAgentAliases()
 
@@ -32,6 +33,11 @@ const mood = computed(() => {
     currentTask: ext['currentTask'] as { task?: string } | undefined,
   })
 })
+
+const notesIndicator = computed(() => ({
+  has: hasAgentNotes(props.agent.id),
+  len: agentNotesLength(props.agent.id),
+}))
 
 function handleCardClick() {
   emit('click', props.agent.id)
@@ -139,12 +145,21 @@ function onCompareClick(event: MouseEvent) {
       </div>
 
       <div class="agent-card-header-right">
-        <div
-          class="agent-mood"
-          :title="mood.label + ' · ' + mood.reason"
-          :aria-label="`心情: ${mood.label} (${mood.reason})`"
-        >
-          {{ mood.emoji }}
+        <div class="agent-header-top-row">
+          <div
+            class="agent-mood"
+            :title="mood.label + ' · ' + mood.reason"
+            :aria-label="`心情: ${mood.label} (${mood.reason})`"
+          >
+            {{ mood.emoji }}
+          </div>
+          <span
+            v-if="notesIndicator.has"
+            class="agent-notes-icon"
+            :title="`有筆記 (${notesIndicator.len} 字)`"
+            :aria-label="`有筆記 (${notesIndicator.len} 字)`"
+            aria-hidden="false"
+          >📝</span>
         </div>
         <div
           :class="['agent-status', getStatusInfo(agent.status).dotClass]"
@@ -222,6 +237,13 @@ function onCompareClick(event: MouseEvent) {
   gap: 4px;
 }
 
+/* Row that groups mood emoji + notes icon side by side */
+.agent-header-top-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .agent-mood {
   font-size: 1.25rem;
   line-height: 1;
@@ -230,6 +252,16 @@ function onCompareClick(event: MouseEvent) {
   /* keep emoji crisp without layout shift */
   width: 1.5rem;
   text-align: center;
+}
+
+/* Notes indicator icon */
+.agent-notes-icon {
+  font-size: 0.75rem;
+  line-height: 1;
+  cursor: default;
+  user-select: none;
+  opacity: 0.8;
+  color: var(--accent, #3b82f6);
 }
 
 /* Compare button — hidden by default, shown on card hover or when selected */
