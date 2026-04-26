@@ -21,6 +21,8 @@ import { partition } from '@/utils/capturePins'
 import { filterByDateRange, RANGE_LABELS } from '@/utils/captureDateFilter'
 import type { DateRange } from '@/utils/captureDateFilter'
 import type { Capture } from '@/utils/quickCapture'
+import { loadSortOrder, saveSortOrder } from '@/utils/captureSortPref'
+import type { SortOrder } from '@/utils/captureSortPref'
 import CaptureHeatmap from './CaptureHeatmap.vue'
 
 const { isListOpen, captures, activeCaptures, archivedCaptures, pinnedIds, closeList, remove, archive, unarchive, clear, update, togglePin, isPinned } = useQuickCapture()
@@ -41,6 +43,18 @@ const searchQuery = ref('')
 // Archive section visibility
 const showArchived = ref(false)
 
+// Sort order: 'desc' = newest first (default), 'asc' = oldest first
+const sortOrder = ref<SortOrder>(loadSortOrder())
+
+const sortLabel = computed(() =>
+  sortOrder.value === 'desc' ? '目前：新→舊，點擊切換為舊→新' : '目前：舊→新，點擊切換為新→舊',
+)
+
+function toggleSort(): void {
+  sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
+  saveSortOrder(sortOrder.value)
+}
+
 const tags = computed(() => tagCounts(captures.value))
 
 function applyFilters(list: Capture[]): Capture[] {
@@ -59,9 +73,17 @@ function applyFilters(list: Capture[]): Capture[] {
 }
 
 const displayed = computed(() => {
-  const filtered = applyFilters([...activeCaptures.value])
-  // When no search/tag filter is active, honour pin order; otherwise keep
-  // filtered relevance order but still float pinned items to the top.
+  // Sort by createdAt first so both pinned and rest groups respect sortOrder.
+  // Search-ranked results skip the time sort (fuzzyScore already orders them).
+  const base = [...activeCaptures.value]
+  const q = searchQuery.value.trim()
+  const sorted = q
+    ? base
+    : base.sort((a, b) =>
+        sortOrder.value === 'desc' ? b.createdAt - a.createdAt : a.createdAt - b.createdAt,
+      )
+  const filtered = applyFilters(sorted)
+  // Float pinned items to the top; both groups remain in sortOrder order.
   const { pinned, rest } = partition(filtered, pinnedIds.value)
   return [...pinned, ...rest]
 })
@@ -245,6 +267,12 @@ function onDownload(): void {
           >
             <option v-for="(label, key) in RANGE_LABELS" :key="key" :value="key">{{ label }}</option>
           </select>
+          <button
+            class="qc-sort-btn"
+            :title="sortLabel"
+            :aria-label="sortLabel"
+            @click="toggleSort"
+          >{{ sortOrder === 'desc' ? '↓ 新→舊' : '↑ 舊→新' }}</button>
           <span v-if="searchQuery || selectedTag || dateRange !== 'all'" class="qcl-filter-count">
             篩選: {{ displayed.length }} / {{ activeCaptures.length }}
           </span>
@@ -943,6 +971,27 @@ function onDownload(): void {
   border-color: var(--green, #a6e3a1);
 }
 
+/* ── Sort toggle button ─────────────────────────────────────────────────── */
+
+.qc-sort-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  padding: 0.3125rem 0.625rem;
+  border-radius: 0.375rem;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.qc-sort-btn:hover {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-accent, #89b4fa);
+}
+
 /* ── Reduced motion ─────────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
@@ -962,7 +1011,8 @@ function onDownload(): void {
   .qcl-clear-btn,
   .tag-chip,
   .qc-search,
-  .qc-date-range {
+  .qc-date-range,
+  .qc-sort-btn {
     transition: none;
     animation: none;
   }
