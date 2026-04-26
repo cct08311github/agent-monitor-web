@@ -9,6 +9,7 @@ import type { SortOrder } from './captureSortPref'
 export const FILTER_DEFAULTS = {
   searchQuery: '',
   selectedTag: null as string | null,
+  selectedContext: null as string | null,
   dateRangeState: { range: 'all' } as DateRangeState,
   sortOrder: 'desc' as SortOrder,
 } as const
@@ -16,6 +17,7 @@ export const FILTER_DEFAULTS = {
 export interface FilterState {
   searchQuery: string
   selectedTag: string | null
+  selectedContext: string | null
   dateRangeState: DateRangeState
   sortOrder: SortOrder
 }
@@ -28,6 +30,7 @@ export function hasActiveFilters(state: FilterState): boolean {
   return (
     state.searchQuery.trim() !== FILTER_DEFAULTS.searchQuery
     || state.selectedTag !== FILTER_DEFAULTS.selectedTag
+    || state.selectedContext !== FILTER_DEFAULTS.selectedContext
     || state.dateRangeState.range !== 'all'
     || state.sortOrder !== FILTER_DEFAULTS.sortOrder
   )

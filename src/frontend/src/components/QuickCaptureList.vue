@@ -28,6 +28,7 @@ import { partition } from '@/utils/capturePins'
 import { filterByDateRange, RANGE_LABELS } from '@/utils/captureDateFilter'
 import type { DateRangeState } from '@/utils/captureDateFilter'
 import type { Capture } from '@/utils/quickCapture'
+import { uniqueContexts, filterByContext } from '@/utils/captureContextFilter'
 import { loadSortOrder, saveSortOrder } from '@/utils/captureSortPref'
 import type { SortOrder } from '@/utils/captureSortPref'
 import { FILTER_DEFAULTS, hasActiveFilters } from '@/utils/captureFilterDefaults'
@@ -57,6 +58,12 @@ const dateRangeState = ref<DateRangeState>({ range: 'all' })
 
 // Tag filtering
 const selectedTag = ref<string | null>(null)
+
+// Context filtering
+const selectedContext = ref<string | null>(null)
+
+// Derived list of unique contexts from all captures (dynamically updated)
+const availableContexts = computed(() => uniqueContexts(captures.value))
 
 // Tag context menu: stores the tag name whose menu is open, or null
 const tagMenuOpen = ref<string | null>(null)
@@ -91,6 +98,7 @@ const filtersActive = computed(() =>
   hasActiveFilters({
     searchQuery: searchQuery.value,
     selectedTag: selectedTag.value,
+    selectedContext: selectedContext.value,
     dateRangeState: dateRangeState.value,
     sortOrder: sortOrder.value,
   }),
@@ -99,6 +107,7 @@ const filtersActive = computed(() =>
 function clearAllFilters(): void {
   searchQuery.value = FILTER_DEFAULTS.searchQuery
   selectedTag.value = FILTER_DEFAULTS.selectedTag
+  selectedContext.value = FILTER_DEFAULTS.selectedContext
   dateRangeState.value = { range: 'all' }
   sortOrder.value = FILTER_DEFAULTS.sortOrder
   saveSortOrder(FILTER_DEFAULTS.sortOrder)
@@ -114,6 +123,7 @@ const trend = computed(() => computeWeeklyTrend(captures.value))
 function applyFilters(list: Capture[]): Capture[] {
   // Date range is applied first (broadest filter)
   list = filterByDateRange(list, dateRangeState.value)
+  list = filterByContext(list, selectedContext.value)
   if (selectedTag.value) list = list.filter((c) => captureHasTag(c, selectedTag.value!))
   const q = searchQuery.value.trim()
   if (q) {
@@ -663,6 +673,14 @@ function onImport(e: Event): void {
           >
             <option v-for="(label, key) in RANGE_LABELS" :key="key" :value="key">{{ label }}</option>
           </select>
+          <select
+            v-model="selectedContext"
+            class="qc-context-filter"
+            aria-label="依 context 篩選"
+          >
+            <option :value="null">全部 context</option>
+            <option v-for="ctx in availableContexts" :key="ctx" :value="ctx">{{ ctx }}</option>
+          </select>
           <template v-if="dateRangeState.range === 'custom'">
             <input
               v-model="dateRangeState.customFrom"
@@ -711,7 +729,7 @@ function onImport(e: Event): void {
             aria-label="清除所有篩選"
             @click="clearAllFilters"
           >清除全部篩選 ✕</button>
-          <span v-if="searchQuery || selectedTag || dateRangeState.range !== 'all'" class="qcl-filter-count">
+          <span v-if="searchQuery || selectedTag || selectedContext || dateRangeState.range !== 'all'" class="qcl-filter-count">
             篩選: {{ displayed.length }} / {{ activeCaptures.length }}
           </span>
         </div>
@@ -1451,6 +1469,24 @@ function onImport(e: Event): void {
   border-color: var(--color-accent, #89b4fa);
 }
 
+.qc-context-filter {
+  background: var(--color-surface-raised, #181825);
+  border: 1px solid var(--color-border, #313244);
+  border-radius: 0.375rem;
+  color: var(--color-text, #cdd6f4);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  padding: 0.3125rem 0.5rem;
+  outline: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+
+.qc-context-filter:focus {
+  border-color: var(--color-accent, #89b4fa);
+}
+
 .qc-custom-date {
   appearance: none;
   background: var(--color-surface-raised, #181825);
@@ -2072,6 +2108,7 @@ function onImport(e: Event): void {
   .tag-chip,
   .qc-search,
   .qc-date-range,
+  .qc-context-filter,
   .qc-custom-date,
   .qc-sort-btn,
   .qc-view-mode-btn,
