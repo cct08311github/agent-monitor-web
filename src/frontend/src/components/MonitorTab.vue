@@ -201,12 +201,21 @@ watch(
   },
 )
 
+// Incremented when user resets the heatmap accumulator, forcing recomputation
+const _heatmapResetKey = ref(0)
+
 // Compute the heatmap data from localStorage
 const heatmapData = computed<Map<string, number> | null>(() => {
   // Re-compute when dashboard updates so heatmap reflects the latest tick
   void appState.latestDashboard
+  // Re-compute when user resets accumulator
+  void _heatmapResetKey.value
   return _accumulator?.load() ?? null
 })
+
+function onHeatmapReset(): void {
+  _heatmapResetKey.value++
+}
 </script>
 
 <template>
@@ -308,7 +317,7 @@ const heatmapData = computed<Map<string, number> | null>(() => {
 
       <!-- Activity Heatmap -->
       <div class="heatmap-row">
-        <ActivityHeatmap :data="heatmapData" />
+        <ActivityHeatmap :data="heatmapData" @reset="onHeatmapReset" />
       </div>
 
       <!-- Empty state -->
