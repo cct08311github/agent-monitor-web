@@ -288,3 +288,140 @@ describe('QuickCaptureList — search', () => {
     wrapper.unmount()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Bulk select tests
+// ---------------------------------------------------------------------------
+
+// The useQuickCapture mock at the top of this file uses vi.fn() for archive,
+// remove, and togglePin — these spies are accessible via the return value of
+// the mocked composable. We can introspect calls by mounting and triggering
+// the DOM directly.
+
+describe('QuickCaptureList — bulk select', () => {
+  beforeEach(() => {
+    mockCaptures.mockReturnValue([
+      makeCapture('a1', 'First idea'),
+      makeCapture('a2', 'Second idea'),
+      makeCapture('a3', 'Third idea'),
+    ])
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  async function waitFlush(n = 3): Promise<void> {
+    for (let i = 0; i < n; i++) await Promise.resolve()
+  }
+
+  it('selecting a checkbox shows the bulk action bar', async () => {
+    const wrapper = mount(QuickCaptureList, { attachTo: document.body })
+    await waitFlush()
+
+    // Initially the bar should not be visible (count=0, v-if on Teleport inner)
+    expect(document.querySelector('[data-testid="capture-bulk-action-bar"]')).toBeNull()
+
+    // Click the first row checkbox
+    const checkboxes = document.querySelectorAll('.qcl-row-checkbox')
+    expect(checkboxes.length).toBeGreaterThan(0)
+    ;(checkboxes[0] as HTMLElement).click()
+    await waitFlush()
+
+    // The bar should now be present in the document body (Teleported)
+    const bar = document.querySelector('[data-testid="capture-bulk-action-bar"]')
+    expect(bar).not.toBeNull()
+
+    wrapper.unmount()
+  })
+
+  it('bulk archive calls archive for the selected capture', async () => {
+    const wrapper = mount(QuickCaptureList, { attachTo: document.body })
+    await waitFlush()
+
+    // Click first row checkbox to select it
+    const checkboxes = document.querySelectorAll('.qcl-row-checkbox')
+    expect(checkboxes.length).toBeGreaterThan(0)
+    ;(checkboxes[0] as HTMLElement).click()
+    await waitFlush()
+
+    // The bulk bar should be visible; click archive
+    const archiveBtn = document.querySelector(
+      '[data-testid="capture-bulk-action-bar"] button[title*="封存"]',
+    ) as HTMLElement | null
+    expect(archiveBtn).not.toBeNull()
+    archiveBtn!.click()
+    await waitFlush()
+
+    // After bulk archive, bar should disappear (selection cleared)
+    expect(document.querySelector('[data-testid="capture-bulk-action-bar"]')).toBeNull()
+
+    wrapper.unmount()
+  })
+
+  it('bulk delete with confirmed dialog removes selected captures', async () => {
+    // Provide a window.confirm stub that returns true
+    Object.defineProperty(window, 'confirm', {
+      value: vi.fn(() => true),
+      writable: true,
+      configurable: true,
+    })
+
+    const wrapper = mount(QuickCaptureList, { attachTo: document.body })
+    await waitFlush()
+
+    // Select two checkboxes
+    const checkboxes = document.querySelectorAll('.qcl-row-checkbox')
+    expect(checkboxes.length).toBeGreaterThanOrEqual(2)
+    ;(checkboxes[0] as HTMLElement).click()
+    await waitFlush()
+    ;(checkboxes[1] as HTMLElement).click()
+    await waitFlush()
+
+    // Count label should show 2 selected
+    const countHint = document.querySelector('.qcl-bulk-count-hint')
+    expect(countHint?.textContent).toContain('2')
+
+    // Click delete in bulk bar
+    const deleteBtn = document.querySelector(
+      '[data-testid="capture-bulk-action-bar"] button[title*="刪除"]',
+    ) as HTMLElement | null
+    expect(deleteBtn).not.toBeNull()
+    deleteBtn!.click()
+    await waitFlush()
+
+    // window.confirm was called
+    expect(window.confirm).toHaveBeenCalled()
+    // After delete, bar should be gone
+    expect(document.querySelector('[data-testid="capture-bulk-action-bar"]')).toBeNull()
+
+    wrapper.unmount()
+  })
+
+  it('clear button empties selection and hides bar', async () => {
+    const wrapper = mount(QuickCaptureList, { attachTo: document.body })
+    await waitFlush()
+
+    // Select a checkbox
+    const checkboxes = document.querySelectorAll('.qcl-row-checkbox')
+    expect(checkboxes.length).toBeGreaterThan(0)
+    ;(checkboxes[0] as HTMLElement).click()
+    await waitFlush()
+
+    // Bar should be visible
+    expect(document.querySelector('[data-testid="capture-bulk-action-bar"]')).not.toBeNull()
+
+    // Click clear button
+    const clearBtn = document.querySelector(
+      '[data-testid="capture-bulk-action-bar"] button[title="清除選取"]',
+    ) as HTMLElement | null
+    expect(clearBtn).not.toBeNull()
+    clearBtn!.click()
+    await waitFlush()
+
+    // Bar should now be hidden (v-if on count=0)
+    expect(document.querySelector('[data-testid="capture-bulk-action-bar"]')).toBeNull()
+
+    wrapper.unmount()
+  })
+})

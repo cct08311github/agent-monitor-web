@@ -12,6 +12,7 @@
  */
 import { watch, nextTick, onUnmounted, ref, computed } from 'vue'
 import { useQuickCapture } from '@/composables/useQuickCapture'
+import { useBulkSelect } from '@/composables/useBulkSelect'
 import { createFocusTrap } from '@/lib/focusTrap'
 import { tagCounts, captureHasTag } from '@/utils/quickCaptureTags'
 import { buildExport } from '@/utils/quickCaptureExport'
@@ -27,8 +28,15 @@ import { groupByDay } from '@/utils/captureTimeline'
 import { loadViewMode, saveViewMode } from '@/utils/captureViewMode'
 import type { ViewMode } from '@/utils/captureViewMode'
 import CaptureHeatmap from './CaptureHeatmap.vue'
+import CaptureBulkActionBar from './CaptureBulkActionBar.vue'
 
 const { isListOpen, captures, activeCaptures, archivedCaptures, pinnedIds, closeList, remove, archive, unarchive, clear, update, togglePin, isPinned, openWithPrefill } = useQuickCapture()
+
+// ---------------------------------------------------------------------------
+// Bulk selection
+// ---------------------------------------------------------------------------
+
+const bulk = useBulkSelect()
 
 // Inline edit state
 const editingId = ref<string | null>(null)
@@ -101,6 +109,66 @@ const displayed = computed(() => {
 
 const displayedArchived = computed(() => applyFilters([...archivedCaptures.value]))
 
+// Keep bulk select aware of current displayed ids
+watch(
+  displayed,
+  (list) => {
+    bulk.setAllIds(list.map((c) => c.id))
+  },
+  { immediate: true },
+)
+
+// When the list closes, clear selection
+watch(isListOpen, (open) => {
+  if (!open) bulk.clear()
+})
+
+// Whether ANY selected capture is currently archived (determines bar mode)
+const bulkHasArchived = computed(() =>
+  [...bulk.selected.value].some((id) => archivedCaptures.value.some((c) => c.id === id)),
+)
+
+function onRowCheckboxClick(e: MouseEvent, id: string): void {
+  bulk.toggle(id, { shift: e.shiftKey })
+}
+
+function onHeaderCheckboxClick(): void {
+  if (bulk.allSelected.value) {
+    bulk.clear()
+  } else {
+    bulk.selectAll()
+  }
+}
+
+function bulkArchive(): void {
+  const ids = [...bulk.selected.value]
+  for (const id of ids) archive(id)
+  useToast().info(`已封存 ${ids.length} 個 capture`)
+  bulk.clear()
+}
+
+function bulkUnarchive(): void {
+  const ids = [...bulk.selected.value]
+  for (const id of ids) unarchive(id)
+  useToast().info(`已還原 ${ids.length} 個 capture`)
+  bulk.clear()
+}
+
+function bulkTogglePin(): void {
+  const ids = [...bulk.selected.value]
+  for (const id of ids) togglePin(id)
+  useToast().info(`已切換 ${ids.length} 個 pin 狀態`)
+  bulk.clear()
+}
+
+function bulkDelete(): void {
+  const ids = [...bulk.selected.value]
+  if (!window.confirm(`確認刪除已選取的 ${ids.length} 個 capture？`)) return
+  for (const id of ids) remove(id)
+  useToast().info(`已刪除 ${ids.length} 個 capture`)
+  bulk.clear()
+}
+
 // In timeline mode: pinned items stay as a flat block at the top;
 // the rest section is grouped by day.  Partition is based on displayed.value
 // which already floats pinned to the front.
@@ -144,6 +212,15 @@ onUnmounted(() => {
 })
 
 function handleClose(): void {
+  closeList()
+}
+
+function handleEsc(): void {
+  // If a selection is active, Esc clears it first without closing the modal
+  if (bulk.count.value > 0) {
+    bulk.clear()
+    return
+  }
   closeList()
 }
 
@@ -245,7 +322,7 @@ function onDownload(): void {
         ref="dialogRef"
         class="qcl-dialog"
         tabindex="-1"
-        @keydown.esc.stop="handleClose"
+        @keydown.esc.stop="handleEsc"
       >
         <!-- Header -->
         <div class="qcl-header">
@@ -334,6 +411,37 @@ function onDownload(): void {
           >#{{ t.tag }} <span class="tag-chip__count">{{ t.count }}</span></button>
         </div>
 
+        <!-- Bulk select header row (shown when list has items) -->
+        <div v-if="displayed.length > 0" class="qcl-bulk-header">
+          <label class="qcl-bulk-select-all">
+            <input
+              type="checkbox"
+              class="qcl-bulk-checkbox"
+              :checked="bulk.allSelected.value"
+              :indeterminate.prop="bulk.someSelected.value"
+              aria-label="全選所有顯示中的 capture"
+              @click="onHeaderCheckboxClick"
+            />
+            <span class="qcl-bulk-select-all-label">
+              {{ bulk.allSelected.value ? '取消全選' : '全選' }}
+            </span>
+          </label>
+          <span v-if="bulk.count.value > 0" class="qcl-bulk-count-hint">
+            已選 {{ bulk.count.value }} / {{ displayed.length }}
+          </span>
+        </div>
+
+        <!-- Bulk action bar (Teleported to body) -->
+        <CaptureBulkActionBar
+          :count="bulk.count.value"
+          :has-archived="bulkHasArchived"
+          @archive="bulkArchive"
+          @unarchive="bulkUnarchive"
+          @pin-toggle="bulkTogglePin"
+          @delete="bulkDelete"
+          @clear="bulk.clear()"
+        />
+
         <!-- Body -->
         <div class="qcl-body">
           <!-- Empty state — no captures at all -->
@@ -360,8 +468,17 @@ function onDownload(): void {
                 :class="{
                   'qcl-item--editing': editingId === capture.id,
                   'qcl-item--pinned': isPinned(capture.id),
+                  'qcl-item--selected': bulk.isSelected(capture.id),
                 }"
               >
+                <!-- Row checkbox -->
+                <input
+                  type="checkbox"
+                  class="qcl-row-checkbox"
+                  :checked="bulk.isSelected(capture.id)"
+                  :aria-label="`選取：${capture.body.slice(0, 30)}`"
+                  @click="(e) => onRowCheckboxClick(e as MouseEvent, capture.id)"
+                />
                 <div class="qcl-item-meta">
                   <span class="qcl-item-context">{{ capture.context }}</span>
                   <span class="qcl-item-time">{{ formatTime(capture.createdAt) }}</span>
@@ -432,8 +549,19 @@ function onDownload(): void {
                     v-for="capture in pinnedDisplayed"
                     :key="capture.id"
                     class="qcl-item qcl-item--pinned"
-                    :class="{ 'qcl-item--editing': editingId === capture.id }"
+                    :class="{
+                      'qcl-item--editing': editingId === capture.id,
+                      'qcl-item--selected': bulk.isSelected(capture.id),
+                    }"
                   >
+                    <!-- Row checkbox -->
+                    <input
+                      type="checkbox"
+                      class="qcl-row-checkbox"
+                      :checked="bulk.isSelected(capture.id)"
+                      :aria-label="`選取：${capture.body.slice(0, 30)}`"
+                      @click="(e) => onRowCheckboxClick(e as MouseEvent, capture.id)"
+                    />
                     <div class="qcl-item-meta">
                       <span class="qcl-item-context">{{ capture.context }}</span>
                       <span class="qcl-item-time">{{ formatTime(capture.createdAt) }}</span>
@@ -489,8 +617,19 @@ function onDownload(): void {
                     v-for="capture in group.captures"
                     :key="capture.id"
                     class="qcl-item"
-                    :class="{ 'qcl-item--editing': editingId === capture.id }"
+                    :class="{
+                      'qcl-item--editing': editingId === capture.id,
+                      'qcl-item--selected': bulk.isSelected(capture.id),
+                    }"
                   >
+                    <!-- Row checkbox -->
+                    <input
+                      type="checkbox"
+                      class="qcl-row-checkbox"
+                      :checked="bulk.isSelected(capture.id)"
+                      :aria-label="`選取：${capture.body.slice(0, 30)}`"
+                      @click="(e) => onRowCheckboxClick(e as MouseEvent, capture.id)"
+                    />
                     <div class="qcl-item-meta">
                       <span class="qcl-item-context">{{ capture.context }}</span>
                       <span class="qcl-item-time">{{ formatTime(capture.createdAt) }}</span>
@@ -1226,6 +1365,73 @@ function onDownload(): void {
   border-bottom: 1px dashed var(--color-border, #313244);
 }
 
+/* ── Bulk select header row ─────────────────────────────────────────────── */
+
+.qcl-bulk-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.375rem 1.25rem 0;
+  flex-shrink: 0;
+}
+
+.qcl-bulk-select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--color-muted, #6c7086);
+  user-select: none;
+}
+
+.qcl-bulk-select-all:hover {
+  color: var(--color-text, #cdd6f4);
+}
+
+.qcl-bulk-checkbox {
+  cursor: pointer;
+  accent-color: var(--color-accent, #89b4fa);
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.qcl-bulk-select-all-label {
+  font-size: 0.75rem;
+}
+
+.qcl-bulk-count-hint {
+  font-size: 0.7rem;
+  color: var(--color-accent, #89b4fa);
+  font-weight: 600;
+}
+
+/* ── Per-row checkbox ───────────────────────────────────────────────────── */
+
+.qcl-row-checkbox {
+  position: absolute;
+  top: 0.625rem;
+  right: 0.875rem;
+  cursor: pointer;
+  accent-color: var(--color-accent, #89b4fa);
+  width: 14px;
+  height: 14px;
+  opacity: 0.4;
+  transition: opacity 0.12s;
+}
+
+.qcl-item:hover .qcl-row-checkbox,
+.qcl-item--selected .qcl-row-checkbox {
+  opacity: 1;
+}
+
+/* Selected item highlight */
+.qcl-item--selected {
+  border-color: var(--color-accent, #89b4fa);
+  background: rgba(137, 180, 250, 0.06);
+}
+
 /* ── Reduced motion ─────────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
@@ -1248,7 +1454,9 @@ function onDownload(): void {
   .qc-search,
   .qc-date-range,
   .qc-sort-btn,
-  .qc-view-mode-btn {
+  .qc-view-mode-btn,
+  .qcl-row-checkbox,
+  .qcl-bulk-select-all {
     transition: none;
     animation: none;
   }
