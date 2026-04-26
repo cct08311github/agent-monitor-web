@@ -9,6 +9,7 @@ import { useToast } from '@/composables/useToast'
 import { useAlertSnooze } from '@/composables/useAlertSnooze'
 import { partitionAlerts, snoozeRemainingLabel, durationLabel } from '@/utils/alertSnooze'
 import { formatTs, formatExportTimestamp } from '@/lib/time'
+import { useTimezone } from '@/composables/useTimezone'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -587,9 +588,15 @@ function fmtMs(ms: number): string {
   return ms.toFixed(0) + 'ms'
 }
 
+const { format: tzFormat } = useTimezone()
+
 function fmtTime(ts: string | number): string {
   const n = typeof ts === 'string' ? Date.parse(ts) : ts
-  return formatTs(n)
+  // Use timezone-aware formatter for alert/error timestamps; fall back to
+  // formatTs (HH:mm:ss) when the epoch is invalid.
+  const formatted = tzFormat(n, { style: 'datetime' })
+  if (formatted === '') return formatTs(n)
+  return formatted
 }
 
 function truncateRequestId(id: string): string {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { buildGrid, intensityBucket, dateKey } from '@/utils/activityHeatmap'
+import { buildGrid, intensityBucket } from '@/utils/activityHeatmap'
+import { useTimezone } from '@/composables/useTimezone'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -34,6 +35,11 @@ const DAY_LABELS: Array<{ row: number; label: string }> = [
 const today = computed(() => new Date())
 
 const grid = computed(() => buildGrid(today.value, WEEKS))
+
+const { format: tzFormat } = useTimezone()
+
+/** Today's date label, respecting the user's timezone preference. */
+const todayLabel = computed(() => tzFormat(today.value, { style: 'date' }))
 
 const totalCells = WEEKS * 7
 
@@ -140,7 +146,7 @@ void totalCells
 
     <!-- Today's date key label -->
     <div class="heatmap-footer" aria-hidden="true">
-      今天: {{ dateKey(today) }}
+      今天: {{ todayLabel }}
     </div>
   </div>
 </template>
