@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { ref, watch, onBeforeUnmount, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, onMounted, nextTick } from 'vue'
 import { loadNote, saveNote, clearNote } from '@/utils/agentNotes'
+import { loadAlias } from '@/utils/agentAliases'
+import { buildExport } from '@/utils/agentNotesExport'
 import { relativeTimeFromNow } from '@/utils/relativeTime'
 import { useToast } from '@/composables/useToast'
 
@@ -128,6 +130,34 @@ function onClear(): void {
   updatedAt.value = null
   toast.info('筆記已清除')
 }
+
+// ── Download / Export ─────────────────────────────────────────────────────────
+
+const canExport = computed(() => text.value.trim().length > 0 && updatedAt.value !== null)
+
+function onDownload(): void {
+  if (!canExport.value) return
+  const alias = loadAlias(props.agentId)
+  const { filename, content } = buildExport({
+    agentId: props.agentId,
+    alias,
+    note: { text: text.value, updatedAt: updatedAt.value ?? Date.now() },
+  })
+  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  try {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.style.display = 'none'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+  toast.success(`已匯出: ${filename}`)
+}
 </script>
 
 <template>
@@ -143,14 +173,25 @@ function onClear(): void {
     ></textarea>
     <div class="agent-notes-footer">
       <span class="agent-notes-meta">{{ text.length }} 字 · 上次儲存: {{ relativeLabel }}</span>
-      <button
-        v-if="text.length > 0 || updatedAt !== null"
-        type="button"
-        class="agent-notes-clear-btn"
-        @click="onClear"
-      >
-        清除
-      </button>
+      <div class="agent-notes-actions">
+        <button
+          type="button"
+          class="agent-notes-download-btn"
+          :disabled="!canExport"
+          :title="canExport ? '下載筆記 (.md)' : '筆記為空，無法匯出'"
+          @click="onDownload"
+        >
+          📥 下載
+        </button>
+        <button
+          v-if="text.length > 0 || updatedAt !== null"
+          type="button"
+          class="agent-notes-clear-btn"
+          @click="onClear"
+        >
+          清除
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -217,8 +258,37 @@ function onClear(): void {
   white-space: nowrap;
 }
 
-.agent-notes-clear-btn {
+.agent-notes-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   flex-shrink: 0;
+}
+
+.agent-notes-download-btn {
+  background: none;
+  border: 1px solid var(--border, #45475a);
+  border-radius: 4px;
+  color: var(--text-muted, #6c7086);
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.agent-notes-download-btn:not(:disabled):hover {
+  border-color: var(--blue, #89b4fa);
+  color: var(--blue, #89b4fa);
+}
+
+.agent-notes-download-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.agent-notes-clear-btn {
   background: none;
   border: 1px solid var(--border, #45475a);
   border-radius: 4px;
