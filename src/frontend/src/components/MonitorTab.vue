@@ -9,6 +9,7 @@ import AgentFocus from '@/components/AgentFocus.vue'
 import AgentPeriphery from '@/components/AgentPeriphery.vue'
 import SubAgentGrid from '@/components/SubAgentGrid.vue'
 import SummaryCards from '@/components/SummaryCards.vue'
+import DailyDigestCard from '@/components/DailyDigestCard.vue'
 import CronTab from '@/components/CronTab.vue'
 import TaskHubTab from '@/components/TaskHubTab.vue'
 import ObservabilityTab from '@/components/ObservabilityTab.vue'
@@ -228,6 +229,9 @@ function onHeatmapReset(): void {
       :cost-range="costRange"
       @update:cost-range="costRange = $event as 'today' | 'week' | 'month' | 'all'"
     />
+
+    <!-- Daily digest card with copy button -->
+    <DailyDigestCard :dashboard="dashboard" />
 
     <!-- Sub-tab navigation -->
     <div class="sub-tabs">
