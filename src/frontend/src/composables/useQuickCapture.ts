@@ -45,6 +45,13 @@ const pinnedIds = ref<string[]>(loadPins())
  */
 const prefillBody = ref<string>('')
 
+/**
+ * Date key (YYYY-MM-DD) to jump to when the list next opens.
+ * QuickCaptureList watches this and scrolls to the target day section.
+ * Reset to null after the jump is consumed.
+ */
+const pendingJumpDate = ref<string | null>(null)
+
 let installed = false
 let keydownHandler: ((e: KeyboardEvent) => void) | null = null
 
@@ -80,6 +87,7 @@ export function useQuickCapture() {
     activeCaptures,
     archivedCaptures,
     prefillBody,
+    pendingJumpDate,
     open: () => {
       isOpen.value = true
     },
@@ -93,6 +101,12 @@ export function useQuickCapture() {
       prefillBody.value = ''
     },
     openList: () => {
+      refreshFromStorage()
+      isListOpen.value = true
+    },
+    /** Open the captures list and immediately jump to the given date. */
+    openListWithJump: (dateKey: string): void => {
+      pendingJumpDate.value = dateKey
       refreshFromStorage()
       isListOpen.value = true
     },

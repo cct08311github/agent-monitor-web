@@ -18,6 +18,7 @@ import AgentConstellation from '@/components/AgentConstellation.vue'
 import ActivityHeatmap from '@/components/ActivityHeatmap.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { useActivityAccumulator } from '@/composables/useActivityAccumulator'
+import { useQuickCapture } from '@/composables/useQuickCapture'
 import type { CompareAgentLike } from '@/utils/agentCompare'
 import type { SubAgentLayout } from '@/utils/constellation'
 
@@ -217,6 +218,14 @@ const heatmapData = computed<Map<string, number> | null>(() => {
 function onHeatmapReset(): void {
   _heatmapResetKey.value++
 }
+
+/**
+ * Handle click on an ActivityHeatmap cell.
+ * Opens the QuickCaptureList and jumps to the selected day.
+ */
+function onActivitySelect(dateKey: string): void {
+  useQuickCapture().openListWithJump(dateKey)
+}
 </script>
 
 <template>
@@ -321,7 +330,7 @@ function onHeatmapReset(): void {
 
       <!-- Activity Heatmap -->
       <div class="heatmap-row">
-        <ActivityHeatmap :data="heatmapData" @reset="onHeatmapReset" />
+        <ActivityHeatmap :data="heatmapData" @reset="onHeatmapReset" @select="onActivitySelect" />
       </div>
 
       <!-- Empty state -->
