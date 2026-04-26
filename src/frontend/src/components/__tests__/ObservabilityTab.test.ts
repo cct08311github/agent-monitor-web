@@ -665,7 +665,7 @@ describe('ObservabilityTab', () => {
     it('renders checkbox and number input for each of the 7 rules', async () => {
       const wrapper = await mountWithThresholds()
 
-      const checkboxes = wrapper.findAll('.obs-checkbox')
+      const checkboxes = wrapper.findAll('.obs-checkbox--threshold')
       const numberInputs = wrapper.findAll('.obs-number-input')
       expect(checkboxes).toHaveLength(7)
       expect(numberInputs).toHaveLength(7)
@@ -683,7 +683,7 @@ describe('ObservabilityTab', () => {
     it('Save button enables after toggling a rule enabled checkbox', async () => {
       const wrapper = await mountWithThresholds()
 
-      const firstCheckbox = wrapper.find('.obs-checkbox')
+      const firstCheckbox = wrapper.find('.obs-checkbox--threshold')
       // jsdom requires manually setting .checked before triggering 'change'
       ;(firstCheckbox.element as HTMLInputElement).checked = false
       await firstCheckbox.trigger('change')
