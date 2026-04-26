@@ -19,6 +19,7 @@ import { useSoundEffect } from '@/composables/useSoundEffect'
 import { useTimezone } from '@/composables/useTimezone'
 import { useWorkspaceMenu } from '@/composables/useWorkspaceMenu'
 import { useQuickCapture } from '@/composables/useQuickCapture'
+import { useThemeScheduleSetting } from '@/composables/useThemeScheduleSetting'
 
 const { isOpen, close } = useKeyboardShortcutsHelp()
 const { restart: restartTour } = useOnboardingTour()
@@ -30,6 +31,7 @@ const { isEnabled: soundEnabled, toggle: toggleSound } = useSoundEffect()
 const { mode: tzMode, toggle: toggleTz } = useTimezone()
 const { open: openWorkspaceMenu } = useWorkspaceMenu()
 const { openList: openCaptureList, captures: quickCaptures } = useQuickCapture()
+const { open: openThemeSchedule } = useThemeScheduleSetting()
 
 function handleOpenWorkspaceMenu(): void {
   close()
@@ -39,6 +41,11 @@ function handleOpenWorkspaceMenu(): void {
 function handleOpenCaptureList(): void {
   close()
   openCaptureList()
+}
+
+function handleOpenThemeSchedule(): void {
+  close()
+  openThemeSchedule()
 }
 
 const tzLabel = computed(() => (tzMode.value === 'utc' ? 'UTC' : '本地時間'))
@@ -189,6 +196,9 @@ onUnmounted(() => {
             </button>
             <button class="ksh-capture-btn" @click="handleOpenCaptureList">
               💡 已捕捉的想法 ({{ quickCaptures.length }})
+            </button>
+            <button class="ksh-theme-schedule-btn" @click="handleOpenThemeSchedule">
+              🕒 主題排程
             </button>
           </div>
         </div>
@@ -490,6 +500,23 @@ onUnmounted(() => {
 }
 
 .ksh-capture-btn:hover {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-text, #cdd6f4);
+}
+
+.ksh-theme-schedule-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.375rem;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.5;
+}
+
+.ksh-theme-schedule-btn:hover {
   color: var(--color-text, #cdd6f4);
   border-color: var(--color-text, #cdd6f4);
 }

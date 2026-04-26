@@ -52,6 +52,8 @@ import {
   teardownQuickCaptureHotkey,
 } from '@/composables/useQuickCapture'
 import { useAgentAliases } from '@/composables/useAgentAliases'
+import { useThemeSchedule } from '@/composables/useThemeSchedule'
+import ThemeScheduleSetting from '@/components/ThemeScheduleSetting.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -61,6 +63,9 @@ const { username, logout: doLogout } = useAuth()
 const { compact, toggleCompact } = useCompactMode()
 const { registerShortcut } = useKeyboardShortcuts()
 const { displayName: agentDisplayName } = useAgentAliases()
+
+// Install the theme schedule ticker (auto-switches light/dark by time of day)
+useThemeSchedule()
 
 const isLoginPage = computed(() => route.name === 'login')
 
@@ -534,6 +539,7 @@ registerShortcut({
     <WorkspaceProfileMenu />
     <QuickCaptureModal :current-context="captureContext" />
     <QuickCaptureList />
+    <ThemeScheduleSetting />
 
     <!-- Konami Code Easter Egg -->
     <div v-if="celebrating" class="konami-celebrate" aria-hidden="true">
