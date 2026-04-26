@@ -6,6 +6,7 @@ import { useTheme } from '@/composables/useTheme'
 import { createFocusTrap } from '@/lib/focusTrap'
 import { useToast } from '@/composables/useToast'
 import { loadHistory, recordCommand, pickRecents } from '@/utils/commandHistory'
+import { fuzzyMatch } from '@/utils/fuzzyScore'
 
 const toast = useToast()
 
@@ -266,13 +267,13 @@ const filteredCommands = computed<Command[]>(() => {
     return [...recentCommands.value, ...nonRecent]
   }
 
-  const ql = q.toLowerCase()
-  return allCommands.value.filter((cmd) => {
-    if (cmd.label.toLowerCase().includes(ql)) return true
-    if (cmd.description?.toLowerCase().includes(ql)) return true
-    if (cmd.keywords?.some((kw) => kw.toLowerCase().includes(ql))) return true
-    return false
-  })
+  // Fuzzy score-based matching: label is primary key, description is secondary (discounted)
+  return fuzzyMatch(
+    allCommands.value,
+    q,
+    (cmd) => cmd.label,
+    [(cmd) => cmd.description ?? '', (cmd) => cmd.keywords?.join(' ') ?? ''],
+  )
 })
 
 /** Group filtered commands by category, preserving insertion order.
