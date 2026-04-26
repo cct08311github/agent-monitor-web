@@ -9,14 +9,20 @@ import {
   cellSizeFor,
 } from '@/utils/heatmapRange'
 import { useTimezone } from '@/composables/useTimezone'
+import { useActivityAccumulator } from '@/composables/useActivityAccumulator'
+import { useToast } from '@/composables/useToast'
 
 // ---------------------------------------------------------------------------
-// Props
+// Props / emits
 // ---------------------------------------------------------------------------
 
 const props = defineProps<{
   /** Map of YYYY-MM-DD → daily session count. null = not yet loaded. */
   data: Map<string, number> | null
+}>()
+
+const emit = defineEmits<{
+  (e: 'reset'): void
 }>()
 
 // ---------------------------------------------------------------------------
@@ -100,6 +106,20 @@ const isEmpty = computed(() => {
   }
   return true
 })
+
+// ---------------------------------------------------------------------------
+// Reset handler
+// ---------------------------------------------------------------------------
+
+const toast = useToast()
+const accumulator = useActivityAccumulator()
+
+function onReset(): void {
+  if (!window.confirm('將清空所有累積的活躍度資料，確定？')) return
+  accumulator.reset()
+  emit('reset')
+  toast.info('已重置活躍度資料')
+}
 </script>
 
 <template>
@@ -116,6 +136,12 @@ const isEmpty = computed(() => {
           @click="setRange(opt)"
         >{{ opt }} 週</button>
       </div>
+      <button
+        class="reset-btn"
+        title="重置累積資料"
+        aria-label="重置累積資料"
+        @click="onReset"
+      >🗑</button>
       <span class="heatmap-legend" aria-hidden="true">
         <svg width="80" height="14" viewBox="0 0 80 14" class="legend-svg">
           <rect x="0"  y="0" width="12" height="12" rx="3" class="cell-l0" />
@@ -248,6 +274,34 @@ const isEmpty = computed(() => {
 
 @media (prefers-reduced-motion: reduce) {
   .range-btn {
+    transition: none;
+  }
+}
+
+/* ── Reset button ── */
+
+.reset-btn {
+  padding: 2px 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+  flex-shrink: 0;
+}
+
+.reset-btn:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reset-btn {
     transition: none;
   }
 }

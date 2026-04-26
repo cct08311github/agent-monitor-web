@@ -85,5 +85,17 @@ export function useActivityAccumulator(storage: Storage = localStorage) {
     return new Map(Object.entries(counts))
   }
 
-  return { increment, load }
+  /**
+   * Clear all accumulated data by removing the storage entry.
+   * Idempotent — safe to call multiple times.
+   */
+  function reset(): void {
+    try {
+      storage.removeItem(STORAGE_KEY)
+    } catch {
+      // Ignore storage errors (private-browsing, quota, etc.)
+    }
+  }
+
+  return { increment, load, reset }
 }

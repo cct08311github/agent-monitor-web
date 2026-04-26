@@ -94,3 +94,48 @@ describe('useActivityAccumulator', () => {
     expect(count).toBe(1)
   })
 })
+
+// ---------------------------------------------------------------------------
+// reset() tests
+// ---------------------------------------------------------------------------
+
+describe('useActivityAccumulator — reset()', () => {
+  it('reset() removes the localStorage entry', () => {
+    const { increment, reset } = useActivityAccumulator(storage)
+    increment(new Date(2026, 3, 26, 10, 0).getTime())
+    // Verify data is present before reset
+    expect(storage.getItem('oc_activity_heatmap')).not.toBeNull()
+    reset()
+    expect(storage.getItem('oc_activity_heatmap')).toBeNull()
+  })
+
+  it('reset() followed by load() returns empty Map', () => {
+    const { increment, load, reset } = useActivityAccumulator(storage)
+    increment(new Date(2026, 3, 26, 10, 0).getTime())
+    increment(new Date(2026, 3, 25, 10, 0).getTime())
+    reset()
+    expect(load().size).toBe(0)
+  })
+
+  it('reset() does not affect other oc_* keys', () => {
+    const { increment, reset } = useActivityAccumulator(storage)
+    // Seed a different oc_* key
+    storage.setItem('oc_session_bookmarks', 'bar')
+    increment(new Date(2026, 3, 26, 10, 0).getTime())
+    reset()
+    // The heatmap key should be gone
+    expect(storage.getItem('oc_activity_heatmap')).toBeNull()
+    // The other key should still be present
+    expect(storage.getItem('oc_session_bookmarks')).toBe('bar')
+  })
+
+  it('calling reset() twice is idempotent — no error thrown', () => {
+    const { increment, reset } = useActivityAccumulator(storage)
+    increment(new Date(2026, 3, 26, 10, 0).getTime())
+    expect(() => {
+      reset()
+      reset()
+    }).not.toThrow()
+    expect(storage.getItem('oc_activity_heatmap')).toBeNull()
+  })
+})
