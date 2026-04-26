@@ -16,6 +16,7 @@ import { buildExport } from '@/utils/quickCaptureExport'
 import { useToast } from '@/composables/useToast'
 import { fuzzyScore } from '@/utils/fuzzyScore'
 import type { Capture } from '@/utils/quickCapture'
+import CaptureHeatmap from './CaptureHeatmap.vue'
 
 const { isListOpen, captures, closeList, remove, clear, update } = useQuickCapture()
 
@@ -172,6 +173,11 @@ function onDownload(): void {
               @click="handleClose"
             >✕</button>
           </div>
+        </div>
+
+        <!-- Capture frequency heatmap (30 days) -->
+        <div v-if="captures.length > 0" class="qcl-heatmap-row">
+          <CaptureHeatmap :captures="captures" />
         </div>
 
         <!-- Search input -->
@@ -559,6 +565,16 @@ function onDownload(): void {
 .qcl-cancel-btn:hover {
   color: var(--color-text, #cdd6f4);
   border-color: var(--color-muted, #6c7086);
+}
+
+/* ── Heatmap row ────────────────────────────────────────────────────────── */
+
+.qcl-heatmap-row {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 1.25rem 0;
+  flex-shrink: 0;
+  overflow-x: auto;
 }
 
 /* ── Search bar ─────────────────────────────────────────────────────────── */
