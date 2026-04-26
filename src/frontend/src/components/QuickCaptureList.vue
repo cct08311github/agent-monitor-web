@@ -18,6 +18,8 @@ import { buildExport } from '@/utils/quickCaptureExport'
 import { useToast } from '@/composables/useToast'
 import { fuzzyScore } from '@/utils/fuzzyScore'
 import { partition } from '@/utils/capturePins'
+import { filterByDateRange, RANGE_LABELS } from '@/utils/captureDateFilter'
+import type { DateRange } from '@/utils/captureDateFilter'
 import type { Capture } from '@/utils/quickCapture'
 import CaptureHeatmap from './CaptureHeatmap.vue'
 
@@ -26,6 +28,9 @@ const { isListOpen, captures, activeCaptures, archivedCaptures, pinnedIds, close
 // Inline edit state
 const editingId = ref<string | null>(null)
 const editingText = ref<string>('')
+
+// Date range filtering
+const dateRange = ref<DateRange>('all')
 
 // Tag filtering
 const selectedTag = ref<string | null>(null)
@@ -39,6 +44,8 @@ const showArchived = ref(false)
 const tags = computed(() => tagCounts(captures.value))
 
 function applyFilters(list: Capture[]): Capture[] {
+  // Date range is applied first (broadest filter)
+  list = filterByDateRange(list, dateRange.value)
   if (selectedTag.value) list = list.filter((c) => captureHasTag(c, selectedTag.value!))
   const q = searchQuery.value.trim()
   if (q) {
@@ -222,7 +229,7 @@ function onDownload(): void {
           >{{ showArchived ? '隱藏已封存' : `顯示已封存 (${archivedCaptures.length})` }}</button>
         </div>
 
-        <!-- Search input -->
+        <!-- Search + Date-range filter row -->
         <div class="qcl-search-bar">
           <input
             v-model="searchQuery"
@@ -231,7 +238,14 @@ function onDownload(): void {
             placeholder="搜尋 captures..."
             aria-label="搜尋 captures"
           />
-          <span v-if="searchQuery || selectedTag" class="qcl-filter-count">
+          <select
+            v-model="dateRange"
+            class="qc-date-range"
+            aria-label="日期範圍篩選"
+          >
+            <option v-for="(label, key) in RANGE_LABELS" :key="key" :value="key">{{ label }}</option>
+          </select>
+          <span v-if="searchQuery || selectedTag || dateRange !== 'all'" class="qcl-filter-count">
             篩選: {{ displayed.length }} / {{ activeCaptures.length }}
           </span>
         </div>
@@ -264,7 +278,8 @@ function onDownload(): void {
           <template v-if="activeCaptures.length > 0 || (searchQuery || selectedTag)">
             <!-- Empty state — filter with no results (active list) -->
             <p v-if="activeCaptures.length > 0 && displayed.length === 0" class="qcl-empty">
-              <template v-if="searchQuery && selectedTag">此篩選下無 capture</template>
+              <template v-if="dateRange !== 'all' && !searchQuery && !selectedTag">此日期範圍無 capture</template>
+              <template v-else-if="searchQuery && selectedTag">此篩選下無 capture</template>
               <template v-else-if="searchQuery">無符合搜尋的 capture</template>
               <template v-else>此 tag 下無 capture</template>
             </p>
@@ -707,6 +722,24 @@ function onDownload(): void {
   border-color: var(--color-accent, #89b4fa);
 }
 
+.qc-date-range {
+  background: var(--color-surface-raised, #181825);
+  border: 1px solid var(--color-border, #313244);
+  border-radius: 0.375rem;
+  color: var(--color-text, #cdd6f4);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  padding: 0.3125rem 0.5rem;
+  outline: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+
+.qc-date-range:focus {
+  border-color: var(--color-accent, #89b4fa);
+}
+
 .qcl-filter-count {
   font-size: 0.7rem;
   color: var(--color-muted, #6c7086);
@@ -928,7 +961,8 @@ function onDownload(): void {
   .qcl-edit-textarea,
   .qcl-clear-btn,
   .tag-chip,
-  .qc-search {
+  .qc-search,
+  .qc-date-range {
     transition: none;
     animation: none;
   }
