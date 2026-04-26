@@ -45,6 +45,13 @@ import {
   teardownWhatsNewAutoOpen,
 } from '@/composables/useWhatsNew'
 import WorkspaceProfileMenu from '@/components/WorkspaceProfileMenu.vue'
+import QuickCaptureModal from '@/components/QuickCaptureModal.vue'
+import QuickCaptureList from '@/components/QuickCaptureList.vue'
+import {
+  installQuickCaptureHotkey,
+  teardownQuickCaptureHotkey,
+} from '@/composables/useQuickCapture'
+import { useAgentAliases } from '@/composables/useAgentAliases'
 
 const route = useRoute()
 const router = useRouter()
@@ -53,6 +60,7 @@ const currentThemeLabel = computed(() => currentTheme.value)
 const { username, logout: doLogout } = useAuth()
 const { compact, toggleCompact } = useCompactMode()
 const { registerShortcut } = useKeyboardShortcuts()
+const { displayName: agentDisplayName } = useAgentAliases()
 
 const isLoginPage = computed(() => route.name === 'login')
 
@@ -87,6 +95,28 @@ const activeDesktopTab = computed<DesktopTab>(() => {
   // 'detail' is a sub-state of 'monitor' — highlight monitor tab
   if (t === 'detail') return 'monitor'
   return (t as DesktopTab) ?? 'monitor'
+})
+
+/**
+ * Auto-detected context for Quick Capture.
+ * When viewing an agent detail, includes the agent's display name.
+ * Otherwise, uses the current tab name.
+ */
+const captureContext = computed<string>(() => {
+  const tab = appState.currentDesktopTab
+  if ((tab === 'detail' || tab === 'monitor') && appState.currentDetailAgentId) {
+    const name = agentDisplayName(appState.currentDetailAgentId)
+    return `AgentDetail: ${name}`
+  }
+  const TAB_LABELS: Record<string, string> = {
+    monitor: 'MonitorTab',
+    system: 'SystemTab',
+    logs: 'LogsTab',
+    chat: 'ChatTab',
+    optimize: 'OptimizeTab',
+    detail: 'AgentDetail',
+  }
+  return TAB_LABELS[tab] ?? tab
 })
 
 // ── Konami Code Easter Egg ──────────────────────────────────────────────────
@@ -265,6 +295,7 @@ onMounted(() => {
   _uninstallShortcutsHelp = installShortcutsHelpHotkey()
   installOnboardingAutoStart()
   installWhatsNewAutoOpen()
+  installQuickCaptureHotkey()
 })
 
 onUnmounted(() => {
@@ -278,6 +309,7 @@ onUnmounted(() => {
   _uninstallShortcutsHelp = null
   teardownOnboardingAutoStart()
   teardownWhatsNewAutoOpen()
+  teardownQuickCaptureHotkey()
 })
 
 // ── Compact mode keyboard shortcut ─────────────────────────────────────────
@@ -500,6 +532,8 @@ registerShortcut({
     <QuietHoursSetting />
     <WhatsNew />
     <WorkspaceProfileMenu />
+    <QuickCaptureModal :current-context="captureContext" />
+    <QuickCaptureList />
 
     <!-- Konami Code Easter Egg -->
     <div v-if="celebrating" class="konami-celebrate" aria-hidden="true">

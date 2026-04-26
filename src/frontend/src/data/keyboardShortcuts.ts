@@ -44,6 +44,16 @@ export const SHORTCUTS: ReadonlyArray<ShortcutEntry> = [
     category: '一般',
   },
   {
+    keys: ['⌘', '⇧', 'N'],
+    description: 'Quick Capture — 快速記錄想法（macOS）',
+    category: '一般',
+  },
+  {
+    keys: ['Ctrl', '⇧', 'N'],
+    description: 'Quick Capture — 快速記錄想法（Windows / Linux）',
+    category: '一般',
+  },
+  {
     keys: ['/'],
     description: '聚焦搜尋欄（Logs / TaskHub / Cron）',
     category: '一般',
