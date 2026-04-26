@@ -69,6 +69,10 @@ interface SessionSummary {
   id: string
   messageCount: number
   lastTs?: string
+  createdAt?: number | string | null
+  preview?: string | null
+  title?: string | null
+  firstMessage?: string | null
 }
 
 const sessions = ref<SessionSummary[]>([])
@@ -216,6 +220,7 @@ const filteredSessions = computed(() =>
 // ── Session bookmarks ─────────────────────────────────────────────────────────
 
 import { loadBookmarks, toggleBookmark, partition } from '@/utils/sessionBookmarks'
+import { buildSessionsCsv } from '@/utils/sessionsCsvExport'
 import AgentNotes from '@/components/AgentNotes.vue'
 import AgentStatsCard from '@/components/AgentStatsCard.vue'
 import { computeAgentStats, type AgentStats } from '@/utils/agentStats'
@@ -237,6 +242,22 @@ const sessionsInsights = computed(() =>
 
 function onToggleBookmark(sessionId: string) {
   bookmarks.value = toggleBookmark(props.agentId, sessionId)
+}
+
+function exportSessionsCsv(): void {
+  const { filename, content } = buildSessionsCsv(
+    props.agentId,
+    sessions.value,
+    bookmarks.value,
+  )
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+  showToast(`已匯出 ${sessions.value.length} 筆 session`, 'success')
 }
 
 const partitionedSessions = computed(() => partition(filteredSessions.value, bookmarks.value))
@@ -460,6 +481,13 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
             :title="showSessionsInsights ? '隱藏統計' : '顯示統計'"
             @click="showSessionsInsights = !showSessionsInsights"
           >📊 統計</button>
+          <button
+            v-if="sessions.length > 0"
+            type="button"
+            class="ctrl-btn si-toggle-btn"
+            title="匯出 Sessions CSV"
+            @click="exportSessionsCsv"
+          >📊 匯出 CSV</button>
           <input
             v-if="sessions.length > 0"
             v-model="sessionSearchQuery"
