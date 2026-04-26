@@ -16,6 +16,8 @@ import { useBulkSelect } from '@/composables/useBulkSelect'
 import { createFocusTrap } from '@/lib/focusTrap'
 import { tagCounts, captureHasTag } from '@/utils/quickCaptureTags'
 import { buildExport } from '@/utils/quickCaptureExport'
+import { isClipboardWriteSupported, writeClipboardText } from '@/utils/clipboardWrite'
+import { formatCaptureForClipboard } from '@/utils/captureFormat'
 import { useToast } from '@/composables/useToast'
 import { fuzzyScore } from '@/utils/fuzzyScore'
 import { partition } from '@/utils/capturePins'
@@ -258,6 +260,17 @@ function handleClearAll(): void {
 function handleClone(c: Capture): void {
   openWithPrefill(c.body)
   useToast().info('已開啟新 capture，可編輯後儲存')
+}
+
+async function handleCopy(c: Capture): Promise<void> {
+  const text = formatCaptureForClipboard(c)
+  const ok = await writeClipboardText(text)
+  const toast = useToast()
+  if (ok) {
+    toast.success('已複製到剪貼簿')
+  } else {
+    toast.warning('無法寫入剪貼簿')
+  }
 }
 
 function startEdit(c: Capture): void {
@@ -595,6 +608,13 @@ function onDownload(): void {
                       @click="handleClone(capture)"
                     >📋</button>
                     <button
+                      class="qcl-copy-btn"
+                      :disabled="!isClipboardWriteSupported()"
+                      :aria-label="`複製為文字：${capture.body.slice(0, 30)}`"
+                      title="複製為文字"
+                      @click="handleCopy(capture)"
+                    >🔗</button>
+                    <button
                       class="qcl-edit-btn"
                       :aria-label="`編輯：${capture.body.slice(0, 30)}`"
                       @click="startEdit(capture)"
@@ -667,6 +687,7 @@ function onDownload(): void {
                           @click="handlePin(capture)"
                         >📌</button>
                         <button class="qcl-clone-btn" :aria-label="`複製為新 capture：${capture.body.slice(0, 30)}`" title="複製為新 capture" @click="handleClone(capture)">📋</button>
+                        <button class="qcl-copy-btn" :disabled="!isClipboardWriteSupported()" :aria-label="`複製為文字：${capture.body.slice(0, 30)}`" title="複製為文字" @click="handleCopy(capture)">🔗</button>
                         <button class="qcl-edit-btn" :aria-label="`編輯：${capture.body.slice(0, 30)}`" @click="startEdit(capture)">✏️ 編輯</button>
                         <button class="qcl-archive-btn" :aria-label="`封存：${capture.body.slice(0, 30)}`" @click="handleArchive(capture)">📦 封存</button>
                         <button class="qcl-delete-btn" :aria-label="`刪除：${capture.body.slice(0, 30)}`" @click="handleDelete(capture)">✕ 刪除</button>
@@ -735,6 +756,7 @@ function onDownload(): void {
                           @click="handlePin(capture)"
                         >📌</button>
                         <button class="qcl-clone-btn" :aria-label="`複製為新 capture：${capture.body.slice(0, 30)}`" title="複製為新 capture" @click="handleClone(capture)">📋</button>
+                        <button class="qcl-copy-btn" :disabled="!isClipboardWriteSupported()" :aria-label="`複製為文字：${capture.body.slice(0, 30)}`" title="複製為文字" @click="handleCopy(capture)">🔗</button>
                         <button class="qcl-edit-btn" :aria-label="`編輯：${capture.body.slice(0, 30)}`" @click="startEdit(capture)">✏️ 編輯</button>
                         <button class="qcl-archive-btn" :aria-label="`封存：${capture.body.slice(0, 30)}`" @click="handleArchive(capture)">📦 封存</button>
                         <button class="qcl-delete-btn" :aria-label="`刪除：${capture.body.slice(0, 30)}`" @click="handleDelete(capture)">✕ 刪除</button>
@@ -1298,6 +1320,30 @@ function onDownload(): void {
   border-color: var(--color-accent, #89b4fa);
 }
 
+/* ── Copy-to-clipboard button ───────────────────────────────────────────── */
+
+.qcl-copy-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.25rem;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.5;
+}
+
+.qcl-copy-btn:hover:not(:disabled) {
+  color: var(--color-accent, #89b4fa);
+  border-color: var(--color-accent, #89b4fa);
+}
+
+.qcl-copy-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 /* ── Archive button ─────────────────────────────────────────────────────── */
 
 .qcl-archive-btn {
@@ -1525,6 +1571,7 @@ function onDownload(): void {
   .qcl-delete-btn,
   .qcl-edit-btn,
   .qcl-clone-btn,
+  .qcl-copy-btn,
   .qcl-pin-btn,
   .qcl-archive-btn,
   .qcl-archive-toggle-btn,
