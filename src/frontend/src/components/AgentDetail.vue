@@ -217,6 +217,10 @@ const filteredSessions = computed(() => {
 
 import { loadBookmarks, toggleBookmark, partition } from '@/utils/sessionBookmarks'
 import AgentNotes from '@/components/AgentNotes.vue'
+import AgentStatsCard from '@/components/AgentStatsCard.vue'
+import { computeAgentStats, type AgentStats } from '@/utils/agentStats'
+import { loadNote } from '@/utils/agentNotes'
+import { useQuickCapture } from '@/composables/useQuickCapture'
 
 const bookmarks = ref<string[]>([])
 
@@ -229,6 +233,22 @@ function onToggleBookmark(sessionId: string) {
 }
 
 const partitionedSessions = computed(() => partition(filteredSessions.value, bookmarks.value))
+
+// ── Agent stats card ──────────────────────────────────────────────────────────
+
+const { captures, pinnedIds } = useQuickCapture()
+
+const agentStats = computed<AgentStats>(() => {
+  const note = loadNote(props.agentId)
+  return computeAgentStats({
+    agentId: props.agentId,
+    displayName: currentDisplayName.value,
+    bookmarks: bookmarks.value,
+    captures: captures.value,
+    pinnedIds: pinnedIds.value,
+    notesText: note?.text ?? '',
+  })
+})
 
 // ── Model usage ───────────────────────────────────────────────────────────────
 
@@ -307,6 +327,12 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
           <span class="detail-row-label">費用</span>
           <span class="detail-row-value" style="color:var(--green)">{{ getAgentCostTWD() }}</span>
         </div>
+      </div>
+
+      <!-- Stats Card -->
+      <div class="detail-card">
+        <div class="detail-card-title">統計</div>
+        <AgentStatsCard :stats="agentStats" />
       </div>
 
       <!-- Token Card -->
