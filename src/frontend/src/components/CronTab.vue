@@ -35,6 +35,7 @@ import {
 } from '@/utils/cronArchive'
 import { CRON_FILTER_DEFAULTS, hasActiveCronFilters } from '@/utils/cronFilterDefaults'
 import { buildCronCsv } from '@/utils/cronCsvExport'
+import { buildCronJson } from '@/utils/cronJsonExport'
 import { computeUpcomingFires } from '@/utils/cronUpcoming'
 import type { UpcomingFire } from '@/utils/cronUpcoming'
 import CronUpcomingTimeline from '@/components/CronUpcomingTimeline.vue'
@@ -371,6 +372,31 @@ function exportCsv(): void {
 }
 
 // ---------------------------------------------------------------------------
+// JSON export
+// ---------------------------------------------------------------------------
+
+function exportJson(): void {
+  const { aliases } = useCronAliases()
+  const { filename, content } = buildCronJson({
+    jobs: jobs.value,
+    aliases: aliases.value,
+    tagsMap: cronTagsMap.value,
+    pinned: pinnedIds.value,
+    archived: [...archivedIds.value],
+  })
+  const blob = new Blob([content], { type: 'application/json;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  showToast(`📥 已匯出 ${jobs.value.length} 筆 cron jobs (JSON)`, 'success')
+}
+
+// ---------------------------------------------------------------------------
 // Clear all filters
 // ---------------------------------------------------------------------------
 
@@ -565,6 +591,14 @@ function getNextRunCountdown(job: CronJob): string {
           @click="exportCsv"
         >
           📊 匯出 CSV
+        </button>
+
+        <button
+          class="cron-export-json-btn"
+          title="匯出 JSON"
+          @click="exportJson"
+        >
+          📥 匯出 JSON
         </button>
 
         <button
@@ -1317,6 +1351,29 @@ function getNextRunCountdown(job: CronJob): string {
 }
 
 .cron-export-csv-btn:hover {
+  background: var(--surface2, rgba(255, 255, 255, 0.07));
+  color: var(--text, #e2e8f0);
+  border-color: var(--accent, #6366f1);
+}
+
+/* ── JSON export button ──────────────────────────────────────────── */
+
+.cron-export-json-btn {
+  padding: 5px 11px;
+  font-size: 12px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.cron-export-json-btn:hover {
   background: var(--surface2, rgba(255, 255, 255, 0.07));
   color: var(--text, #e2e8f0);
   border-color: var(--accent, #6366f1);
