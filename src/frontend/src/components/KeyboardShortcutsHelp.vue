@@ -18,6 +18,7 @@ import { useWhatsNew } from '@/composables/useWhatsNew'
 import { useSoundEffect } from '@/composables/useSoundEffect'
 import { useTimezone } from '@/composables/useTimezone'
 import { useWorkspaceMenu } from '@/composables/useWorkspaceMenu'
+import { useQuickCapture } from '@/composables/useQuickCapture'
 
 const { isOpen, close } = useKeyboardShortcutsHelp()
 const { restart: restartTour } = useOnboardingTour()
@@ -28,10 +29,16 @@ const { open: openWhatsNew } = useWhatsNew()
 const { isEnabled: soundEnabled, toggle: toggleSound } = useSoundEffect()
 const { mode: tzMode, toggle: toggleTz } = useTimezone()
 const { open: openWorkspaceMenu } = useWorkspaceMenu()
+const { openList: openCaptureList, captures: quickCaptures } = useQuickCapture()
 
 function handleOpenWorkspaceMenu(): void {
   close()
   openWorkspaceMenu()
+}
+
+function handleOpenCaptureList(): void {
+  close()
+  openCaptureList()
 }
 
 const tzLabel = computed(() => (tzMode.value === 'utc' ? 'UTC' : '本地時間'))
@@ -179,6 +186,9 @@ onUnmounted(() => {
             </button>
             <button class="ksh-workspace-btn" @click="handleOpenWorkspaceMenu">
               📦 工作區
+            </button>
+            <button class="ksh-capture-btn" @click="handleOpenCaptureList">
+              💡 已捕捉的想法 ({{ quickCaptures.length }})
             </button>
           </div>
         </div>
@@ -463,6 +473,23 @@ onUnmounted(() => {
 }
 
 .ksh-workspace-btn:hover {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-text, #cdd6f4);
+}
+
+.ksh-capture-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.375rem;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.5;
+}
+
+.ksh-capture-btn:hover {
   color: var(--color-text, #cdd6f4);
   border-color: var(--color-text, #cdd6f4);
 }
