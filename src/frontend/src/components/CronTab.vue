@@ -55,6 +55,7 @@ const searchInputRef = ref<HTMLInputElement | null>(null)
 const searchQuery = ref('')
 const filterMode = ref<'all' | 'enabled' | 'disabled'>('all')
 const sortBy = ref<'name' | 'nextRun' | 'lastRun'>('name')
+const cronPinnedOnly = ref(false)
 
 // ---------------------------------------------------------------------------
 // Cron archive
@@ -144,6 +145,11 @@ const filteredJobs = computed<CronJob[]>(() => {
   // 3. Filter by selected tag
   result = filterJobsByTag(result, cronTagsMap.value, selectedCronTag.value)
 
+  // 3b. Filter pinned only
+  if (cronPinnedOnly.value) {
+    result = result.filter((j) => pinnedIds.value.includes(j.id))
+  }
+
   // 4. Sort
   result = [...result].sort((a, b) => {
     if (sortBy.value === 'name') {
@@ -192,6 +198,7 @@ const cronFiltersActive = computed(() =>
     selectedTag: selectedCronTag.value,
     filterMode: filterMode.value,
     showArchived: showArchived.value,
+    pinnedOnly: cronPinnedOnly.value,
   }),
 )
 
@@ -431,6 +438,7 @@ function clearAllCronFilters(): void {
   selectedCronTag.value = CRON_FILTER_DEFAULTS.selectedTag
   filterMode.value = CRON_FILTER_DEFAULTS.filterMode
   showArchived.value = CRON_FILTER_DEFAULTS.showArchived
+  cronPinnedOnly.value = CRON_FILTER_DEFAULTS.pinnedOnly
   showToast('已清除所有篩選', 'info')
 }
 
@@ -596,6 +604,15 @@ function getNextRunCountdown(job: CronJob): string {
             已停用
           </button>
         </div>
+
+        <button
+          :class="['cron-pinned-only-btn', { active: cronPinnedOnly }]"
+          :aria-pressed="cronPinnedOnly"
+          title="只看釘選的 cron jobs"
+          @click="cronPinnedOnly = !cronPinnedOnly"
+        >
+          📌 只看釘選
+        </button>
 
         <select v-model="sortBy" class="cron-sort-select" aria-label="排序方式">
           <option value="name">名稱</option>
@@ -1499,6 +1516,35 @@ function getNextRunCountdown(job: CronJob): string {
 }
 
 .cron-upcoming-btn.active {
+  background: var(--accent, #6366f1);
+  border-color: var(--accent, #6366f1);
+  color: #fff;
+}
+
+/* ── Pinned-only toggle button ───────────────────────────────────── */
+
+.cron-pinned-only-btn {
+  padding: 5px 11px;
+  font-size: 12px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.cron-pinned-only-btn:hover {
+  background: var(--surface2, rgba(255, 255, 255, 0.07));
+  color: var(--text, #e2e8f0);
+  border-color: var(--accent, #6366f1);
+}
+
+.cron-pinned-only-btn.active {
   background: var(--accent, #6366f1);
   border-color: var(--accent, #6366f1);
   color: #fff;

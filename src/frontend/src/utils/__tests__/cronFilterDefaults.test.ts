@@ -7,14 +7,16 @@ const defaults: CronFilterState = {
   selectedTag: CRON_FILTER_DEFAULTS.selectedTag,
   filterMode: CRON_FILTER_DEFAULTS.filterMode,
   showArchived: CRON_FILTER_DEFAULTS.showArchived,
+  pinnedOnly: CRON_FILTER_DEFAULTS.pinnedOnly,
 }
 
 describe('CRON_FILTER_DEFAULTS', () => {
-  it('has all 4 expected keys', () => {
+  it('has all 5 expected keys', () => {
     expect(CRON_FILTER_DEFAULTS).toHaveProperty('searchQuery')
     expect(CRON_FILTER_DEFAULTS).toHaveProperty('selectedTag')
     expect(CRON_FILTER_DEFAULTS).toHaveProperty('filterMode')
     expect(CRON_FILTER_DEFAULTS).toHaveProperty('showArchived')
+    expect(CRON_FILTER_DEFAULTS).toHaveProperty('pinnedOnly')
   })
 
   it('searchQuery default is empty string', () => {
@@ -31,6 +33,10 @@ describe('CRON_FILTER_DEFAULTS', () => {
 
   it('showArchived default is false', () => {
     expect(CRON_FILTER_DEFAULTS.showArchived).toBe(false)
+  })
+
+  it('pinnedOnly default is false', () => {
+    expect(CRON_FILTER_DEFAULTS.pinnedOnly).toBe(false)
   })
 })
 
@@ -63,6 +69,26 @@ describe('hasActiveCronFilters', () => {
     expect(hasActiveCronFilters({ ...defaults, showArchived: true })).toBe(true)
   })
 
+  it('returns true when pinnedOnly is true', () => {
+    expect(hasActiveCronFilters({ ...defaults, pinnedOnly: true })).toBe(true)
+  })
+
+  it('returns false when pinnedOnly is false (at default)', () => {
+    expect(hasActiveCronFilters({ ...defaults, pinnedOnly: false })).toBe(false)
+  })
+
+  it('returns true when multiple filters deviate from defaults including pinnedOnly', () => {
+    expect(
+      hasActiveCronFilters({
+        searchQuery: 'nightly',
+        selectedTag: 'ci',
+        filterMode: 'enabled',
+        showArchived: true,
+        pinnedOnly: true,
+      }),
+    ).toBe(true)
+  })
+
   it('returns true when multiple filters deviate from defaults', () => {
     expect(
       hasActiveCronFilters({
@@ -70,6 +96,7 @@ describe('hasActiveCronFilters', () => {
         selectedTag: 'ci',
         filterMode: 'enabled',
         showArchived: true,
+        pinnedOnly: false,
       }),
     ).toBe(true)
   })

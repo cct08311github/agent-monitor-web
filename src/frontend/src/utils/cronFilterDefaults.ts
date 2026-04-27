@@ -9,6 +9,7 @@ export const CRON_FILTER_DEFAULTS = {
   selectedTag: null as string | null,
   filterMode: 'all' as 'all' | 'enabled' | 'disabled',
   showArchived: false,
+  pinnedOnly: false,
 } as const
 
 export interface CronFilterState {
@@ -16,6 +17,7 @@ export interface CronFilterState {
   selectedTag: string | null
   filterMode: 'all' | 'enabled' | 'disabled'
   showArchived: boolean
+  pinnedOnly: boolean
 }
 
 /**
@@ -28,5 +30,6 @@ export function hasActiveCronFilters(state: CronFilterState): boolean {
     || state.selectedTag !== CRON_FILTER_DEFAULTS.selectedTag
     || state.filterMode !== CRON_FILTER_DEFAULTS.filterMode
     || state.showArchived !== CRON_FILTER_DEFAULTS.showArchived
+    || state.pinnedOnly !== CRON_FILTER_DEFAULTS.pinnedOnly
   )
 }
