@@ -8,15 +8,21 @@ const defaults: FilterState = {
   selectedContext: FILTER_DEFAULTS.selectedContext,
   dateRangeState: { ...FILTER_DEFAULTS.dateRangeState },
   sortOrder: FILTER_DEFAULTS.sortOrder,
+  pinnedOnly: FILTER_DEFAULTS.pinnedOnly,
 }
 
 describe('FILTER_DEFAULTS', () => {
-  it('has all 5 expected keys', () => {
+  it('has all 6 expected keys', () => {
     expect(FILTER_DEFAULTS).toHaveProperty('searchQuery')
     expect(FILTER_DEFAULTS).toHaveProperty('selectedTag')
     expect(FILTER_DEFAULTS).toHaveProperty('selectedContext')
     expect(FILTER_DEFAULTS).toHaveProperty('dateRangeState')
     expect(FILTER_DEFAULTS).toHaveProperty('sortOrder')
+    expect(FILTER_DEFAULTS).toHaveProperty('pinnedOnly')
+  })
+
+  it('pinnedOnly default is false', () => {
+    expect(FILTER_DEFAULTS.pinnedOnly).toBe(false)
   })
 
   it('searchQuery default is empty string', () => {
@@ -73,6 +79,24 @@ describe('hasActiveFilters', () => {
     expect(hasActiveFilters({ ...defaults, sortOrder: 'asc' })).toBe(true)
   })
 
+  it('returns false when pinnedOnly is false (default)', () => {
+    expect(hasActiveFilters({ ...defaults, pinnedOnly: false })).toBe(false)
+  })
+
+  it('returns true when pinnedOnly is true', () => {
+    expect(hasActiveFilters({ ...defaults, pinnedOnly: true })).toBe(true)
+  })
+
+  it('returns true when pinnedOnly is true combined with other active filters', () => {
+    expect(
+      hasActiveFilters({
+        ...defaults,
+        pinnedOnly: true,
+        selectedTag: 'important',
+      }),
+    ).toBe(true)
+  })
+
   it('returns true when multiple filters deviate from defaults', () => {
     expect(
       hasActiveFilters({
@@ -81,6 +105,7 @@ describe('hasActiveFilters', () => {
         selectedContext: 'LogsTab',
         dateRangeState: { range: 'today' },
         sortOrder: 'asc',
+        pinnedOnly: false,
       }),
     ).toBe(true)
   })
