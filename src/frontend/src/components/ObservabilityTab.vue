@@ -15,6 +15,7 @@ import { formatTs, formatExportTimestamp } from '@/lib/time'
 import { useTimezone } from '@/composables/useTimezone'
 import { buildAlertsCsv } from '@/utils/alertsCsvExport'
 import type { AlertForCsv } from '@/utils/alertsCsvExport'
+import { buildAlertsJson } from '@/utils/alertsJsonExport'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -583,6 +584,26 @@ function exportAlertsCsv(): void {
   showToast(`已匯出 ${alertsForCsv.length} 筆 alert`, 'success')
 }
 
+function exportAlertsJson(): void {
+  const now = new Date()
+  const { filename, content } = buildAlertsJson(
+    {
+      alerts: alertsWithId.value,
+      snoozedIds: [...snoozes.value.keys()],
+      snoozes: snoozes.value,
+    },
+    now,
+  )
+  const blob = new Blob([content], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+  showToast(`已匯出 ${alertsWithId.value.length} 筆 alert (JSON)`, 'success')
+}
+
 async function refresh(): Promise<void> {
   const tasks: Promise<void>[] = [
     fetchMetrics(),
@@ -999,6 +1020,15 @@ onUnmounted(() => {
           @click="exportAlertsCsv"
         >
           📊 匯出 CSV
+        </button>
+        <button
+          class="obs-btn obs-btn--secondary obs-btn--sm"
+          :disabled="alertsWithId.length === 0"
+          data-testid="alerts-json-export"
+          title="匯出 Alerts JSON"
+          @click="exportAlertsJson"
+        >
+          📥 匯出 JSON
         </button>
       </div>
 
