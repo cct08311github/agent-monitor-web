@@ -219,12 +219,19 @@ const filteredSessions = computed(() => {
   if (sessionsBookmarkedOnly.value) {
     result = result.filter((s) => bookmarks.value.includes(s.id))
   }
+  // Sort by createdAt before bookmark partition so pinned order reflects chosen direction
+  result = [...result].sort((a, b) => {
+    const ta = a.createdAt != null ? Number(a.createdAt) : 0
+    const tb = b.createdAt != null ? Number(b.createdAt) : 0
+    return sessionsSortOrder.value === 'desc' ? tb - ta : ta - tb
+  })
   return result
 })
 
 // ── Session bookmarks ─────────────────────────────────────────────────────────
 
 import { loadBookmarks, toggleBookmark, partition } from '@/utils/sessionBookmarks'
+import { loadSessionsSortOrder, saveSessionsSortOrder, type SortOrder } from '@/utils/sessionsSortPref'
 import { buildSessionsCsv } from '@/utils/sessionsCsvExport'
 import { buildSessionsJson } from '@/utils/sessionsJsonExport'
 import { buildSessionsMarkdown } from '@/utils/sessionsMarkdownExport'
@@ -238,6 +245,12 @@ import { computeSessionsInsights } from '@/utils/sessionsInsights'
 
 const bookmarks = ref<string[]>([])
 const showSessionsInsights = ref(false)
+const sessionsSortOrder = ref<SortOrder>(loadSessionsSortOrder())
+
+function toggleSessionsSort(): void {
+  sessionsSortOrder.value = sessionsSortOrder.value === 'desc' ? 'asc' : 'desc'
+  saveSessionsSortOrder(sessionsSortOrder.value)
+}
 
 function refreshBookmarks() {
   bookmarks.value = loadBookmarks(props.agentId)
@@ -558,6 +571,13 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
             :title="sessionsBookmarkedOnly ? '顯示全部 sessions' : '只看書籤 sessions'"
             @click="sessionsBookmarkedOnly = !sessionsBookmarkedOnly"
           >⭐ 只看書籤</button>
+          <button
+            v-if="sessions.length > 0"
+            type="button"
+            class="sessions-sort-btn"
+            :title="sessionsSortOrder === 'desc' ? '目前：新→舊，點擊切換為舊→新' : '目前：舊→新，點擊切換為新→舊'"
+            @click="toggleSessionsSort"
+          >{{ sessionsSortOrder === 'desc' ? '↓ 新→舊' : '↑ 舊→新' }}</button>
         </div>
         <!-- Sessions Insights Panel -->
         <SessionsInsights v-if="showSessionsInsights" :insights="sessionsInsights" />
@@ -879,5 +899,29 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
   background: var(--accent, #6366f1);
   border-color: var(--accent, #6366f1);
   color: #fff;
+}
+
+/* ── Sessions sort toggle ─────────────────────────────────────────── */
+
+.sessions-sort-btn {
+  padding: 3px 9px;
+  font-size: 11px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.sessions-sort-btn:hover {
+  background: var(--surface2, rgba(255, 255, 255, 0.07));
+  color: var(--text, #e2e8f0);
+  border-color: var(--accent, #6366f1);
 }
 </style>
