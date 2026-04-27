@@ -36,6 +36,7 @@ import {
 import { CRON_FILTER_DEFAULTS, hasActiveCronFilters } from '@/utils/cronFilterDefaults'
 import { buildCronCsv } from '@/utils/cronCsvExport'
 import { buildCronJson } from '@/utils/cronJsonExport'
+import { buildCronMarkdown } from '@/utils/cronMarkdownExport'
 import { computeUpcomingFires } from '@/utils/cronUpcoming'
 import type { UpcomingFire } from '@/utils/cronUpcoming'
 import CronUpcomingTimeline from '@/components/CronUpcomingTimeline.vue'
@@ -397,6 +398,31 @@ function exportJson(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Markdown export
+// ---------------------------------------------------------------------------
+
+function exportMarkdown(): void {
+  const { aliases } = useCronAliases()
+  const { filename, content } = buildCronMarkdown({
+    jobs: jobs.value,
+    aliases: aliases.value,
+    tagsMap: cronTagsMap.value,
+    pinned: pinnedIds.value,
+    archived: [...archivedIds.value],
+  })
+  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  showToast(`📝 已匯出 ${jobs.value.length} 筆 cron jobs (Markdown)`, 'success')
+}
+
+// ---------------------------------------------------------------------------
 // Clear all filters
 // ---------------------------------------------------------------------------
 
@@ -599,6 +625,14 @@ function getNextRunCountdown(job: CronJob): string {
           @click="exportJson"
         >
           📥 匯出 JSON
+        </button>
+
+        <button
+          class="cron-export-md-btn"
+          title="匯出 Markdown"
+          @click="exportMarkdown"
+        >
+          📝 匯出 Markdown
         </button>
 
         <button
@@ -1374,6 +1408,29 @@ function getNextRunCountdown(job: CronJob): string {
 }
 
 .cron-export-json-btn:hover {
+  background: var(--surface2, rgba(255, 255, 255, 0.07));
+  color: var(--text, #e2e8f0);
+  border-color: var(--accent, #6366f1);
+}
+
+/* ── Markdown export button ──────────────────────────────────────── */
+
+.cron-export-md-btn {
+  padding: 5px 11px;
+  font-size: 12px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.cron-export-md-btn:hover {
   background: var(--surface2, rgba(255, 255, 255, 0.07));
   color: var(--text, #e2e8f0);
   border-color: var(--accent, #6366f1);
