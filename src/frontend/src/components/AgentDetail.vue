@@ -212,10 +212,15 @@ function runDiagnose(): void {
 import { filterSessionsByQuery } from '@/utils/sessionSearchFilter'
 
 const sessionSearchQuery = ref('')
+const sessionsBookmarkedOnly = ref(false)
 
-const filteredSessions = computed(() =>
-  filterSessionsByQuery(sessions.value, sessionSearchQuery.value),
-)
+const filteredSessions = computed(() => {
+  let result = filterSessionsByQuery(sessions.value, sessionSearchQuery.value)
+  if (sessionsBookmarkedOnly.value) {
+    result = result.filter((s) => bookmarks.value.includes(s.id))
+  }
+  return result
+})
 
 // ── Session bookmarks ─────────────────────────────────────────────────────────
 
@@ -544,6 +549,15 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
             placeholder="搜尋 session..."
             class="session-search-input"
           >
+          <button
+            v-if="sessions.length > 0"
+            type="button"
+            class="sessions-bookmark-only-btn"
+            :class="{ active: sessionsBookmarkedOnly }"
+            :aria-pressed="sessionsBookmarkedOnly"
+            :title="sessionsBookmarkedOnly ? '顯示全部 sessions' : '只看書籤 sessions'"
+            @click="sessionsBookmarkedOnly = !sessionsBookmarkedOnly"
+          >⭐ 只看書籤</button>
         </div>
         <!-- Sessions Insights Panel -->
         <SessionsInsights v-if="showSessionsInsights" :insights="sessionsInsights" />
@@ -557,7 +571,7 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
         <div v-else-if="sessions.length === 0" style="color:var(--text-muted);font-size:12px">無 session 記錄</div>
         <div v-else>
           <div
-            v-if="filteredSessions.length === 0 && sessionSearchQuery.trim().length > 0"
+            v-if="filteredSessions.length === 0 && (sessionSearchQuery.trim().length > 0 || sessionsBookmarkedOnly)"
             class="sessions-empty-search"
           >無符合 session</div>
           <!-- Pinned (bookmarked) sessions -->
@@ -835,5 +849,35 @@ const modelUsageList = computed<[string, ModelUsageEntry][]>(() => {
   min-width: 0;
   width: 180px;
   outline: none;
+}
+
+/* ── Sessions bookmarked-only toggle ─────────────────────────────── */
+
+.sessions-bookmark-only-btn {
+  padding: 3px 9px;
+  font-size: 11px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.sessions-bookmark-only-btn:hover {
+  background: var(--surface2, rgba(255, 255, 255, 0.07));
+  color: var(--text, #e2e8f0);
+  border-color: var(--accent, #6366f1);
+}
+
+.sessions-bookmark-only-btn.active {
+  background: var(--accent, #6366f1);
+  border-color: var(--accent, #6366f1);
+  color: #fff;
 }
 </style>
