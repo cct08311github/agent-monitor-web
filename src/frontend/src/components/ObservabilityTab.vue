@@ -13,6 +13,8 @@ import { partitionAlerts, snoozeRemainingLabel, durationLabel } from '@/utils/al
 import { filterAlertsByQuery } from '@/utils/alertSearchFilter'
 import { formatTs, formatExportTimestamp } from '@/lib/time'
 import { useTimezone } from '@/composables/useTimezone'
+import { buildAlertsCsv } from '@/utils/alertsCsvExport'
+import type { AlertForCsv } from '@/utils/alertsCsvExport'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -560,6 +562,27 @@ function exportJSON(category: ExportCategory): void {
   URL.revokeObjectURL(url)
 }
 
+function exportAlertsCsv(): void {
+  const now = new Date()
+  const alertsForCsv: AlertForCsv[] = alertsWithId.value.map((a) => ({
+    id: a.id,
+    rule: a.rule,
+    message: a.message,
+    level: a.severity,
+    ts: a.ts,
+  }))
+  const snoozedIds = [...snoozes.value.keys()]
+  const { filename, content } = buildAlertsCsv(alertsForCsv, snoozedIds, now)
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+  showToast(`已匯出 ${alertsForCsv.length} 筆 alert`, 'success')
+}
+
 async function refresh(): Promise<void> {
   const tasks: Promise<void>[] = [
     fetchMetrics(),
@@ -968,6 +991,15 @@ onUnmounted(() => {
           data-testid="alert-search-input"
           aria-label="搜尋 alert"
         />
+        <button
+          class="obs-btn obs-btn--secondary obs-btn--sm"
+          :disabled="alertsWithId.length === 0"
+          data-testid="alerts-csv-export"
+          title="匯出 Alerts CSV"
+          @click="exportAlertsCsv"
+        >
+          📊 匯出 CSV
+        </button>
       </div>
 
       <!-- Error state -->
