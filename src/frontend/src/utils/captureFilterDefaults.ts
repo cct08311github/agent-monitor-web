@@ -12,6 +12,7 @@ export const FILTER_DEFAULTS = {
   selectedContext: null as string | null,
   dateRangeState: { range: 'all' } as DateRangeState,
   sortOrder: 'desc' as SortOrder,
+  pinnedOnly: false,
 } as const
 
 export interface FilterState {
@@ -20,6 +21,7 @@ export interface FilterState {
   selectedContext: string | null
   dateRangeState: DateRangeState
   sortOrder: SortOrder
+  pinnedOnly: boolean
 }
 
 /**
@@ -33,5 +35,6 @@ export function hasActiveFilters(state: FilterState): boolean {
     || state.selectedContext !== FILTER_DEFAULTS.selectedContext
     || state.dateRangeState.range !== 'all'
     || state.sortOrder !== FILTER_DEFAULTS.sortOrder
+    || state.pinnedOnly !== FILTER_DEFAULTS.pinnedOnly
   )
 }

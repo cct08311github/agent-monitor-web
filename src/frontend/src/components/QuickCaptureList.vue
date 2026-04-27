@@ -76,6 +76,9 @@ const tagMenuOpen = ref<string | null>(null)
 // Search
 const searchQuery = ref('')
 
+// Pinned-only filter
+const pinnedOnly = ref(false)
+
 // Archive section visibility
 const showArchived = ref(false)
 
@@ -111,6 +114,7 @@ const filtersActive = computed(() =>
     selectedContext: selectedContext.value,
     dateRangeState: dateRangeState.value,
     sortOrder: sortOrder.value,
+    pinnedOnly: pinnedOnly.value,
   }),
 )
 
@@ -121,6 +125,7 @@ function clearAllFilters(): void {
   dateRangeState.value = { range: 'all' }
   sortOrder.value = FILTER_DEFAULTS.sortOrder
   saveSortOrder(FILTER_DEFAULTS.sortOrder)
+  pinnedOnly.value = FILTER_DEFAULTS.pinnedOnly
   useToast().info('已清除所有篩選')
 }
 
@@ -139,6 +144,7 @@ function applyFilters(list: Capture[]): Capture[] {
   list = filterByDateRange(list, dateRangeState.value)
   list = filterByContext(list, selectedContext.value)
   if (selectedTag.value) list = list.filter((c) => captureHasTag(c, selectedTag.value!))
+  if (pinnedOnly.value) list = list.filter((c) => pinnedIds.value.includes(c.id))
   const q = searchQuery.value.trim()
   if (q) {
     list = list
@@ -756,6 +762,14 @@ function onImport(e: Event): void {
             @click="toggleSort"
           >{{ sortOrder === 'desc' ? '↓ 新→舊' : '↑ 舊→新' }}</button>
           <button
+            class="qc-pinned-only-btn"
+            :class="{ 'is-active': pinnedOnly }"
+            title="只顯示釘選的 capture"
+            aria-label="只顯示釘選的 capture"
+            :aria-pressed="pinnedOnly"
+            @click="pinnedOnly = !pinnedOnly"
+          >📌 只看釘選</button>
+          <button
             class="qc-view-mode-btn"
             :class="{ 'qc-view-mode-btn--active': viewMode === 'timeline' }"
             :title="viewMode === 'flat' ? '切換為 Timeline（日期分組）' : '切換為 Flat（一般列表）'"
@@ -780,7 +794,7 @@ function onImport(e: Event): void {
             aria-label="清除所有篩選"
             @click="clearAllFilters"
           >清除全部篩選 ✕</button>
-          <span v-if="searchQuery || selectedTag || selectedContext || dateRangeState.range !== 'all'" class="qcl-filter-count">
+          <span v-if="searchQuery || selectedTag || selectedContext || dateRangeState.range !== 'all' || pinnedOnly" class="qcl-filter-count">
             篩選: {{ displayed.length }} / {{ activeCaptures.length }}
           </span>
         </div>
@@ -1937,6 +1951,33 @@ function onImport(e: Event): void {
   border-color: var(--color-accent, #89b4fa);
 }
 
+/* ── Pinned-only toggle button ─────────────────────────────────────────── */
+
+.qc-pinned-only-btn {
+  background: none;
+  border: 1px solid var(--color-border, #313244);
+  color: var(--color-muted, #6c7086);
+  cursor: pointer;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  padding: 0.3125rem 0.625rem;
+  border-radius: 0.375rem;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.qc-pinned-only-btn:hover {
+  color: var(--color-text, #cdd6f4);
+  border-color: var(--color-accent, #89b4fa);
+}
+
+.qc-pinned-only-btn.is-active {
+  color: var(--color-accent, #89b4fa);
+  border-color: var(--color-accent, #89b4fa);
+  background: rgba(137, 180, 250, 0.08);
+}
+
 /* ── View mode toggle button ────────────────────────────────────────────── */
 
 .qc-view-mode-btn {
@@ -2206,6 +2247,7 @@ function onImport(e: Event): void {
   .qc-context-filter,
   .qc-custom-date,
   .qc-sort-btn,
+  .qc-pinned-only-btn,
   .qc-view-mode-btn,
   .qc-jump-date,
   .qcl-row-checkbox,
