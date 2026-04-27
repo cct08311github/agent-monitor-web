@@ -16,6 +16,7 @@ import { useBulkSelect } from '@/composables/useBulkSelect'
 import { createFocusTrap } from '@/lib/focusTrap'
 import { tagCounts, captureHasTag } from '@/utils/quickCaptureTags'
 import { computeCaptureStats } from '@/utils/captureStats'
+import { computeWordStats, formatWordCount } from '@/utils/captureWordStats'
 import { computeWeeklyTrend, trendLabel } from '@/utils/captureWeeklyTrend'
 import { computeStreak } from '@/utils/captureStreak'
 import { buildExport } from '@/utils/quickCaptureExport'
@@ -126,6 +127,8 @@ function clearAllFilters(): void {
 const tags = computed(() => tagCounts(captures.value))
 
 const stats = computed(() => computeCaptureStats(captures.value, archivedIds.value, pinnedIds.value))
+
+const wordStats = computed(() => computeWordStats(captures.value))
 
 const trend = computed(() => computeWeeklyTrend(captures.value))
 
@@ -1157,6 +1160,14 @@ function onImport(e: Event): void {
             <span class="stat">釘選 {{ stats.pinned }}</span>
             <span class="stat-sep" aria-hidden="true">·</span>
             <span class="stat">{{ stats.tagCount }} 個 tag<template v-if="stats.topTag"> (top: #{{ stats.topTag.tag }} {{ stats.topTag.count }})</template></span>
+            <template v-if="wordStats.totalWords > 0">
+              <span class="stat-sep" aria-hidden="true">·</span>
+              <span
+                class="stat"
+                :title="`最長 capture：${wordStats.longestWords} 字`"
+                aria-label="`字數統計：共 ${wordStats.totalWords} 字，平均 ${wordStats.averageWords} 字`"
+              >📝 {{ formatWordCount(wordStats.totalWords) }} 字 (avg {{ wordStats.averageWords }})</span>
+            </template>
             <template v-if="trend">
               <span class="stat-sep" aria-hidden="true">·</span>
               <span
