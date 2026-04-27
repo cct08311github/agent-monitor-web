@@ -14,6 +14,28 @@ vi.mock('@/composables/useApi', () => ({
   },
 }))
 
+// Bookmarks state (mutable so individual tests can override)
+let mockBookmarks: string[] = []
+
+vi.mock('@/utils/sessionBookmarks', () => ({
+  loadBookmarks: vi.fn(() => [...mockBookmarks]),
+  toggleBookmark: vi.fn((_agentId: string, sessionId: string) => {
+    const idx = mockBookmarks.indexOf(sessionId)
+    if (idx >= 0) {
+      mockBookmarks = mockBookmarks.filter((id) => id !== sessionId)
+    } else {
+      mockBookmarks = [...mockBookmarks, sessionId]
+    }
+    return [...mockBookmarks]
+  }),
+  partition: vi.fn((items: { id: string }[], bookmarks: string[]) => {
+    const set = new Set(bookmarks)
+    const pinned = items.filter((i) => set.has(i.id))
+    const rest = items.filter((i) => !set.has(i.id))
+    return { pinned, rest }
+  }),
+}))
+
 vi.mock('@/composables/useToast', () => ({
   showToast: vi.fn(),
   useToast: () => ({ showToast: vi.fn() }),
@@ -438,6 +460,163 @@ describe('AgentDetail — skeleton loading states', () => {
     await nextTick()
     // After loading completes the skeleton should be gone
     expect(wrapper.findAll('[role="status"][aria-label="loading"]')).toHaveLength(0)
+    wrapper.unmount()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 7. Sessions bookmarked-only filter (#690)
+// ---------------------------------------------------------------------------
+
+describe('AgentDetail — sessions bookmarked-only filter', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // Reset bookmarks state before each test
+    mockBookmarks = []
+  })
+
+  function setupSessionsMocks(sessionList: { id: string; messageCount: number; lastTs?: string }[]) {
+    mockGet.mockImplementation((url: string) => {
+      if (url.includes('/sessions')) return Promise.resolve({ success: true, sessions: sessionList })
+      if (url.includes('/history')) return Promise.resolve({ success: true, history: [] })
+      return Promise.resolve({ success: true })
+    })
+  }
+
+  it('renders the bookmark-only toggle button when sessions exist', async () => {
+    setupSessionsMocks([
+      { id: 'session-aaa', messageCount: 2 },
+      { id: 'session-bbb', messageCount: 5 },
+    ])
+
+    const wrapper = mountDetail()
+    await flushPromises()
+    await nextTick()
+
+    const btn = wrapper.find('.sessions-bookmark-only-btn')
+    expect(btn.exists()).toBe(true)
+    expect(btn.text()).toContain('只看書籤')
+
+    wrapper.unmount()
+  })
+
+  it('does not render bookmark-only button when sessions list is empty', async () => {
+    setupDefaultMocks() // sessions: []
+
+    const wrapper = mountDetail()
+    await flushPromises()
+    await nextTick()
+
+    expect(wrapper.find('.sessions-bookmark-only-btn').exists()).toBe(false)
+
+    wrapper.unmount()
+  })
+
+  it('toggle on shows only bookmarked sessions', async () => {
+    // session-bbb is bookmarked
+    mockBookmarks = ['session-bbb']
+
+    setupSessionsMocks([
+      { id: 'session-aaa', messageCount: 2 },
+      { id: 'session-bbb', messageCount: 5 },
+      { id: 'session-ccc', messageCount: 1 },
+    ])
+
+    const wrapper = mountDetail()
+    await flushPromises()
+    await nextTick()
+
+    // All 3 sessions shown initially
+    expect(wrapper.findAll('.detail-card button.btn-reset').length).toBe(3)
+
+    // Click toggle
+    const btn = wrapper.find('.sessions-bookmark-only-btn')
+    await btn.trigger('click')
+    await nextTick()
+
+    // Only bookmarked session-bbb should remain
+    const sessionButtons = wrapper.findAll('.detail-card button.btn-reset')
+    expect(sessionButtons.length).toBe(1)
+    expect(sessionButtons[0].text()).toContain('session-bbb'.slice(-16))
+
+    wrapper.unmount()
+  })
+
+  it('toggle button gets .active class when enabled', async () => {
+    mockBookmarks = ['session-aaa']
+
+    setupSessionsMocks([
+      { id: 'session-aaa', messageCount: 2 },
+      { id: 'session-bbb', messageCount: 5 },
+    ])
+
+    const wrapper = mountDetail()
+    await flushPromises()
+    await nextTick()
+
+    const btn = wrapper.find('.sessions-bookmark-only-btn')
+    expect(btn.classes()).not.toContain('active')
+
+    await btn.trigger('click')
+    await nextTick()
+
+    expect(btn.classes()).toContain('active')
+
+    wrapper.unmount()
+  })
+
+  it('AND with search query — only bookmarked sessions matching search are shown', async () => {
+    // session-abc-001 and session-xyz-002 are bookmarked; session-abc-003 is NOT bookmarked
+    mockBookmarks = ['session-abc-001', 'session-xyz-002']
+
+    setupSessionsMocks([
+      { id: 'session-abc-001', messageCount: 2 },
+      { id: 'session-xyz-002', messageCount: 5 },
+      { id: 'session-abc-003', messageCount: 1 },
+    ])
+
+    const wrapper = mountDetail()
+    await flushPromises()
+    await nextTick()
+
+    // Enable bookmarked-only filter first
+    await wrapper.find('.sessions-bookmark-only-btn').trigger('click')
+    await nextTick()
+
+    // 2 bookmarked sessions: session-abc-001 and session-xyz-002
+    expect(wrapper.findAll('.detail-card button.btn-reset').length).toBe(2)
+
+    // Now type "abc" in search — should show only session-abc-001 (bookmarked AND matches abc)
+    const searchInput = wrapper.find('.session-search-input')
+    await searchInput.setValue('abc')
+    await nextTick()
+
+    const sessionButtons = wrapper.findAll('.detail-card button.btn-reset')
+    expect(sessionButtons.length).toBe(1)
+    expect(sessionButtons[0].text()).toContain('session-abc-001'.slice(-16))
+
+    wrapper.unmount()
+  })
+
+  it('shows empty state when bookmarked-only is active but no bookmarks exist', async () => {
+    mockBookmarks = [] // no bookmarks
+
+    setupSessionsMocks([
+      { id: 'session-aaa', messageCount: 2 },
+      { id: 'session-bbb', messageCount: 5 },
+    ])
+
+    const wrapper = mountDetail()
+    await flushPromises()
+    await nextTick()
+
+    // Enable bookmarked-only
+    await wrapper.find('.sessions-bookmark-only-btn').trigger('click')
+    await nextTick()
+
+    expect(wrapper.find('.sessions-empty-search').exists()).toBe(true)
+    expect(wrapper.text()).toContain('無符合 session')
+
     wrapper.unmount()
   })
 })
