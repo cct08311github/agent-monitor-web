@@ -16,6 +16,8 @@ import { useTimezone } from '@/composables/useTimezone'
 import { buildAlertsCsv } from '@/utils/alertsCsvExport'
 import type { AlertForCsv } from '@/utils/alertsCsvExport'
 import { buildAlertsJson } from '@/utils/alertsJsonExport'
+import { buildAlertsMarkdown } from '@/utils/alertsMarkdownExport'
+import type { AlertForMd } from '@/utils/alertsMarkdownExport'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -604,6 +606,27 @@ function exportAlertsJson(): void {
   showToast(`已匯出 ${alertsWithId.value.length} 筆 alert (JSON)`, 'success')
 }
 
+function exportAlertsMarkdown(): void {
+  const now = new Date()
+  const alertsForMd: AlertForMd[] = alertsWithId.value.map((a) => ({
+    id: a.id,
+    rule: a.rule,
+    message: a.message,
+    level: a.severity,
+    ts: a.ts,
+  }))
+  const snoozedIds = [...snoozes.value.keys()]
+  const { filename, content } = buildAlertsMarkdown(alertsForMd, snoozedIds, now)
+  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+  showToast(`已匯出 ${alertsForMd.length} 筆 alert (Markdown)`, 'success')
+}
+
 async function refresh(): Promise<void> {
   const tasks: Promise<void>[] = [
     fetchMetrics(),
@@ -1029,6 +1052,15 @@ onUnmounted(() => {
           @click="exportAlertsJson"
         >
           📥 匯出 JSON
+        </button>
+        <button
+          class="obs-btn obs-btn--secondary obs-btn--sm"
+          :disabled="alertsWithId.length === 0"
+          data-testid="alerts-md-export"
+          title="匯出 Alerts Markdown"
+          @click="exportAlertsMarkdown"
+        >
+          📝 匯出 Markdown
         </button>
       </div>
 
